@@ -3,7 +3,7 @@ import type { VoiceProvider } from './audioVoices';
 import { normalizeElevenLabsCheapModel } from './audioCatalog';
 import { modelSlug } from './modelSchema';
 
-/** Credits / 100 ký tự — khớp vmedia.ai khi API không trả price hợp lệ. */
+/** Credits / 100 ký tự — khớp 79ai.net khi API không trả price hợp lệ. */
 export const TTS_PRICE_PER_100: Record<VoiceProvider, number> = {
   omnivoice_local: 20,
   elevenlabs_cheap: 35,

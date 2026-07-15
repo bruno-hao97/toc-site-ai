@@ -10,7 +10,7 @@ export interface TtsModelOption {
   matchIds: string[];
 }
 
-/** Catalog ElevenLabs — khớp vmedia.ai (label + model_id thật). */
+/** Catalog ElevenLabs — khớp 79ai.net (label + model_id thật). */
 export const ELEVENLABS_MODEL_CATALOG: TtsModelOption[] = [
   {
     modelId: 'eleven_v3',
@@ -36,7 +36,7 @@ export const ELEVENLABS_MODEL_CATALOG: TtsModelOption[] = [
   },
 ];
 
-/** Catalog OpenVoice (omnivoice_local) — khớp vmedia.ai. */
+/** Catalog OpenVoice (omnivoice_local) — khớp 79ai.net. */
 export const OPENVOICE_MODEL_CATALOG: TtsModelOption[] = [
   {
     modelId: 'omnivoice_v1',
@@ -50,7 +50,7 @@ export const OPENVOICE_MODEL_CATALOG: TtsModelOption[] = [
   },
 ];
 
-/** Catalog Minimax — khớp vmedia.ai + fallback legacy. */
+/** Catalog Minimax — khớp 79ai.net + fallback legacy. */
 export const MINIMAX_MODEL_CATALOG: TtsModelOption[] = [
   {
     modelId: 'minimax_speech_2_8_hd',
@@ -84,7 +84,7 @@ export interface TtsLanguageOption {
   labelKey: TranslationKey;
 }
 
-/** Ngôn ngữ cố định — khớp vmedia.ai (không lấy từ verified_languages). */
+/** Ngôn ngữ cố định — khớp 79ai.net (không lấy từ verified_languages). */
 export const TTS_LANGUAGE_OPTIONS: TtsLanguageOption[] = [
   { value: 'auto', labelKey: 'audio.lang.auto' },
   { value: 'vi', labelKey: 'audio.lang.vi' },

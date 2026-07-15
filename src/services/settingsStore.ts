@@ -6,7 +6,7 @@ const KEYS = {
 } as const;
 
 /** Domain Gommo cho login, gen media, feed, me… */
-export const DEFAULT_DOMAIN = 'vmedia.ai';
+export const DEFAULT_DOMAIN = '79ai.net';
 /** Domain Gommo cho plans + create_payment (cùng DEFAULT_DOMAIN) */
 export const PRICING_DOMAIN = DEFAULT_DOMAIN;
 /** URL site public (Vercel) */
@@ -14,19 +14,21 @@ export const APP_SITE_URL = 'https://trungtamai.vn';
 export const DEFAULT_PROJECT_ID = 'default';
 
 const LEGACY_DOMAINS = new Set([
-  '79ai.net',
+  'vmedia.ai',
+  'www.vmedia.ai',
   '79ai.com',
   'www.79ai.net',
   'trungtamai.vn',
   'www.trungtamai.vn',
 ]);
 
-/** Chuẩn hóa domain cũ (79ai, trungtamai…) → vmedia.ai. */
+/** Chuẩn hóa domain cũ (vmedia, trungtamai…) → 79ai.net. */
 export function normalizeDomain(domain?: string | null): string {
   const trimmed = (domain || '').trim();
   if (!trimmed) return DEFAULT_DOMAIN;
   const lower = trimmed.toLowerCase().replace(/^www\./, '');
-  if (LEGACY_DOMAINS.has(lower) || lower.endsWith('.79ai.net')) return DEFAULT_DOMAIN;
+  if (lower === '79ai.net') return DEFAULT_DOMAIN;
+  if (LEGACY_DOMAINS.has(lower) || lower.endsWith('.vmedia.ai')) return DEFAULT_DOMAIN;
   return trimmed;
 }
 
