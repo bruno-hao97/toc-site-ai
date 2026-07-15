@@ -1,0 +1,8 @@
+[build]
+builder = "nixpacks"
+buildCommand = "npm install && npm run build:server"
+
+[deploy]
+startCommand = "node dist-server/index.js"
+healthcheckPath = "/api/health"
+restartPolicyType = "on_failure"

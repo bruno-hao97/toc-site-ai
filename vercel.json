@@ -1,0 +1,10 @@
+{
+  "rewrites": [
+    { "source": "/api/payos/:path*", "destination": "https://api.trungtamai.vn/api/payos/:path*" },
+    { "source": "/v2/:path*", "destination": "https://v2.api.gommo.net/:path*" },
+    { "source": "/api/apps/go-mmo/:path*", "destination": "https://api.gommo.net/api/apps/go-mmo/:path*" },
+    { "source": "/api/v2/:path*", "destination": "https://api.gommo.net/api/v2/:path*" },
+    { "source": "/ai/:path*", "destination": "https://api.gommo.net/ai/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

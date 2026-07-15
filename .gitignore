@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-server/
+data/
+.env
+.env.local
+.env*.local
+*.env.local
+*.db
+
+# Reference-only Next.js project (has its own git history)
+landing/
