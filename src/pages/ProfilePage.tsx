@@ -148,8 +148,8 @@ export default function ProfilePage() {
     setLoading(true);
     try {
       const s = await refreshSession();
-      setMe(s.upstream_me);
-      setCredits(s.upstream_me.balancesInfo?.credits_ai ?? 0);
+      setMe(s.upstream_me ?? null);
+      setCredits(s.user?.credits ?? s.upstream_me?.balancesInfo?.credits_ai ?? 0);
     } finally {
       setLoading(false);
     }

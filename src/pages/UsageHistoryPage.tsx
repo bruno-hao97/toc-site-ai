@@ -185,7 +185,7 @@ export default function UsageHistoryPage() {
     setLoading(true);
     setError('');
     try {
-      if (auth?.access_token) {
+      if (auth?.access_token && auth.domain) {
         const res = await fetchUpstreamUsageHistory(auth.access_token, auth.domain, {});
         if (res.items.length > 0) {
           setItems(res.items);

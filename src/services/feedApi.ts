@@ -8,7 +8,7 @@ async function feedRequest<T extends { success?: boolean; message?: string }>(
   fields: Record<string, string>,
 ): Promise<T> {
   const auth = loadAuth();
-  if (!auth?.access_token) throw new UpstreamMeError('Chưa đăng nhập', 401);
+  if (!auth?.access_token || !auth.domain) throw new UpstreamMeError('Chưa đăng nhập', 401);
   const body = new URLSearchParams({
     access_token: auth.access_token.trim(),
     domain: auth.domain.trim(),

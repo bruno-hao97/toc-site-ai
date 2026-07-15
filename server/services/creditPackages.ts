@@ -61,3 +61,12 @@ export const CREDIT_PACKAGES: readonly CreditPackage[] = [
 export function getCreditPackage(packageId: string): CreditPackage | undefined {
   return CREDIT_PACKAGES.find((item) => item.id === packageId);
 }
+
+/** Credits the buyer receives for a topup package (amountVnd + bonus%). */
+export function creditsForTopupPackage(packageId: string): number | undefined {
+  const creditPackage = getCreditPackage(packageId);
+  if (!creditPackage) return undefined;
+  return Math.round(
+    (creditPackage.amountVnd * (100 + creditPackage.bonusPercent)) / 100,
+  );
+}

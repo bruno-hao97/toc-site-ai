@@ -1,0 +1,2 @@
+# Ignore runtime secrets uploaded to VPS
+server/php-bridge/config.local.php

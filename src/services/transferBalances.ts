@@ -1,79 +1,104 @@
-import { loadAuth } from './authStore';
-import { gommoDeviceFields } from './gommoDevice';
-import { GOMMO_AUTH_BASE, GOMMO_AUTH_PATH } from './upstreamMe';
+import { loadAuth, type PlatformUser } from './authStore';
 
-export const MIN_TRANSFER_CREDIT = 10_000;
+export const MIN_TRANSFER_CREDIT = 1_000;
 export const MAX_TRANSFER_CREDIT = 20_000_000;
 
-export interface SendBalancesInput {
-  username: string;
+export interface PlatformTransferInput {
+  to: string;
   value: number;
   message: string;
-  type?: string;
 }
 
-export interface SendBalancesResult {
-  message?: string;
-  runtime?: number;
+export interface PlatformTransferResult {
+  message: string;
+  amount: number;
+  transferId?: string;
+  from?: PlatformUser;
+  to?: { id: string; email: string; name: string | null; credits: number };
 }
 
-function normalizeTransferError(message?: string): string {
-  if (!message) return 'Chuyển credit thất bại';
-  if (/domain/i.test(message)) {
-    return 'Bạn cần truy cập đúng domain đã đăng ký để chuyển credit.';
-  }
-  return message;
-}
-
-export async function sendBalances(input: SendBalancesInput): Promise<SendBalancesResult> {
+async function creditsRequest(
+  path: '/api/credits/transfer' | '/api/credits/grant',
+  input: PlatformTransferInput,
+): Promise<PlatformTransferResult> {
   const auth = loadAuth();
-  if (!auth?.access_token) throw new Error('Chưa đăng nhập');
+  if (!auth?.platform_token) {
+    throw new Error('Chưa đăng nhập tài khoản hệ thống');
+  }
 
-  const username = input.username.trim();
+  const to = input.to.trim();
   const message = input.message.trim();
   const value = Math.floor(input.value);
 
-  if (!username) throw new Error('Nhập username người nhận');
+  if (!to) throw new Error('Nhập email hoặc SĐT người nhận');
   if (!message) throw new Error('Lời nhắn là bắt buộc');
-  if (value < MIN_TRANSFER_CREDIT || value > MAX_TRANSFER_CREDIT) {
-    throw new Error(
-      `Số credit phải từ ${MIN_TRANSFER_CREDIT.toLocaleString('vi-VN')} đến ${MAX_TRANSFER_CREDIT.toLocaleString('vi-VN')}`,
-    );
+  if (path === '/api/credits/transfer') {
+    if (value < MIN_TRANSFER_CREDIT || value > MAX_TRANSFER_CREDIT) {
+      throw new Error(
+        `Số credit phải từ ${MIN_TRANSFER_CREDIT.toLocaleString('vi-VN')} đến ${MAX_TRANSFER_CREDIT.toLocaleString('vi-VN')}`,
+      );
+    }
+  } else if (value < 1 || value > MAX_TRANSFER_CREDIT) {
+    throw new Error(`Số credit phải từ 1 đến ${MAX_TRANSFER_CREDIT.toLocaleString('vi-VN')}`);
   }
 
-  const body = new URLSearchParams({
-    access_token: auth.access_token.trim(),
-    domain: auth.domain.trim(),
-    type: input.type || 'credits_ai',
-    value: String(value),
-    username,
-    message,
-    ...gommoDeviceFields(),
-  }).toString();
-
-  const res = await fetch(`${GOMMO_AUTH_BASE}${GOMMO_AUTH_PATH}/users/sendBalances`, {
+  const res = await fetch(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${auth.platform_token}`,
+    },
+    body: JSON.stringify({ to, amount: value, message }),
   });
 
   const text = await res.text();
-  let raw: Record<string, unknown>;
+  let parsed: {
+    success?: boolean;
+    message?: string;
+    data?: PlatformTransferResult & { message?: string };
+  };
   try {
-    raw = JSON.parse(text) as Record<string, unknown>;
+    parsed = JSON.parse(text) as typeof parsed;
   } catch {
     throw new Error(text || `HTTP ${res.status}`);
   }
 
-  if (raw.error) {
-    throw new Error(normalizeTransferError(String(raw.message || '')));
-  }
-  if (!res.ok) {
-    throw new Error(normalizeTransferError(String(raw.message || `HTTP ${res.status}`)));
+  if (!res.ok || !parsed.success || !parsed.data) {
+    throw new Error(parsed.message || 'Giao dịch credit thất bại');
   }
 
   return {
-    message: typeof raw.message === 'string' ? raw.message : 'Chuyển credit thành công',
-    runtime: typeof raw.runtime === 'number' ? raw.runtime : undefined,
+    message: parsed.data.message || parsed.message || 'Thành công',
+    amount: parsed.data.amount ?? value,
+    transferId: parsed.data.transferId,
+    from: parsed.data.from,
+    to: parsed.data.to,
   };
+}
+
+/** User → user: trừ credit người gửi. */
+export async function transferPlatformCredits(
+  input: PlatformTransferInput,
+): Promise<PlatformTransferResult> {
+  return creditsRequest('/api/credits/transfer', input);
+}
+
+/** Admin → user: cấp từ quỹ (không trừ ví admin). */
+export async function grantPlatformCredits(
+  input: PlatformTransferInput,
+): Promise<PlatformTransferResult> {
+  return creditsRequest('/api/credits/grant', input);
+}
+
+/** @deprecated dùng transferPlatformCredits */
+export async function sendBalances(input: {
+  username: string;
+  value: number;
+  message: string;
+}): Promise<PlatformTransferResult> {
+  return transferPlatformCredits({
+    to: input.username,
+    value: input.value,
+    message: input.message,
+  });
 }

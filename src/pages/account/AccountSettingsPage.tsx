@@ -47,7 +47,7 @@ export default function AccountSettingsPage() {
     try {
       const message = await gommoChangePassword({
         accessToken: auth.access_token,
-        domain: auth.domain,
+        domain: auth.domain || '',
         currentPassword: currentPw,
         newPassword: newPw,
       });

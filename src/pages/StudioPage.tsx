@@ -1632,7 +1632,7 @@ export default function StudioPage({
   async function refreshCreditsAfterJob() {
     try {
       const refreshed = await refreshSession();
-      setCredits(refreshed.upstream_me.balancesInfo?.credits_ai ?? credits);
+      setCredits(refreshed.user?.credits ?? refreshed.upstream_me?.balancesInfo?.credits_ai ?? credits);
     } catch {
       /* ignore */
     }

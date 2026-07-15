@@ -1,8 +1,9 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, KeyRound, KeySquare, Lock, User, X } from 'lucide-react';
-import { loginWithGommoToken } from '../services/authStore';
-import { gommoLoginWithPassword, gommoResetPassword, GommoAuthError } from '../services/gommoAuth';
+import { loginWithGommoToken, loginWithPlatformSession } from '../services/authStore';
+import { gommoResetPassword, GommoAuthError } from '../services/gommoAuth';
+import { platformLogin, PlatformAuthError } from '../services/platformAuth';
 import { UpstreamMeError } from '../services/upstreamMe';
 import { APP_SITE_URL, DEFAULT_DOMAIN } from '../services/settingsStore';
 
@@ -34,11 +35,13 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const token = await gommoLoginWithPassword(email, password, DEFAULT_DOMAIN);
-      await loginWithGommoToken(token, DEFAULT_DOMAIN);
+      const { token, user } = await platformLogin(email, password);
+      await loginWithPlatformSession(token, user);
       navigate('/home');
     } catch (err) {
-      setError(err instanceof GommoAuthError || err instanceof Error ? err.message : String(err));
+      setError(
+        err instanceof PlatformAuthError || err instanceof Error ? err.message : String(err),
+      );
     } finally {
       setLoading(false);
     }

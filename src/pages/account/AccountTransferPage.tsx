@@ -1,26 +1,39 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeftRight, Coins, MessageSquare, User } from 'lucide-react';
-import { notifyCreditsUpdated, refreshSession } from '../../services/authStore';
 import {
+  getCreditsAi,
+  loadAuth,
+  loginWithPlatformSession,
+  notifyCreditsUpdated,
+  refreshSession,
+} from '../../services/authStore';
+import {
+  grantPlatformCredits,
   MAX_TRANSFER_CREDIT,
   MIN_TRANSFER_CREDIT,
-  sendBalances,
+  transferPlatformCredits,
 } from '../../services/transferBalances';
 
 const SAFETY_RULES = [
   'Giao dịch chuyển credit không thể hoàn tác sau khi thành công.',
-  'Kiểm tra kỹ username người nhận để tránh chuyển nhầm.',
-  'Không chuyển tiền cho người lạ hoặc theo yêu cầu từ nguồn không đáng tin.',
-  `Hạn mức tối thiểu ${MIN_TRANSFER_CREDIT.toLocaleString('vi-VN')} và tối đa ${MAX_TRANSFER_CREDIT.toLocaleString('vi-VN')} credit mỗi lần.`,
+  'Kiểm tra kỹ email / SĐT người nhận (tài khoản trên hệ thống của bạn).',
+  'Không chuyển credit cho người lạ hoặc theo yêu cầu từ nguồn không đáng tin.',
+  `Chuyển từ ví: tối thiểu ${MIN_TRANSFER_CREDIT.toLocaleString('vi-VN')} · tối đa ${MAX_TRANSFER_CREDIT.toLocaleString('vi-VN')} credit.`,
 ] as const;
 
 export default function AccountTransferPage() {
-  const [username, setUsername] = useState('');
-  const [value, setValue] = useState('10000');
+  const auth = loadAuth();
+  const isAdmin = Boolean(auth?.user?.isAdmin);
+  const [mode, setMode] = useState<'transfer' | 'grant'>(isAdmin ? 'grant' : 'transfer');
+  const [to, setTo] = useState('');
+  const [value, setValue] = useState(isAdmin ? '10000' : '1000');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const minAmount = mode === 'grant' ? 1 : MIN_TRANSFER_CREDIT;
+  const balance = useMemo(() => getCreditsAi(), [success, loading]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -28,15 +41,21 @@ export default function AccountTransferPage() {
     setSuccess('');
     setLoading(true);
     try {
-      const result = await sendBalances({
-        username,
-        value: Number(value),
-        message,
-      });
-      await refreshSession();
+      const input = { to, value: Number(value), message };
+      const result =
+        mode === 'grant'
+          ? await grantPlatformCredits(input)
+          : await transferPlatformCredits(input);
+
+      const session = await refreshSession();
+      if (session.platform_token && session.user) {
+        await loginWithPlatformSession(session.platform_token, session.user);
+      }
       notifyCreditsUpdated();
-      setSuccess(result.message || 'Chuyển credit thành công');
-      setUsername('');
+      setSuccess(
+        `${result.message}: ${result.amount.toLocaleString('vi-VN')} credit → ${result.to?.email || to}`,
+      );
+      setTo('');
       setMessage('');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -48,19 +67,44 @@ export default function AccountTransferPage() {
   return (
     <div className="account-settings">
       <h1 className="account-content-title">↔ CHUYỂN TIỀN</h1>
+      <p className="muted" style={{ marginBottom: '1rem' }}>
+        Số dư của bạn: <strong>{balance.toLocaleString('vi-VN')}</strong> credit
+        {isAdmin ? ' · Bạn đang có quyền admin' : ''}
+      </p>
 
       <div className="account-transfer-grid">
         <section className="panel account-card account-transfer-form-card">
+          {isAdmin ? (
+            <div className="form" style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className={`btn ${mode === 'grant' ? 'primary' : ''}`}
+                onClick={() => setMode('grant')}
+                disabled={loading}
+              >
+                Cấp từ quỹ admin
+              </button>
+              <button
+                type="button"
+                className={`btn ${mode === 'transfer' ? 'primary' : ''}`}
+                onClick={() => setMode('transfer')}
+                disabled={loading}
+              >
+                Chuyển từ ví của tôi
+              </button>
+            </div>
+          ) : null}
+
           <form className="form account-form account-transfer-form" onSubmit={handleSubmit}>
             <label className="field">
               <span className="label">
                 <User size={14} aria-hidden />
-                USERNAME NGƯỜI NHẬN
+                EMAIL / SĐT NGƯỜI NHẬN
               </span>
               <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Nhập username hoặc số điện thoại"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                placeholder="user@email.com hoặc 09xxxxxxxx"
                 autoComplete="off"
                 disabled={loading}
               />
@@ -73,17 +117,18 @@ export default function AccountTransferPage() {
               </span>
               <input
                 type="number"
-                min={MIN_TRANSFER_CREDIT}
+                min={minAmount}
                 max={MAX_TRANSFER_CREDIT}
                 step={1000}
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
-                placeholder={String(MIN_TRANSFER_CREDIT)}
+                placeholder={String(minAmount)}
                 disabled={loading}
               />
               <p className="account-transfer-limits">
-                Min: {MIN_TRANSFER_CREDIT.toLocaleString('vi-VN')} · Max:{' '}
-                {MAX_TRANSFER_CREDIT.toLocaleString('vi-VN')}
+                {mode === 'grant'
+                  ? 'Cấp từ quỹ hệ thống — không trừ ví admin'
+                  : `Min: ${MIN_TRANSFER_CREDIT.toLocaleString('vi-VN')} · Max: ${MAX_TRANSFER_CREDIT.toLocaleString('vi-VN')}`}
               </p>
             </label>
 
@@ -107,7 +152,7 @@ export default function AccountTransferPage() {
 
             <button type="submit" className="btn account-transfer-submit" disabled={loading}>
               <ArrowLeftRight size={16} aria-hidden />
-              {loading ? 'Đang chuyển…' : 'CHUYỂN NGAY'}
+              {loading ? 'Đang xử lý…' : mode === 'grant' ? 'CẤP CREDIT' : 'CHUYỂN NGAY'}
             </button>
           </form>
         </section>

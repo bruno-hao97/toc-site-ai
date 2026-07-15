@@ -6,12 +6,28 @@ const appUrl = (process.env.APP_URL || 'http://localhost:5173').replace(/\/$/, '
 export const config = {
   port: Number(process.env.PORT) || 3001,
   appUrl,
+  jwt: {
+    secret: (process.env.JWT_SECRET || 'dev-change-me').trim(),
+    expiresIn: (process.env.JWT_EXPIRES_IN || '7d').trim(),
+  },
+  auth: {
+    signupBonusCredits: Number(process.env.SIGNUP_BONUS_CREDITS) || 0,
+    /** Khi MySQL chỉ mở localhost trên VPS — proxy auth qua PHP bridge */
+    bridgeUrl: (process.env.AUTH_BRIDGE_URL || '').trim().replace(/\/$/, ''),
+  },
+  db: {
+    host: (process.env.DB_HOST || '').trim(),
+    port: Number(process.env.DB_PORT) || 3306,
+    user: (process.env.DB_USER || '').trim(),
+    password: process.env.DB_PASSWORD || '',
+    database: (process.env.DB_NAME || process.env.DB_DATABASE || '').trim(),
+  },
   gommo: {
     baseUrl: process.env.GOMMO_API_BASE_URL || process.env.GOMMO_BASE_URL || 'https://v2.api.gommo.net',
     authBaseUrl: process.env.GOMMO_AUTH_BASE_URL || 'https://api.gommo.net',
     authPath: process.env.GOMMO_AUTH_PATH || '/api/apps/go-mmo',
     accessToken: (process.env.GOMMO_ACCESS_TOKEN || '').trim(),
-    apiDomain: (process.env.GOMMO_API_DOMAIN || 'vmedia.ai').trim(),
+    apiDomain: (process.env.GOMMO_API_DOMAIN || process.env.GOMMO_DOMAIN || 'vmedia.ai').trim(),
   },
   topup: {
     minVnd: Number(process.env.TOPUP_MIN_VND) || 10_000,

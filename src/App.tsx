@@ -78,7 +78,9 @@ function AppHeader() {
   function refreshCredits() {
     if (!loadAuth()) return;
     refreshSession()
-      .then((s) => setCredits(s.upstream_me.balancesInfo?.credits_ai ?? 0))
+      .then((s) =>
+        setCredits(s.user?.credits ?? s.upstream_me?.balancesInfo?.credits_ai ?? 0),
+      )
       .catch((err) => {
         if (err instanceof UpstreamMeError && (err.status === 401 || err.status === 403)) {
           clearAuth();

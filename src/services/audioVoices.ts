@@ -274,7 +274,7 @@ async function postAudioApi(body: URLSearchParams): Promise<Record<string, unkno
 
 function baseAudioFields(locale: AppLocale, projectId?: string): URLSearchParams {
   const auth = loadAuth();
-  if (!auth?.access_token) throw new UpstreamMeError('Chưa đăng nhập', 401);
+  if (!auth?.access_token || !auth.domain) throw new UpstreamMeError('Chưa đăng nhập', 401);
 
   return new URLSearchParams({
     access_token: auth.access_token.trim(),

@@ -1,8 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { loginWithGommoToken } from '../services/authStore';
-import { gommoRegisterWithPassword, GommoAuthError } from '../services/gommoAuth';
-import { DEFAULT_DOMAIN } from '../services/settingsStore';
+import { loginWithPlatformSession } from '../services/authStore';
+import { platformRegister, PlatformAuthError } from '../services/platformAuth';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -22,17 +21,16 @@ export default function RegisterPage() {
     setLoading(true);
     setError('');
     try {
-      const token = await gommoRegisterWithPassword({
+      const { token, user } = await platformRegister({
         email,
         password,
         name: name.trim() || undefined,
-        phone: phone.trim(),
-        domain: DEFAULT_DOMAIN,
+        phone: phone.trim() || undefined,
       });
-      await loginWithGommoToken(token, DEFAULT_DOMAIN);
+      await loginWithPlatformSession(token, user);
       navigate('/home');
     } catch (err) {
-      setError(err instanceof GommoAuthError || err instanceof Error ? err.message : String(err));
+      setError(err instanceof PlatformAuthError || err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
