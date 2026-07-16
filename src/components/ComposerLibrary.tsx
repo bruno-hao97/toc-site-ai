@@ -385,7 +385,7 @@ export default function ComposerLibrary({
       )}
       <div ref={sentinelRef} className="clib-sentinel" />
 
-      {previewIndex != null && kind !== 'unsupported' && (
+      {previewIndex != null && (
         <ComposerLibraryPreviewModal
           items={sortedItems}
           index={previewIndex}

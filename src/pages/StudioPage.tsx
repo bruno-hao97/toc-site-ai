@@ -57,11 +57,11 @@ import {
 } from '../constants/studioTypes';
 import {
   getCreditsAi,
-  getGommoClient,
   loadAuth,
   notifyCreditsUpdated,
   refreshSession,
 } from '../services/authStore';
+import { getJobClient } from '../services/platformJobClient';
 
 import {
   addLocalJob,
@@ -817,7 +817,7 @@ export default function StudioPage({
   const resizingRef = useRef(false);
   const sideWidthRef = useRef(sideWidth);
 
-  const client = useMemo(() => (loadAuth() ? getGommoClient() : null), []);
+  const client = useMemo(() => (loadAuth() ? getJobClient() : null), []);
   const auth = loadAuth();
   // Chỉ /video mới có chế độ Motion; tab chỉ hiện khi list có ít nhất 1 model motion.
   const hasMotionModels = useMemo(

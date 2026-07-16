@@ -1,0 +1,334 @@
+<?php
+declare(strict_types=1);
+
+function gommo_cfg(): array
+{
+    $cfg = platform_config();
+    return [
+        'token' => (string) ($cfg['gommo_access_token'] ?? ''),
+        'domain' => (string) ($cfg['gommo_domain'] ?? '79ai.net'),
+        'project_id' => (string) ($cfg['gommo_project_id'] ?? 'default'),
+        'api_base' => rtrim((string) ($cfg['gommo_api_base'] ?? 'https://v2.api.gommo.net'), '/'),
+    ];
+}
+
+function gommo_post_form(string $path, array $fields): array
+{
+    $g = gommo_cfg();
+    if ($g['token'] === '') {
+        throw new RuntimeException('Chưa cấu hình gommo_access_token trên server');
+    }
+
+    $fields['domain'] = $fields['domain'] ?? $g['domain'];
+    if (!isset($fields['project_id']) || $fields['project_id'] === '') {
+        $fields['project_id'] = $g['project_id'];
+    }
+    $fields['access_token'] = $g['token'];
+
+    $url = $g['api_base'] . $path;
+    $body = http_build_query(flatten_form_fields($fields));
+
+    $ch = curl_init($url);
+    if ($ch === false) {
+        throw new RuntimeException('curl init failed');
+    }
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $body,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 120,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . $g['token'],
+            'Content-Type: application/x-www-form-urlencoded',
+            'Accept: application/json',
+        ],
+    ]);
+    $raw = curl_exec($ch);
+    $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+
+    if ($raw === false) {
+        throw new RuntimeException('Gommo request failed: ' . $err);
+    }
+
+    $parsed = json_decode($raw, true);
+    if (!is_array($parsed)) {
+        throw new RuntimeException('Gommo response không phải JSON: ' . substr($raw, 0, 200));
+    }
+    if ($status >= 400 || ($parsed['success'] ?? true) === false) {
+        $msg = (string) ($parsed['message'] ?? ('HTTP ' . $status));
+        throw new RuntimeException($msg);
+    }
+
+    return $parsed;
+}
+
+/** @param mixed $value */
+function flatten_form_fields($value, string $prefix = ''): array
+{
+    $out = [];
+    if (!is_array($value)) {
+        if ($value !== null && $value !== '') {
+            $out[$prefix] = $value;
+        }
+        return $out;
+    }
+    foreach ($value as $key => $item) {
+        $k = $prefix === '' ? (string) $key : $prefix . '[' . $key . ']';
+        if (is_array($item)) {
+            $out = array_merge($out, flatten_form_fields($item, $k));
+        } elseif ($item !== null && $item !== '') {
+            $out[$k] = $item;
+        }
+    }
+    return $out;
+}
+
+function extract_provider_job_id(array $envelope): ?string
+{
+    $data = $envelope['data'] ?? [];
+    if (!is_array($data)) {
+        return null;
+    }
+    foreach (['id_base', 'job_id', 'id'] as $key) {
+        if (!empty($data[$key])) {
+            return (string) $data[$key];
+        }
+    }
+    return null;
+}
+
+function extract_result_url(array $envelope): ?string
+{
+    $data = $envelope['data'] ?? [];
+    $raw = $envelope['raw'] ?? [];
+    if (!is_array($data)) {
+        $data = [];
+    }
+    if (!is_array($raw)) {
+        $raw = [];
+    }
+    $candidates = [
+        $data['result_url'] ?? null,
+        $raw['imageInfo']['result_url'] ?? null,
+        $raw['videoInfo']['result_url'] ?? null,
+        $raw['videoInfo']['url'] ?? null,
+    ];
+    foreach ($candidates as $url) {
+        if (is_string($url) && preg_match('/^https?:\\/\\//i', $url)) {
+            return $url;
+        }
+    }
+    return null;
+}
+
+function extract_status(array $envelope): string
+{
+    $data = $envelope['data'] ?? [];
+    $raw = $envelope['raw'] ?? [];
+    if (is_array($data) && !empty($data['status'])) {
+        return (string) $data['status'];
+    }
+    if (is_array($raw)) {
+        if (!empty($raw['imageInfo']['status'])) {
+            return (string) $raw['imageInfo']['status'];
+        }
+        if (!empty($raw['videoInfo']['status'])) {
+            return (string) $raw['videoInfo']['status'];
+        }
+    }
+    return '';
+}
+
+function image_job_cost(): int
+{
+    $cfg = platform_config();
+    return max(1, (int) ($cfg['image_job_cost'] ?? 10));
+}
+
+/** @return list<array<string, mixed>> */
+function gommo_models_list(array $envelope): array
+{
+    $data = $envelope['data'] ?? null;
+    if (is_array($data) && isset($data['models']) && is_array($data['models'])) {
+        return array_values($data['models']);
+    }
+    if (is_array($data) && $data !== [] && array_keys($data) === range(0, count($data) - 1)) {
+        return $data;
+    }
+    return [];
+}
+
+function gommo_model_id(array $model): string
+{
+    foreach (['model', 'slug', 'model_id', 'id'] as $key) {
+        if (!empty($model[$key]) && is_string($model[$key])) {
+            return $model[$key];
+        }
+        if (!empty($model[$key]) && (is_int($model[$key]) || is_float($model[$key]))) {
+            return (string) $model[$key];
+        }
+    }
+    return '';
+}
+
+function gommo_fetch_models(string $type): array
+{
+    $g = gommo_cfg();
+    $path = '/ai/models?type=' . rawurlencode($type) . '&domain=' . rawurlencode($g['domain']);
+    $envelope = gommo_post_form($path, [
+        'type' => $type,
+        'domain' => $g['domain'],
+    ]);
+    return gommo_models_list($envelope);
+}
+
+/**
+ * Giá theo mode + resolution — cùng logic Studio resolveModelPrice.
+ *
+ * @param array<string, mixed> $model
+ */
+function resolve_model_price(array $model, string $mode, string $resolution): int
+{
+    $eq = static function (?string $a, ?string $b): bool {
+        return strtolower((string) ($a ?? '')) === strtolower((string) ($b ?? ''));
+    };
+
+    $base = isset($model['price']) ? (int) $model['price'] : 0;
+    $prices = $model['prices'] ?? null;
+    if (!is_array($prices) || $prices === []) {
+        return max(0, $base);
+    }
+
+    $hit = null;
+    foreach ($prices as $p) {
+        if (!is_array($p)) {
+            continue;
+        }
+        $pMode = isset($p['mode']) ? (string) $p['mode'] : null;
+        $pRes = isset($p['resolution']) ? (string) $p['resolution'] : null;
+        if ($eq($pMode, $mode) && $eq($pRes, $resolution)) {
+            $hit = $p;
+            break;
+        }
+    }
+    if ($hit === null) {
+        foreach ($prices as $p) {
+            if (!is_array($p)) {
+                continue;
+            }
+            $pMode = $p['mode'] ?? null;
+            $pRes = isset($p['resolution']) ? (string) $p['resolution'] : null;
+            if ($pMode === null && $eq($pRes, $resolution)) {
+                $hit = $p;
+                break;
+            }
+        }
+    }
+    if ($hit === null) {
+        foreach ($prices as $p) {
+            if (!is_array($p)) {
+                continue;
+            }
+            $pMode = isset($p['mode']) ? (string) $p['mode'] : null;
+            $pRes = $p['resolution'] ?? null;
+            if ($pRes === null && $eq($pMode, $mode)) {
+                $hit = $p;
+                break;
+            }
+        }
+    }
+    if ($hit === null) {
+        foreach ($prices as $p) {
+            if (!is_array($p)) {
+                continue;
+            }
+            $pRes = isset($p['resolution']) ? (string) $p['resolution'] : null;
+            if ($eq($pRes, $resolution)) {
+                $hit = $p;
+                break;
+            }
+        }
+    }
+    if ($hit === null) {
+        foreach ($prices as $p) {
+            if (!is_array($p)) {
+                continue;
+            }
+            $pMode = isset($p['mode']) ? (string) $p['mode'] : null;
+            if ($eq($pMode, $mode)) {
+                $hit = $p;
+                break;
+            }
+        }
+    }
+
+    if (is_array($hit) && isset($hit['price'])) {
+        return max(0, (int) $hit['price']);
+    }
+    if ($base > 0) {
+        return $base;
+    }
+    $first = $prices[0] ?? null;
+    if (is_array($first) && isset($first['price'])) {
+        return max(0, (int) $first['price']);
+    }
+    return 0;
+}
+
+/**
+ * Giá job từ catalog Gommo. Fallback image_job_cost nếu không tìm thấy.
+ *
+ * @param array<string, mixed> $fields
+ */
+function resolve_job_cost(string $type, string $modelId, array $fields): int
+{
+    $mode = trim((string) ($fields['mode'] ?? ''));
+    $resolution = trim((string) ($fields['resolution'] ?? ''));
+
+    try {
+        $models = gommo_fetch_models($type);
+        $needle = strtolower($modelId);
+        foreach ($models as $model) {
+            if (!is_array($model)) {
+                continue;
+            }
+            $id = strtolower(gommo_model_id($model));
+            if ($id === '' || $id !== $needle) {
+                continue;
+            }
+            $price = resolve_model_price($model, $mode, $resolution);
+            if ($price > 0) {
+                return $price;
+            }
+            break;
+        }
+    } catch (Throwable $e) {
+        // fallback below
+    }
+
+    return image_job_cost();
+}
+
+function refund_user_credits(PDO $pdo, string $userId, int $amount): void
+{
+    if ($amount <= 0) {
+        return;
+    }
+    $pdo->prepare('UPDATE users SET credits = credits + ? WHERE id = ?')->execute([$amount, $userId]);
+}
+
+function charge_user_credits(PDO $pdo, string $userId, int $amount): void
+{
+    $lock = $pdo->prepare('SELECT credits FROM users WHERE id = ? FOR UPDATE');
+    $lock->execute([$userId]);
+    $row = $lock->fetch();
+    if (!$row) {
+        throw new RuntimeException('User không tồn tại');
+    }
+    if ((int) $row['credits'] < $amount) {
+        throw new RuntimeException('Số dư credit không đủ (cần ' . number_format($amount) . ')');
+    }
+    $pdo->prepare('UPDATE users SET credits = credits - ? WHERE id = ?')->execute([$amount, $userId]);
+}

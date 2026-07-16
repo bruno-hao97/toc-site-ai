@@ -1,4 +1,5 @@
 import { GommoClient, type JobType, type PollMedia } from './api';
+import type { PlatformJobClient } from './platformJobClient';
 import {
   classifyGatewayStatus,
   extractPollSnapshot,
@@ -28,7 +29,7 @@ const POLL_INTERVAL_MS = 3500;
 const POLL_MAX_ATTEMPTS = 80;
 
 export async function startPolling(
-  client: GommoClient,
+  client: GommoClient | PlatformJobClient,
   jobId: string,
   media: PollMedia,
   {
@@ -75,7 +76,7 @@ export async function startPolling(
 }
 
 export async function createJobAndPoll(
-  client: GommoClient,
+  client: GommoClient | PlatformJobClient,
   type: JobType,
   modelId: string,
   fields: Record<string, unknown>,

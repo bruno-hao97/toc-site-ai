@@ -71,7 +71,7 @@ export const AGENT_CHAT_MODELS = [
 
 export type AgentChatModelId = (typeof AGENT_CHAT_MODELS)[number]['id'];
 
-export function resolveAgentChatModel(modelId?: string): AgentChatModel {
+export function resolveAgentChatModel(modelId?: string): (typeof AGENT_CHAT_MODELS)[number] {
   return AGENT_CHAT_MODELS.find((m) => m.id === modelId) ?? AGENT_CHAT_MODELS[1];
 }
 

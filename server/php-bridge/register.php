@@ -21,14 +21,15 @@ if (strlen($password) < 6) {
 }
 
 try {
-    $pdo = db($CONFIG);
+    $cfg = platform_config();
+    $pdo = db();
     if (find_user_by_email($pdo, $email)) {
         json_out(409, ['success' => false, 'message' => 'Email đã được đăng ký']);
     }
 
     $id = uuid_v4();
     $hash = password_hash($password, PASSWORD_BCRYPT);
-    $credits = (int) ($CONFIG['signup_bonus_credits'] ?? 0);
+    $credits = (int) ($cfg['signup_bonus_credits'] ?? 0);
 
     $stmt = $pdo->prepare(
         'INSERT INTO users (id, email, phone, name, password_hash, credits) VALUES (?, ?, ?, ?, ?, ?)'
@@ -50,7 +51,7 @@ try {
     json_out(201, [
         'success' => true,
         'data' => [
-            'token' => sign_jwt($id, $CONFIG),
+            'token' => sign_jwt($id),
             'user' => user_public($user),
         ],
     ]);

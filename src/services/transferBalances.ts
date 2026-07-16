@@ -60,11 +60,22 @@ async function creditsRequest(
   try {
     parsed = JSON.parse(text) as typeof parsed;
   } catch {
-    throw new Error(text || `HTTP ${res.status}`);
+    if (/<\s*html/i.test(text) || /404 Not Found/i.test(text)) {
+      throw new Error(
+        'API cấp/chuyển credit không tìm thấy trên server. Thử lại sau khi upload grant.php / transfer.php lên VPS.',
+      );
+    }
+    throw new Error(`Máy chủ trả lỗi HTTP ${res.status} (không phải JSON)`);
   }
 
   if (!res.ok || !parsed.success || !parsed.data) {
-    throw new Error(parsed.message || 'Giao dịch credit thất bại');
+    const msg = parsed.message || 'Giao dịch credit thất bại';
+    if (res.status === 404 || /không tìm thấy người nhận/i.test(msg)) {
+      throw new Error(
+        `${msg}. Hãy nhập email đầy đủ (vd: user2@gmail.com) hoặc đúng SĐT / tên đã đăng ký.`,
+      );
+    }
+    throw new Error(msg);
   }
 
   return {

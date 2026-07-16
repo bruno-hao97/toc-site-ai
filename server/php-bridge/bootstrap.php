@@ -1,10 +1,6 @@
 <?php
 /**
  * Platform auth API — chạy trên cùng VPS với MySQL (localhost).
- * Endpoints:
- *   POST /api/platform/register.php
- *   POST /api/platform/login.php
- *   GET  /api/platform/me.php
  */
 
 declare(strict_types=1);
@@ -26,8 +22,23 @@ if (!is_file($configFile)) {
     exit;
 }
 
-/** @var array $CONFIG */
-$CONFIG = require $configFile;
+$loaded = require $configFile;
+if (!is_array($loaded)) {
+    http_response_code(503);
+    echo json_encode(['success' => false, 'message' => 'config.local.php phải return array']);
+    exit;
+}
+
+$GLOBALS['PLATFORM_CONFIG'] = $loaded;
+
+function platform_config(): array
+{
+    $cfg = $GLOBALS['PLATFORM_CONFIG'] ?? null;
+    if (!is_array($cfg)) {
+        throw new RuntimeException('Platform config chưa được load');
+    }
+    return $cfg;
+}
 
 function json_out(int $status, array $payload): void
 {
@@ -36,19 +47,20 @@ function json_out(int $status, array $payload): void
     exit;
 }
 
-function db(array $CONFIG): PDO
+function db(): PDO
 {
     static $pdo = null;
     if ($pdo instanceof PDO) {
         return $pdo;
     }
+    $cfg = platform_config();
     $dsn = sprintf(
         'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
-        $CONFIG['db_host'],
-        (int) $CONFIG['db_port'],
-        $CONFIG['db_name']
+        $cfg['db_host'],
+        (int) $cfg['db_port'],
+        $cfg['db_name']
     );
-    $pdo = new PDO($dsn, $CONFIG['db_user'], $CONFIG['db_password'], [
+    $pdo = new PDO($dsn, $cfg['db_user'], $cfg['db_password'], [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ]);
@@ -76,27 +88,29 @@ function b64url_decode(string $data): string
     return base64_decode(strtr($data, '-_', '+/')) ?: '';
 }
 
-function sign_jwt(string $userId, array $CONFIG): string
+function sign_jwt(string $userId): string
 {
+    $cfg = platform_config();
     $header = b64url_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'], JSON_UNESCAPED_SLASHES));
     $now = time();
     $payload = b64url_encode(json_encode([
         'sub' => $userId,
         'iat' => $now,
-        'exp' => $now + (int) $CONFIG['jwt_expires_seconds'],
+        'exp' => $now + (int) $cfg['jwt_expires_seconds'],
     ], JSON_UNESCAPED_SLASHES));
-    $sig = b64url_encode(hash_hmac('sha256', $header . '.' . $payload, $CONFIG['jwt_secret'], true));
+    $sig = b64url_encode(hash_hmac('sha256', $header . '.' . $payload, $cfg['jwt_secret'], true));
     return $header . '.' . $payload . '.' . $sig;
 }
 
-function verify_jwt(string $token, array $CONFIG): string
+function verify_jwt(string $token): string
 {
+    $cfg = platform_config();
     $parts = explode('.', $token);
     if (count($parts) !== 3) {
         throw new RuntimeException('Token không hợp lệ');
     }
     [$header, $payload, $sig] = $parts;
-    $expected = b64url_encode(hash_hmac('sha256', $header . '.' . $payload, $CONFIG['jwt_secret'], true));
+    $expected = b64url_encode(hash_hmac('sha256', $header . '.' . $payload, $cfg['jwt_secret'], true));
     if (!hash_equals($expected, $sig)) {
         throw new RuntimeException('Token không hợp lệ');
     }
@@ -148,30 +162,49 @@ function find_user_by_email_or_phone(PDO $pdo, string $query): ?array
     if (strpos($q, '@') !== false) {
         return find_user_by_email($pdo, strtolower($q));
     }
-    $stmt = $pdo->prepare('SELECT * FROM users WHERE phone = ? OR email = ? LIMIT 1');
-    $stmt->execute([$q, strtolower($q)]);
+
+    // SĐT, email đúng chuỗi, name, hoặc phần trước @ của email (vd: user2 → user2@…)
+    $stmt = $pdo->prepare(
+        'SELECT * FROM users
+         WHERE phone = ?
+            OR email = ?
+            OR LOWER(COALESCE(name, \'\')) = ?
+            OR email LIKE ?
+         ORDER BY
+           CASE
+             WHEN phone = ? THEN 0
+             WHEN email = ? THEN 1
+             WHEN LOWER(COALESCE(name, \'\')) = ? THEN 2
+             ELSE 3
+           END
+         LIMIT 1'
+    );
+    $lower = strtolower($q);
+    $like = $lower . '@%';
+    $stmt->execute([$q, $lower, $lower, $like, $q, $lower, $lower]);
     $row = $stmt->fetch();
     return $row ?: null;
 }
 
-function require_bearer_user(array $CONFIG): array
+function require_bearer_user(): array
 {
     $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
     if (!preg_match('/^Bearer\s+(\S+)/i', $auth, $m)) {
         json_out(401, ['success' => false, 'message' => 'Thiếu token đăng nhập']);
     }
-    $userId = verify_jwt($m[1], $CONFIG);
-    $pdo = db($CONFIG);
+    $userId = verify_jwt($m[1]);
+    $pdo = db();
     $user = find_user_by_id($pdo, $userId);
     if (!$user) {
         json_out(401, ['success' => false, 'message' => 'Tài khoản không tồn tại']);
     }
-    return [$pdo, sync_admin_flag($pdo, $user, $CONFIG)];
+    return [$pdo, sync_admin_flag($pdo, $user)];
 }
 
-function sync_admin_flag(PDO $pdo, array $user, array $CONFIG): array
+function sync_admin_flag(PDO $pdo, array $user): array
 {
-    $emails = $CONFIG['admin_emails'] ?? [];
+    $cfg = platform_config();
+    $emails = $cfg['admin_emails'] ?? [];
     if (!is_array($emails)) {
         return $user;
     }
@@ -188,12 +221,13 @@ function sync_admin_flag(PDO $pdo, array $user, array $CONFIG): array
     return $user;
 }
 
-function user_is_admin(array $user, array $CONFIG): bool
+function user_is_admin(array $user): bool
 {
     if (!empty($user['is_admin'])) {
         return true;
     }
-    $emails = $CONFIG['admin_emails'] ?? [];
+    $cfg = platform_config();
+    $emails = $cfg['admin_emails'] ?? [];
     if (!is_array($emails)) {
         return false;
     }

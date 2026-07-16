@@ -7,8 +7,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_out(405, ['success' => false, 'message' => 'Method not allowed']);
 }
 
-[$pdo, $admin] = require_bearer_user($CONFIG);
-if (!user_is_admin($admin, $CONFIG)) {
+[$pdo, $admin] = require_bearer_user();
+if (!user_is_admin($admin)) {
     json_out(403, ['success' => false, 'message' => 'Chỉ admin được cấp credit từ quỹ hệ thống']);
 }
 
@@ -17,8 +17,9 @@ $toQuery = trim((string) ($body['to'] ?? $body['email'] ?? $body['username'] ?? 
 $message = trim((string) ($body['message'] ?? ''));
 $amount = (int) floor((float) ($body['amount'] ?? $body['value'] ?? 0));
 
+$cfg = platform_config();
 $min = 1;
-$max = (int) ($CONFIG['transfer_max'] ?? 20_000_000);
+$max = (int) ($cfg['transfer_max'] ?? 20000000);
 
 if ($toQuery === '') {
     json_out(400, ['success' => false, 'message' => 'Nhập email hoặc SĐT người nhận']);

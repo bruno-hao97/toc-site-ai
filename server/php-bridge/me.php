@@ -8,7 +8,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 try {
-    [$pdo, $user] = require_bearer_user($CONFIG);
+    [, $user] = require_bearer_user();
     json_out(200, ['success' => true, 'data' => ['user' => user_public($user)]]);
 } catch (Throwable $e) {
     json_out(401, ['success' => false, 'message' => $e->getMessage()]);

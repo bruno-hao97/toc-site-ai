@@ -7,14 +7,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_out(405, ['success' => false, 'message' => 'Method not allowed']);
 }
 
-[$pdo, $from] = require_bearer_user($CONFIG);
+[$pdo, $from] = require_bearer_user();
 $body = read_json_body();
 $toQuery = trim((string) ($body['to'] ?? $body['email'] ?? $body['username'] ?? ''));
 $message = trim((string) ($body['message'] ?? ''));
 $amount = (int) floor((float) ($body['amount'] ?? $body['value'] ?? 0));
 
-$min = (int) ($CONFIG['transfer_min'] ?? 1000);
-$max = (int) ($CONFIG['transfer_max'] ?? 20_000_000);
+$cfg = platform_config();
+$min = (int) ($cfg['transfer_min'] ?? 1000);
+$max = (int) ($cfg['transfer_max'] ?? 20000000);
 
 if ($toQuery === '') {
     json_out(400, ['success' => false, 'message' => 'Nhập email hoặc SĐT người nhận']);

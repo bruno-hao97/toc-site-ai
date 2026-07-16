@@ -4,6 +4,7 @@ import gommoProxyRoutes from './routes/gommoProxy.js';
 import payosRoutes from './routes/payos.js';
 import authRoutes from './routes/auth.js';
 import creditsRoutes from './routes/credits.js';
+import jobsRoutes from './routes/jobs.js';
 import { config } from './config.js';
 import { migrateDatabase } from './db/migrate.js';
 import { isDatabaseConfigured } from './db/pool.js';
@@ -30,6 +31,7 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/credits', creditsRoutes);
+app.use('/api/jobs', jobsRoutes);
 app.use('/api/payos', payosRoutes);
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

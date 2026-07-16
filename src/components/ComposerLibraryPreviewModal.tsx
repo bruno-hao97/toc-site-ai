@@ -370,8 +370,9 @@ export default function ComposerLibraryPreviewModal({
                 <button
                   type="button"
                   className="clib-preview-action-tile"
-                  disabled
-                  title="Chưa hỗ trợ"
+                  disabled={!onPublish}
+                  title={onPublish ? undefined : 'Chưa hỗ trợ'}
+                  onClick={onPublish}
                 >
                   <Upload size={18} />
                   <span>Đăng tải</span>

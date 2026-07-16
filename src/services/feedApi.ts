@@ -2,6 +2,7 @@ import { GOMMO_AUTH_BASE, GOMMO_AUTH_PATH, UpstreamMeError } from './upstreamMe'
 import { clearAuth, loadAuth, resolveProjectId } from './authStore';
 import { GOMMO_CHAT_CONFIG } from './gommoChatConfig';
 import { buildDeviceInfo } from './audioVoices';
+import { usesPlatformJobs } from './platformJobClient';
 
 async function feedRequest<T extends { success?: boolean; message?: string }>(
   gommoUrl: string,
@@ -301,6 +302,9 @@ function mapImageToFeedItem(img: MyImageItem): FeedItem {
 }
 
 export async function fetchMyVideos(params: FetchMineParams = {}): Promise<MinePage> {
+  if (usesPlatformJobs()) {
+    return fetchPlatformMine('video', params);
+  }
   const { limit = 30, afterId = '' } = params;
   const fields = mineFields({
     limit: String(limit),
@@ -320,6 +324,9 @@ export async function fetchMyVideos(params: FetchMineParams = {}): Promise<MineP
 }
 
 export async function fetchMyImages(params: FetchMineParams = {}): Promise<MinePage> {
+  if (usesPlatformJobs()) {
+    return fetchPlatformMine('image', params);
+  }
   const { limit = 30, afterId = '' } = params;
   const fields = mineFields({
     limit: String(limit),
@@ -337,6 +344,106 @@ export async function fetchMyImages(params: FetchMineParams = {}): Promise<MineP
   const items = raw.map(mapImageToFeedItem);
   const last = raw.length ? raw[raw.length - 1] : undefined;
   return { items, nextAfterId: parsed.next_after_id ?? last?.id_base ?? '' };
+}
+
+interface PlatformJobListItem {
+  id: string;
+  providerJobId?: string | null;
+  jobType: string;
+  modelId: string;
+  status: string;
+  resultUrl: string;
+  prompt?: string | null;
+  ratio?: string | null;
+  resolution?: string | null;
+  createdTime?: number | null;
+}
+
+function platformJobToFeedItem(job: PlatformJobListItem): FeedItem {
+  const url = job.resultUrl;
+  const feedType = job.jobType === 'video' ? 'video' : 'image';
+  return {
+    id_base: job.id,
+    type: feedType,
+    status: 'FINISH',
+    prompt: job.prompt || undefined,
+    model: job.modelId,
+    ratio: job.ratio || undefined,
+    resolution: job.resolution || undefined,
+    thumbnail_url: url,
+    download_url: url,
+    created_time: job.createdTime ?? undefined,
+    resolutions: url
+      ? [{ type: feedType, status: 'FINISH', url, name: job.resolution || undefined }]
+      : undefined,
+  };
+}
+
+async function fetchPlatformMine(
+  type: 'image' | 'video',
+  params: FetchMineParams,
+): Promise<MinePage> {
+  const auth = loadAuth();
+  const token = auth?.platform_token?.trim();
+  if (!token) throw new UpstreamMeError('Chưa đăng nhập tài khoản hệ thống', 401);
+
+  const { limit = 30, afterId = '' } = params;
+  const qs = new URLSearchParams({ type, limit: String(limit) });
+  if (afterId) qs.set('afterId', afterId);
+
+  const res = await fetch(`/api/jobs/list?${qs}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  });
+  if (res.status === 401 || res.status === 403) {
+    clearAuth();
+    if (typeof window !== 'undefined') window.location.href = '/login';
+  }
+  const text = await res.text();
+  let parsed: {
+    success?: boolean;
+    message?: string;
+    data?: { items?: PlatformJobListItem[]; nextAfterId?: string };
+  };
+  try {
+    parsed = JSON.parse(text) as typeof parsed;
+  } catch {
+    throw new UpstreamMeError(text || `HTTP ${res.status}`, res.status);
+  }
+  if (!res.ok || !parsed.success || !parsed.data) {
+    throw new UpstreamMeError(parsed.message || 'Không tải được thư viện', res.status);
+  }
+  const items = (parsed.data.items ?? []).map(platformJobToFeedItem);
+  return { items, nextAfterId: parsed.data.nextAfterId ?? '' };
+}
+
+async function deletePlatformJob(jobId: string): Promise<void> {
+  const auth = loadAuth();
+  const token = auth?.platform_token?.trim();
+  if (!token) throw new UpstreamMeError('Chưa đăng nhập tài khoản hệ thống', 401);
+
+  const res = await fetch('/api/jobs/delete', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ platformJobId: jobId }),
+  });
+  if (res.status === 401 || res.status === 403) {
+    clearAuth();
+    if (typeof window !== 'undefined') window.location.href = '/login';
+  }
+  const text = await res.text();
+  let parsed: { success?: boolean; message?: string };
+  try {
+    parsed = JSON.parse(text) as typeof parsed;
+  } catch {
+    throw new UpstreamMeError(text || `HTTP ${res.status}`, res.status);
+  }
+  if (!res.ok || parsed.success === false) {
+    throw new UpstreamMeError(parsed.message || 'Xóa thất bại', res.status);
+  }
 }
 
 export function feedModelLabel(item: FeedItem): string {
@@ -378,10 +485,15 @@ export function formatFeedTime(value: string | number | undefined): string {
   }
 }
 
-/** Xóa ảnh/video trên Gommo (POST /api/apps/go-mmo/ai/post-delete). */
+/** Xóa ảnh/video — platform: MySQL; token: Gommo. */
 export async function deleteFeedPost(idBase: string): Promise<void> {
   const id = idBase.trim();
   if (!id) throw new UpstreamMeError('Thiếu id_base', 400);
+
+  if (usesPlatformJobs()) {
+    await deletePlatformJob(id);
+    return;
+  }
 
   const fields = { id_base: id, ...gommoDeviceFields() };
   const parsed = await feedRequest<{ success?: boolean; message?: string }>(

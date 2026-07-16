@@ -25,10 +25,10 @@ export function historyEntryToFeedItem(entry: HistoryEntry): FeedItem {
   const resolution = entry.meta?.resolution?.trim() || '';
   const ratio = entry.meta?.ratio?.trim() || '';
   const created = Math.floor(new Date(entry.createdAt).getTime() / 1000);
-
+  const feedType = historyFeedType(entry);
   return {
     id_base: entry.id,
-    type: historyFeedType(entry),
+    type: feedType,
     status: 'FINISH',
     prompt: entry.prompt,
     model: entry.modelSlug || entry.modelName,
@@ -38,8 +38,8 @@ export function historyEntryToFeedItem(entry: HistoryEntry): FeedItem {
     download_url: entry.resultUrl,
     created_time: Number.isFinite(created) ? created : undefined,
     resolutions: resolution
-      ? [{ status: 'FINISH', url: entry.resultUrl, name: resolution }]
-      : [{ status: 'FINISH', url: entry.resultUrl }],
+      ? [{ type: feedType, status: 'FINISH', url: entry.resultUrl, name: resolution }]
+      : [{ type: feedType, status: 'FINISH', url: entry.resultUrl }],
   };
 }
 

@@ -104,7 +104,7 @@ export default function AccountTransferPage() {
               <input
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
-                placeholder="user@email.com hoặc 09xxxxxxxx"
+                placeholder="email, SĐT, hoặc tên (vd: user2 / user2@email.com)"
                 autoComplete="off"
                 disabled={loading}
               />

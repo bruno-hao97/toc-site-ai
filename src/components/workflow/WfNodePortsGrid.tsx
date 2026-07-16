@@ -32,7 +32,7 @@ export function WfNodePortsGrid({
   ports,
   expanded,
 }: {
-  ports: { in: WfPortDef[]; out: WfPortDef[] };
+  ports: { in: readonly WfPortDef[]; out: readonly WfPortDef[] };
   expanded: boolean;
 }) {
   if (expanded) {

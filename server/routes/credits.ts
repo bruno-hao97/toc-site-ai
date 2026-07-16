@@ -30,8 +30,32 @@ async function forwardToBridge(
     body: JSON.stringify(req.body ?? {}),
   });
   const text = await upstream.text();
+  const contentType = upstream.headers.get('content-type') || '';
+
+  // VPS/nginx HTML 404 → JSON rõ ràng (tránh UI hiện nguyên trang aaPanel)
+  if (
+    upstream.status === 404 &&
+    (!contentType.includes('application/json') || /<\s*html/i.test(text) || /404 Not Found/i.test(text))
+  ) {
+    console.error('[credits] bridge missing', url, text.slice(0, 120));
+    res.status(502).json({
+      success: false,
+      message: `Không gọi được ${path} trên bridge (${url}). Kiểm tra file trên VPS.`,
+    });
+    return;
+  }
+
+  if (/<\s*html/i.test(text) && !contentType.includes('application/json')) {
+    console.error('[credits] bridge non-json', url, upstream.status, text.slice(0, 120));
+    res.status(502).json({
+      success: false,
+      message: `Bridge trả HTML (HTTP ${upstream.status}) thay vì JSON — kiểm tra ${path} trên VPS.`,
+    });
+    return;
+  }
+
   res.status(upstream.status);
-  res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/json');
+  res.setHeader('Content-Type', contentType.includes('json') ? contentType : 'application/json');
   res.send(text);
 }
 
