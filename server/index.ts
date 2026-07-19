@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import gommoProxyRoutes from './routes/gommoProxy.js';
 import payosRoutes from './routes/payos.js';
 import authRoutes from './routes/auth.js';
@@ -34,6 +36,16 @@ app.use('/api/credits', creditsRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/payos', payosRoutes);
 
+const isProduction = process.env.NODE_ENV === 'production';
+const distDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist');
+
+if (isProduction) {
+  app.use(express.static(distDir));
+  app.get(/^(?!\/api(?:\/|$)|\/ai(?:\/|$)|\/v2(?:\/|$)).*/, (_req, res) => {
+    res.sendFile(path.join(distDir, 'index.html'));
+  });
+}
+
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
   res.status(500).json({ success: false, message: err.message || 'Internal error' });
@@ -47,7 +59,9 @@ async function start() {
   }
 
   app.listen(config.port, () => {
-    console.log(`API server http://localhost:${config.port} (platform auth + Gommo proxy + PayOS)`);
+    console.log(
+      `API server http://localhost:${config.port} (platform auth + Gommo proxy + PayOS${isProduction ? ' + static dist' : ''})`,
+    );
   });
 }
 

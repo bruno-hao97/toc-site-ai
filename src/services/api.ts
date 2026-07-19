@@ -1,8 +1,8 @@
 import { DEFAULT_DOMAIN } from './settingsStore';
 import { gommoDeviceFields } from './gommoDevice';
 
-/** Prefix /v2 = cùng origin → proxy server forward tới v2.api.gommo.net (che URL). */
-export const BASE_URL = '/v2';
+/** Qua PHP proxy gw.php → v2.api.gommo.net (che URL). Local: Vite proxy /api/platform → pro.agi.vn. */
+export const BASE_URL = '/api/platform/gw.php/v2';
 
 export type JobType =
   | 'image'

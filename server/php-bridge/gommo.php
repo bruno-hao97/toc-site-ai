@@ -6,13 +6,26 @@ function gommo_cfg(): array
     $cfg = platform_config();
     return [
         'token' => (string) ($cfg['gommo_access_token'] ?? ''),
-        'domain' => (string) ($cfg['gommo_domain'] ?? '79ai.net'),
+        'domain' => (string) ($cfg['gommo_domain'] ?? 'vmedia.ai'),
         'project_id' => (string) ($cfg['gommo_project_id'] ?? 'default'),
         'api_base' => rtrim((string) ($cfg['gommo_api_base'] ?? 'https://v2.api.gommo.net'), '/'),
+        // Host cho newsfeed / public-videos / me (khác host v2 dùng cho job).
+        'auth_base' => rtrim((string) ($cfg['gommo_auth_base'] ?? 'https://api.gommo.net'), '/'),
     ];
 }
 
+/** POST form tới host v2 (job) — giữ nguyên hành vi cũ, tự chèn project_id. */
 function gommo_post_form(string $path, array $fields): array
+{
+    $g = gommo_cfg();
+    if (!isset($fields['project_id']) || $fields['project_id'] === '') {
+        $fields['project_id'] = $g['project_id'];
+    }
+    return gommo_request_form($g['api_base'], $path, $fields);
+}
+
+/** POST form tới base tùy ý — luôn chèn access_token dùng chung của admin. */
+function gommo_request_form(string $base, string $path, array $fields): array
 {
     $g = gommo_cfg();
     if ($g['token'] === '') {
@@ -20,12 +33,9 @@ function gommo_post_form(string $path, array $fields): array
     }
 
     $fields['domain'] = $fields['domain'] ?? $g['domain'];
-    if (!isset($fields['project_id']) || $fields['project_id'] === '') {
-        $fields['project_id'] = $g['project_id'];
-    }
     $fields['access_token'] = $g['token'];
 
-    $url = $g['api_base'] . $path;
+    $url = rtrim($base, '/') . $path;
     $body = http_build_query(flatten_form_fields($fields));
 
     $ch = curl_init($url);

@@ -5,7 +5,7 @@ import { loginWithGommoToken, loginWithPlatformSession } from '../services/authS
 import { gommoResetPassword, GommoAuthError } from '../services/gommoAuth';
 import { platformLogin, PlatformAuthError } from '../services/platformAuth';
 import { UpstreamMeError } from '../services/upstreamMe';
-import { APP_SITE_URL, DEFAULT_DOMAIN } from '../services/settingsStore';
+import { DEFAULT_DOMAIN } from '../services/settingsStore';
 
 type Step = 'menu' | 'account' | 'token' | 'reset';
 
@@ -232,9 +232,10 @@ export default function LoginPage() {
               </label>
               <p className="lead sm">
                 Lấy Access Token tại Account Settings trên{' '}
-                <a href={`${APP_SITE_URL}/settings/tokens`} target="_blank" rel="noreferrer">
+                <a href="https://vmedia.ai/" target="_blank" rel="noreferrer">
                   {DEFAULT_DOMAIN}
-                </a>.
+                </a>
+                .
               </p>
               {error && <p className="error">{error}</p>}
               <button type="submit" className="btn auth-submit" disabled={tokenLoading}>

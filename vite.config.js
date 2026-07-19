@@ -17,6 +17,12 @@ export default defineConfig({
     allowedHosts: true,     // Cho phép Cloudflare Tunnel
 
     proxy: {
+      // PHP bridge trên VPS — ưu tiên trước /api → Node
+      '/api/platform': {
+        target: 'https://pro.agi.vn',
+        changeOrigin: true,
+        secure: false,
+      },
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,

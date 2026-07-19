@@ -13,7 +13,7 @@ export interface GommoChatConfig {
 }
 
 export const GOMMO_CHAT_CONFIG: GommoChatConfig = {
-  baseUrl: '/api/v2',
+  baseUrl: '/api/platform/gw.php/api/v2',
   server: 'cheap',
   model: 'gpt-5.5::cheap',
   agentId: 'd234b19ae119f741696eafa913d246cc',

@@ -23,4 +23,11 @@ return [
     'admin_emails' => [
         'you@gmail.com',
     ],
+    // Token Gommo dùng chung của admin — mọi user tạo job & xem feed qua token này.
+    'gommo_access_token' => 'CHANGE_ME',
+    'gommo_domain' => 'vmedia.ai',
+    'gommo_project_id' => 'default',
+    'gommo_api_base' => 'https://v2.api.gommo.net',
+    'gommo_auth_base' => 'https://api.gommo.net',
+    'image_job_cost' => 10,
 ];

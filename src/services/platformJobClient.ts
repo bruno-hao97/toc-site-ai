@@ -6,10 +6,11 @@ import {
   type PollMedia,
 } from './api';
 import { loadAuth, saveAuth } from './authStore';
+import { PLATFORM_BRIDGE } from './platformBridge';
 
 /** GommoClient qua server — trừ credit platform + token admin VMedia. */
 export class PlatformJobClient {
-  domain = '79ai.net';
+  domain = 'vmedia.ai';
   projectId = 'default';
   accessToken = 'platform';
 
@@ -46,7 +47,7 @@ export class PlatformJobClient {
     if (type !== 'image') {
       throw new Error('Platform job proxy phase 1 chỉ hỗ trợ image');
     }
-    const res = await fetch(`/api/jobs/models?type=${encodeURIComponent(type)}`, {
+    const res = await fetch(`${PLATFORM_BRIDGE.jobModels}?type=${encodeURIComponent(type)}`, {
       headers: this.authHeaders(),
     });
     const text = await res.text();
@@ -73,7 +74,7 @@ export class PlatformJobClient {
   ): Promise<GommoEnvelope> {
     const parsed = await this.postJson<{
       data: { envelope: GommoEnvelope; credits?: number; platformJobId?: string };
-    }>('/api/jobs/create', { type, modelId, fields });
+    }>(PLATFORM_BRIDGE.jobCreate, { type, modelId, fields });
 
     const auth = loadAuth();
     if (auth?.user && typeof parsed.data.credits === 'number') {
@@ -88,7 +89,7 @@ export class PlatformJobClient {
   }
 
   async pollOnce(jobId: string, media: PollMedia): Promise<GommoEnvelope> {
-    const parsed = await this.postJson<{ data: { envelope: GommoEnvelope } }>('/api/jobs/poll', {
+    const parsed = await this.postJson<{ data: { envelope: GommoEnvelope } }>(PLATFORM_BRIDGE.jobPoll, {
       providerJobId: jobId,
       media,
     });
@@ -111,7 +112,7 @@ export function getJobClient(): GommoClient | PlatformJobClient {
   if (auth.access_token?.trim()) {
     return new GommoClient({
       accessToken: auth.access_token,
-      domain: auth.domain || '79ai.net',
+      domain: auth.domain || 'vmedia.ai',
       projectId: auth.projectId,
     });
   }

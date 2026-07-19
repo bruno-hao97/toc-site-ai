@@ -74,7 +74,7 @@ export interface AudioListItem {
 
 const AUDIO_URLS = [
   `${GOMMO_AUTH_BASE}/ai/audio`,
-  `${GOMMO_AUTH_BASE}${GOMMO_AUTH_PATH}/ai/audio`,
+  `${GOMMO_AUTH_PATH}/ai/audio`,
 ];
 
 export function buildDeviceInfo(locale: AppLocale): string {

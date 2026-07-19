@@ -28,7 +28,7 @@ async function upstreamAuthPost<T>(
     ...extra,
   }).toString();
 
-  const res = await fetch(`${GOMMO_AUTH_BASE}${GOMMO_AUTH_PATH}${path}`, {
+  const res = await fetch(`${GOMMO_AUTH_PATH}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,

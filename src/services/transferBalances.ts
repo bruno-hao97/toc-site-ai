@@ -1,4 +1,5 @@
 import { loadAuth, type PlatformUser } from './authStore';
+import { PLATFORM_BRIDGE } from './platformBridge';
 
 export const MIN_TRANSFER_CREDIT = 1_000;
 export const MAX_TRANSFER_CREDIT = 20_000_000;
@@ -18,7 +19,7 @@ export interface PlatformTransferResult {
 }
 
 async function creditsRequest(
-  path: '/api/credits/transfer' | '/api/credits/grant',
+  path: typeof PLATFORM_BRIDGE.transfer | typeof PLATFORM_BRIDGE.grant,
   input: PlatformTransferInput,
 ): Promise<PlatformTransferResult> {
   const auth = loadAuth();
@@ -32,7 +33,7 @@ async function creditsRequest(
 
   if (!to) throw new Error('Nhập email hoặc SĐT người nhận');
   if (!message) throw new Error('Lời nhắn là bắt buộc');
-  if (path === '/api/credits/transfer') {
+  if (path === PLATFORM_BRIDGE.transfer) {
     if (value < MIN_TRANSFER_CREDIT || value > MAX_TRANSFER_CREDIT) {
       throw new Error(
         `Số credit phải từ ${MIN_TRANSFER_CREDIT.toLocaleString('vi-VN')} đến ${MAX_TRANSFER_CREDIT.toLocaleString('vi-VN')}`,
@@ -91,14 +92,14 @@ async function creditsRequest(
 export async function transferPlatformCredits(
   input: PlatformTransferInput,
 ): Promise<PlatformTransferResult> {
-  return creditsRequest('/api/credits/transfer', input);
+  return creditsRequest(PLATFORM_BRIDGE.transfer, input);
 }
 
 /** Admin → user: cấp từ quỹ (không trừ ví admin). */
 export async function grantPlatformCredits(
   input: PlatformTransferInput,
 ): Promise<PlatformTransferResult> {
-  return creditsRequest('/api/credits/grant', input);
+  return creditsRequest(PLATFORM_BRIDGE.grant, input);
 }
 
 /** @deprecated dùng transferPlatformCredits */

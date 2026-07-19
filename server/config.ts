@@ -27,7 +27,7 @@ export const config = {
     authBaseUrl: process.env.GOMMO_AUTH_BASE_URL || 'https://api.gommo.net',
     authPath: process.env.GOMMO_AUTH_PATH || '/api/apps/go-mmo',
     accessToken: (process.env.GOMMO_ACCESS_TOKEN || '').trim(),
-    apiDomain: (process.env.GOMMO_API_DOMAIN || process.env.GOMMO_DOMAIN || '79ai.net').trim(),
+    apiDomain: (process.env.GOMMO_API_DOMAIN || process.env.GOMMO_DOMAIN || 'vmedia.ai').trim(),
   },
   topup: {
     minVnd: Number(process.env.TOPUP_MIN_VND) || 10_000,

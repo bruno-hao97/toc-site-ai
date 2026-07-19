@@ -1,6 +1,7 @@
 import { GommoClient } from './api';
 import { fetchUpstreamMe, type UpstreamMeResponse } from './upstreamMe';
 import { GOMMO_CHAT_CONFIG } from './gommoChatConfig';
+import { PLATFORM_BRIDGE } from './platformBridge';
 import { loadSettings, normalizeDomain, saveSettings } from './settingsStore';
 
 const SESSION_KEY = 'gommo_session';
@@ -184,7 +185,7 @@ export async function refreshSession(): Promise<AuthState> {
   if (!auth) throw new Error('Chưa đăng nhập');
 
   if (auth.platform_token) {
-    const res = await fetch('/api/auth/me', {
+    const res = await fetch(PLATFORM_BRIDGE.me, {
       headers: { Authorization: `Bearer ${auth.platform_token}` },
     });
     const text = await res.text();

@@ -1,6 +1,7 @@
-/** Rỗng = cùng origin → request đi qua proxy server tới api.gommo.net (che URL). */
-export const GOMMO_AUTH_BASE = '';
-export const GOMMO_AUTH_PATH = '/api/apps/go-mmo';
+/** Qua PHP proxy gw.php → api.gommo.net (che URL). Local: Vite proxy /api/platform → pro.agi.vn. */
+export const GOMO_GW = '/api/platform/gw.php';
+export const GOMMO_AUTH_BASE = GOMO_GW;
+export const GOMMO_AUTH_PATH = `${GOMO_GW}/api/apps/go-mmo`;
 
 export interface UpstreamUserInfo {
   id_private?: string;
@@ -58,7 +59,7 @@ export async function fetchUpstreamMe(
     domain: domain.trim(),
   }).toString();
 
-  const res = await fetch(`${GOMMO_AUTH_BASE}${GOMMO_AUTH_PATH}/ai/me`, {
+  const res = await fetch(`${GOMMO_AUTH_PATH}/ai/me`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,

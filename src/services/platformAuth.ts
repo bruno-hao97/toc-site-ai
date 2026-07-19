@@ -1,3 +1,5 @@
+import { PLATFORM_BRIDGE } from './platformBridge';
+
 export class PlatformAuthError extends Error {
   status?: number;
 
@@ -30,12 +32,16 @@ async function parseAuthJson(res: Response): Promise<AuthResponse> {
   try {
     return JSON.parse(text) as AuthResponse;
   } catch {
-    throw new PlatformAuthError(text || `HTTP ${res.status}`, res.status);
+    const isHtml = /^\s*</.test(text) || text.includes('<!doctype', 0);
+    const friendly = isHtml
+      ? 'API backend chưa sẵn sàng (404). Kiểm tra Node server và nginx proxy /api trên VPS.'
+      : text.slice(0, 200) || `HTTP ${res.status}`;
+    throw new PlatformAuthError(friendly, res.status);
   }
 }
 
 export async function platformLogin(email: string, password: string) {
-  const res = await fetch('/api/auth/login', {
+  const res = await fetch(PLATFORM_BRIDGE.login, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -53,7 +59,7 @@ export async function platformRegister(input: {
   phone?: string;
   name?: string;
 }) {
-  const res = await fetch('/api/auth/register', {
+  const res = await fetch(PLATFORM_BRIDGE.register, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),

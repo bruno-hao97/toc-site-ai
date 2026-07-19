@@ -3,6 +3,25 @@ import { clearAuth, loadAuth, resolveProjectId } from './authStore';
 import { GOMMO_CHAT_CONFIG } from './gommoChatConfig';
 import { buildDeviceInfo } from './audioVoices';
 import { usesPlatformJobs } from './platformJobClient';
+import { PLATFORM_BRIDGE } from './platformBridge';
+
+/**
+ * GET feed qua PHP bridge cho user thường (chỉ có platform_token).
+ * Server tự chèn access_token admin dùng chung — user không cần token Gommo.
+ */
+async function platformFeedGet<T extends { success?: boolean; message?: string }>(
+  baseUrl: string,
+  params: Record<string, string>,
+): Promise<T> {
+  const auth = loadAuth();
+  const token = auth?.platform_token?.trim();
+  if (!token) throw new UpstreamMeError('Chưa đăng nhập tài khoản hệ thống', 401);
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`${baseUrl}?${qs}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+  });
+  return parseFeedRes<T>(res);
+}
 
 async function feedRequest<T extends { success?: boolean; message?: string }>(
   gommoUrl: string,
@@ -137,18 +156,22 @@ export async function fetchNewsfeed(params: FetchFeedParams = {}): Promise<FeedP
     afterImageId = '',
   } = params;
 
-  const fields: Record<string, string> = {
-    limit: String(limit),
-    project_id: projectId,
-    privacy,
-  };
-  if (afterVideoId) fields.after_video_id = afterVideoId;
-  if (afterImageId) fields.after_image_id = afterImageId;
-
-  const parsed = await feedRequest<FeedResponse>(
-    `${GOMMO_AUTH_BASE}/ai/newfeeds`,
-    fields,
-  );
+  let parsed: FeedResponse;
+  if (usesPlatformJobs()) {
+    const q: Record<string, string> = { limit: String(limit), privacy };
+    if (afterVideoId) q.after_video_id = afterVideoId;
+    if (afterImageId) q.after_image_id = afterImageId;
+    parsed = await platformFeedGet<FeedResponse>(PLATFORM_BRIDGE.newfeeds, q);
+  } else {
+    const fields: Record<string, string> = {
+      limit: String(limit),
+      project_id: projectId,
+      privacy,
+    };
+    if (afterVideoId) fields.after_video_id = afterVideoId;
+    if (afterImageId) fields.after_image_id = afterImageId;
+    parsed = await feedRequest<FeedResponse>(`${GOMMO_AUTH_BASE}/ai/newfeeds`, fields);
+  }
 
   return {
     items: parsed.data ?? [],
@@ -185,17 +208,27 @@ export async function fetchPublicVideos(params: FetchPublicVideosParams = {}): P
     afterId = '',
   } = params;
 
-  const fields: Record<string, string> = {
-    type,
-    public_prompt: String(publicPrompt),
-    limit: String(limit),
-  };
-  if (afterId) fields.after_id = afterId;
-
-  const parsed = await feedRequest<PublicVideosResponse>(
-    `${GOMMO_AUTH_BASE}${GOMMO_AUTH_PATH}/ai/public-videos`,
-    fields,
-  );
+  let parsed: PublicVideosResponse;
+  if (usesPlatformJobs()) {
+    const q: Record<string, string> = {
+      type,
+      public_prompt: String(publicPrompt),
+      limit: String(limit),
+    };
+    if (afterId) q.after_id = afterId;
+    parsed = await platformFeedGet<PublicVideosResponse>(PLATFORM_BRIDGE.publicVideos, q);
+  } else {
+    const fields: Record<string, string> = {
+      type,
+      public_prompt: String(publicPrompt),
+      limit: String(limit),
+    };
+    if (afterId) fields.after_id = afterId;
+    parsed = await feedRequest<PublicVideosResponse>(
+      `${GOMMO_AUTH_PATH}/ai/public-videos`,
+      fields,
+    );
+  }
 
   const items = parsed.data ?? [];
   const last = items.length ? items[items.length - 1] : undefined;
@@ -391,7 +424,7 @@ async function fetchPlatformMine(
   const qs = new URLSearchParams({ type, limit: String(limit) });
   if (afterId) qs.set('afterId', afterId);
 
-  const res = await fetch(`/api/jobs/list?${qs}`, {
+  const res = await fetch(`/api/platform/job-list.php?${qs}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
   });
   if (res.status === 401 || res.status === 403) {
@@ -421,7 +454,7 @@ async function deletePlatformJob(jobId: string): Promise<void> {
   const token = auth?.platform_token?.trim();
   if (!token) throw new UpstreamMeError('Chưa đăng nhập tài khoản hệ thống', 401);
 
-  const res = await fetch('/api/jobs/delete', {
+  const res = await fetch('/api/platform/job-delete.php', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -497,7 +530,7 @@ export async function deleteFeedPost(idBase: string): Promise<void> {
 
   const fields = { id_base: id, ...gommoDeviceFields() };
   const parsed = await feedRequest<{ success?: boolean; message?: string }>(
-    `${GOMMO_AUTH_BASE}${GOMMO_AUTH_PATH}/ai/post-delete`,
+    `${GOMMO_AUTH_PATH}/ai/post-delete`,
     fields,
   );
   if (parsed.success === false) {

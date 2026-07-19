@@ -103,8 +103,8 @@ export interface SubscriptionPaymentResult {
   runtime?: number;
 }
 
-const PLANS_URL = `${GOMMO_AUTH_BASE}${GOMMO_AUTH_PATH}/subscriptions/plans`;
-const CREATE_PAYMENT_URL = `${GOMMO_AUTH_BASE}${GOMMO_AUTH_PATH}/subscriptions/create_payment`;
+const PLANS_URL = `${GOMMO_AUTH_PATH}/subscriptions/plans`;
+const CREATE_PAYMENT_URL = `${GOMMO_AUTH_PATH}/subscriptions/create_payment`;
 
 function normalizePlan(raw: unknown): SubscriptionPlan | null {
   if (!raw || typeof raw !== 'object') return null;
