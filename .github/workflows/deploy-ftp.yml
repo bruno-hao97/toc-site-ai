@@ -1,0 +1,67 @@
+# Auto-deploy frontend + PHP bridge lên VPS qua FTP khi push main.
+# Cần GitHub Secrets: FTP_SERVER, FTP_USERNAME, FTP_PASSWORD
+# Hướng dẫn: deploy/AUTO-DEPLOY.md
+
+name: Deploy FTP (pro.agi.vn)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ftp-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install & build frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Prepare PHP bridge (no secrets)
+        run: |
+          mkdir -p deploy/bridge-upload
+          rsync -a \
+            --exclude='config.local.php' \
+            --exclude='config.local.example.php' \
+            --exclude='hotfix-upload.php' \
+            --exclude='.gitignore' \
+            server/php-bridge/ deploy/bridge-upload/
+
+      - name: Upload webroot (dist → /)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          # Neu FTPS: Settings → Variables → FTP_PROTOCOL=ftps, roi doi dong duoi thanh ${{ vars.FTP_PROTOCOL }}
+          protocol: ftp
+          local-dir: ./dist/
+          server-dir: ./
+          dangerous-clean-slate: false
+
+      - name: Upload PHP bridge (→ /api/platform/)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          local-dir: ./deploy/bridge-upload/
+          server-dir: ./api/platform/
+          dangerous-clean-slate: false

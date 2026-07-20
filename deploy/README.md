@@ -1,5 +1,14 @@
 # Deploy lên VPS (pro.agi.vn)
 
+## Auto-deploy khi push `main` (FTP)
+
+Xem **[AUTO-DEPLOY.md](./AUTO-DEPLOY.md)** — GitHub Actions build + upload FTP.  
+Cần thêm Secrets `FTP_SERVER` / `FTP_USERNAME` / `FTP_PASSWORD` một lần.
+
+Deploy tay trên Windows: `deploy\deploy-ftp.cmd` (sau khi tạo `deploy\ftp.local.ps1`).
+
+---
+
 ## Vì sao local OK mà domain lỗi 404 HTML?
 
 Frontend gọi `/api/auth/login` — local có Vite proxy sang Node, production cần **Node API + nginx proxy** *hoặc* rewrite sang PHP bridge.

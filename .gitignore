@@ -8,5 +8,10 @@ data/
 *.env.local
 *.db
 
+# FTP deploy (local credentials + staging)
+deploy/ftp.local.ps1
+deploy/ftp-upload/
+deploy/bridge-upload/
+
 # Reference-only Next.js project (has its own git history)
 landing/
