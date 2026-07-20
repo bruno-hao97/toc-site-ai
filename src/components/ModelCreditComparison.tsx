@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Loader2 } from 'lucide-react';
-import { getGommoClient, loadAuth } from '../services/authStore';
+import { isLoggedIn } from '../services/authStore';
+import { getJobClient } from '../services/platformJobClient';
 import type { GommoModel, JobType } from '../services/api';
 import type { CreditPackage } from '../services/topupApi';
 
@@ -90,14 +91,13 @@ export default function ModelCreditComparison({ creditPackages }: Props) {
 
   useEffect(() => {
     let active = true;
-    const auth = loadAuth();
-    if (!auth?.access_token) {
+    if (!isLoggedIn()) {
       setLoading(false);
       setError('Đăng nhập để xem bảng giá model.');
       return;
     }
 
-    const client = getGommoClient();
+    const client = getJobClient();
     setLoading(true);
     setError('');
 

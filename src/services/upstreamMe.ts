@@ -50,36 +50,3 @@ export class UpstreamMeError extends Error {
   }
 }
 
-export async function fetchUpstreamMe(
-  accessToken: string,
-  domain: string,
-): Promise<UpstreamMeResponse> {
-  const body = new URLSearchParams({
-    access_token: accessToken.trim(),
-    domain: domain.trim(),
-  }).toString();
-
-  const res = await fetch(`${GOMMO_AUTH_PATH}/ai/me`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
-
-  const text = await res.text();
-  let parsed: UpstreamMeResponse;
-  try {
-    parsed = JSON.parse(text) as UpstreamMeResponse;
-  } catch {
-    throw new UpstreamMeError(text || `HTTP ${res.status}`, res.status);
-  }
-
-  if (!res.ok || parsed.success === false) {
-    throw new UpstreamMeError(parsed.message || `HTTP ${res.status}`, res.status);
-  }
-
-  if (!parsed.userInfo?.id_base && !parsed.userInfo?.email) {
-    throw new UpstreamMeError('Token hợp lệ nhưng thiếu userInfo');
-  }
-
-  return parsed;
-}

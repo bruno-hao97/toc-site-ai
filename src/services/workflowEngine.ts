@@ -1,11 +1,12 @@
 import type { GommoModel, JobType } from './api';
-import { getGommoClient, loadAuth } from './authStore';
+import { isLoggedIn, loadAuth } from './authStore';
+import { getJobClient } from './platformJobClient';
 import { createJobAndPoll, type PollProgress } from './polling';
 import {
   analyzeModel,
   buildJobPayload,
-  defaultSelections,
   isModelAvailable,
+  mergeSelectionsForSchema,
   modelSlug,
   parseModelsList,
   type JobSelections,
@@ -17,10 +18,9 @@ export async function fetchModelsForType(type: JobType): Promise<GommoModel[]> {
   const cached = modelsCache.get(type);
   if (cached) return cached;
 
-  const auth = loadAuth();
-  if (!auth?.access_token) return [];
+  if (!isLoggedIn()) return [];
 
-  const env = await getGommoClient().fetchModels(type);
+  const env = await getJobClient().fetchModels(type);
   const models = parseModelsList(env);
   modelsCache.set(type, models);
   return models;
@@ -46,18 +46,19 @@ export async function runNodeJob(input: RunNodeInput): Promise<string> {
   if (!model) throw new Error(`Không tìm thấy model "${modelId}" cho ${type}`);
 
   const auth = loadAuth();
-  if (!auth?.access_token) throw new Error('Chưa đăng nhập');
+  if (!auth || !isLoggedIn()) throw new Error('Chưa đăng nhập');
 
+  const client = getJobClient();
   const schema = analyzeModel(model, type);
-  const merged: JobSelections = { ...defaultSelections(schema), ...selections };
+  const merged = mergeSelectionsForSchema(selections, schema);
   const { payload } = buildJobPayload(model, type, merged, {
-    domain: auth.domain,
-    projectId: auth.projectId,
+    domain: auth.domain || client.domain,
+    projectId: client.projectId,
   });
 
   onStatus?.('Đang tạo job…');
   const { pollResult, resultUrl } = await createJobAndPoll(
-    getGommoClient(),
+    client,
     type,
     modelId,
     payload,

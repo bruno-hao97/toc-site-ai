@@ -21,11 +21,12 @@ import {
 } from 'lucide-react';
 import type { GommoModel } from '../services/api';
 import {
-  getGommoClient,
+  isLoggedIn,
   loadAuth,
   notifyCreditsUpdated,
   refreshSession,
 } from '../services/authStore';
+import { getJobClient } from '../services/platformJobClient';
 import {
   createAudio,
   getAudioLists,
@@ -182,8 +183,8 @@ export default function AudioPage() {
   const { t, locale } = useLocale();
   const auth = loadAuth();
   const client = useMemo(
-    () => (auth?.access_token ? getGommoClient() : null),
-    [auth?.access_token],
+    () => (isLoggedIn() ? getJobClient() : null),
+    [auth?.platform_token],
   );
 
   const [activeFeature, setActiveFeature] = useState<AudioFeature>('tts');
@@ -385,7 +386,7 @@ export default function AudioPage() {
   }
 
   const loadAudioLists = useCallback(async () => {
-    if (!auth?.access_token) {
+    if (!auth?.platform_token) {
       setAudioLists(historyToAudioListItems(listHistory('tts')));
       return;
     }
@@ -400,7 +401,7 @@ export default function AudioPage() {
     } finally {
       setListsLoading(false);
     }
-  }, [auth?.access_token, locale]);
+  }, [auth?.platform_token, locale]);
 
   useEffect(() => {
     let cancelled = false;
@@ -581,7 +582,7 @@ export default function AudioPage() {
       setError(t('audio.noModel'));
       return;
     }
-    if (!auth?.access_token) {
+    if (!auth?.platform_token) {
       setError(t('audio.loginRequired'));
       return;
     }
@@ -654,7 +655,7 @@ export default function AudioPage() {
       setError(t('audio.noModel'));
       return;
     }
-    if (!auth?.access_token) {
+    if (!auth?.platform_token) {
       setError(t('audio.loginRequired'));
       return;
     }

@@ -105,7 +105,7 @@ export default function WorkflowAgentPanel({
     if (!text || thinking) return;
 
     if (!isGommoChatConfigured()) {
-      window.alert('Bạn cần đăng nhập (Access Token Gommo) để chat với Agent.');
+      window.alert('Bạn cần đăng nhập tài khoản hệ thống để chat với Agent.');
       return;
     }
 

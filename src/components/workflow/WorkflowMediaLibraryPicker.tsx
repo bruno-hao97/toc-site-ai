@@ -12,7 +12,8 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { getGommoClient, loadAuth } from '../../services/authStore';
+import { isLoggedIn } from '../../services/authStore';
+import { getJobClient } from '../../services/platformJobClient';
 import {
   feedMediaUrl,
   feedModelLabel,
@@ -112,7 +113,7 @@ export default function WorkflowMediaLibraryPicker({
 
   const load = useCallback(
     async (after: string, reset: boolean) => {
-      if (!loadAuth()?.access_token) {
+      if (!isLoggedIn()) {
         setError('Cần đăng nhập để xem thư viện.');
         setItems([]);
         setHasMore(false);
@@ -279,14 +280,14 @@ export default function WorkflowMediaLibraryPicker({
   const handleUpload = async (files: FileList | null) => {
     const list = files ? Array.from(files) : [];
     if (!list.length) return;
-    if (!loadAuth()?.access_token) {
+    if (!isLoggedIn()) {
       setError('Cần đăng nhập để upload');
       return;
     }
     setUploading(true);
     setError('');
     try {
-      const client = getGommoClient();
+      const client = getJobClient();
       for (const file of list) {
         const valid =
           kind === 'image'

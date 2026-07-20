@@ -1,4 +1,4 @@
-import { getGommoClient, loadAuth } from './authStore';
+import { isLoggedIn, loadAuth } from './authStore';
 import {
   analyzeModel,
   buildJobPayload,
@@ -7,17 +7,18 @@ import {
   type JobSelections,
   type ModelSchema,
 } from './modelSchema';
+import { getJobClient } from './platformJobClient';
 import { createJobAndPoll } from './polling';
 import type { GommoModel, JobType } from './api';
 
-/** Có thể tạo job khi đã đăng nhập Gommo. */
+/** Có thể tạo job khi đã đăng nhập (platform hoặc Gommo). */
 export function canQuickCreate(): boolean {
-  return Boolean(loadAuth()?.access_token?.trim());
+  return isLoggedIn();
 }
 
 export async function loadQuickModels(type: JobType): Promise<GommoModel[]> {
   if (!loadAuth()) return [];
-  return parseModelsList(await getGommoClient().fetchModels(type));
+  return parseModelsList(await getJobClient().fetchModels(type));
 }
 
 export function buildQuickSchema(model: GommoModel, type: JobType): ModelSchema {
@@ -26,7 +27,7 @@ export function buildQuickSchema(model: GommoModel, type: JobType): ModelSchema 
 
 export async function uploadQuickImage(file: File): Promise<string | null> {
   if (!loadAuth()) return null;
-  const { url } = await getGommoClient().uploadImage(file);
+  const { url } = await getJobClient().uploadImage(file);
   return url;
 }
 
@@ -48,11 +49,11 @@ export async function quickGenerate({
   const auth = loadAuth();
   if (!auth) throw new Error('Chưa đăng nhập — không thể tạo job.');
 
-  const client = getGommoClient();
+  const client = getJobClient();
   const slug = modelSlug(model);
   const { payload } = buildJobPayload(model, type, selections, {
-    domain: auth.domain,
-    projectId: auth.projectId,
+    domain: auth.domain || client.domain,
+    projectId: client.projectId,
   });
 
   const { pollResult, resultUrl } = await createJobAndPoll(

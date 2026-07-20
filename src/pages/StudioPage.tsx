@@ -72,7 +72,7 @@ import {
 import {
   analyzeModel,
   buildJobPayload,
-  defaultSelections,
+  mergeSelectionsForSchema,
   modelSlug,
   parseModelsList,
   type JobSelections,
@@ -1178,21 +1178,15 @@ export default function StudioPage({
     const s = analyzeModel(currentModel, jobType);
     setSchema(s);
     setSelections((prev) => {
-      const defs = defaultSelections(s);
       const defaults = defaultSelectionsForType(jobType);
-      return {
-        ...defs,
+      return mergeSelectionsForSchema(prev, s, {
         prompt: prev.prompt || defaults.prompt,
         text: prev.text || defaults.text,
         name: prev.name || defaults.name,
-        mode: prev.mode || defs.mode,
-        ratio: prev.ratio || defs.ratio,
-        resolution: prev.resolution || defs.resolution,
-        duration: prev.duration || defs.duration,
-        images: prev.images?.length ? prev.images : defs.images,
-        references: prev.references?.length ? prev.references : defs.references,
-        subjects: prev.subjects?.length ? prev.subjects : defs.subjects,
-      };
+        ...(prev.images?.length ? { images: prev.images } : {}),
+        ...(prev.references?.length ? { references: prev.references } : {}),
+        ...(prev.subjects?.length ? { subjects: prev.subjects } : {}),
+      });
     });
   }, [currentModel, jobType]);
 
@@ -1290,8 +1284,8 @@ export default function StudioPage({
       else runSelections.images = [refUrl];
     }
     const { payload } = buildJobPayload(model, jobType, runSelections, {
-      domain: auth?.domain,
-      projectId: auth?.projectId,
+      domain: auth?.domain || client?.domain,
+      projectId: client?.projectId,
     });
 
     const localId = crypto.randomUUID();

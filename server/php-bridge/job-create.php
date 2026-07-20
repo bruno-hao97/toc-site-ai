@@ -1,13 +1,107 @@
 <?php
 declare(strict_types=1);
 
+const JOB_CREATE_BRIDGE_BUILD = '2026-07-20-hotfix2';
+
 require __DIR__ . '/bootstrap.php';
 require __DIR__ . '/gommo.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    json_out(405, ['success' => false, 'message' => 'Method not allowed']);
+// --- inline status helpers (1 file upload, không cần file phụ) ---
+if (!function_exists('is_job_success_claim')) {
+    function is_job_success_claim(string $status): bool
+    {
+        $s = strtoupper(trim($status));
+        if ($s === '') {
+            return false;
+        }
+        return $s === 'SUCCESS'
+            || $s === 'SUCCEEDED'
+            || $s === 'DONE'
+            || $s === 'COMPLETED'
+            || $s === 'FINISH'
+            || $s === 'FINISHED'
+            || strpos($s, 'SUCCESS') === 0;
+    }
+}
+if (!function_exists('is_job_failed_status')) {
+    function is_job_failed_status(string $status): bool
+    {
+        $s = strtoupper(trim($status));
+        if ($s === '') {
+            return false;
+        }
+        static $failed = [
+            'FAILED', 'FAILURE', 'ERROR', 'CANCELLED', 'CANCELED', 'REJECTED', 'FAIL',
+            'NSFW', 'BLOCKED', 'DENIED', 'TIMEOUT', 'TIMED_OUT',
+            'MEDIA_GENERATION_STATUS_FAILED', 'MEDIA_GENERATION_STATUS_ERROR',
+            'MEDIA_GENERATION_STATUS_CANCELLED',
+        ];
+        if (in_array($s, $failed, true)) {
+            return true;
+        }
+        if (
+            strpos($s, 'PENDING') === 0
+            || strpos($s, 'SUCCESS') === 0
+            || strpos($s, 'PROCESS') === 0
+            || strpos($s, 'ACTIVE') !== false
+            || strpos($s, 'QUEUE') !== false
+            || $s === 'RUNNING'
+            || $s === 'FINISH'
+            || $s === 'FINISHED'
+            || $s === 'DONE'
+            || $s === 'COMPLETED'
+        ) {
+            return false;
+        }
+        if (
+            strpos($s, 'FAIL') !== false
+            || strpos($s, 'ERROR') !== false
+            || strpos($s, 'REJECT') !== false
+            || strpos($s, 'CANCEL') !== false
+            || strpos($s, 'DENIED') !== false
+            || strpos($s, 'BLOCK') !== false
+            || strpos($s, 'TIMEOUT') !== false
+        ) {
+            return true;
+        }
+        return false;
+    }
+}
+if (!function_exists('normalize_stored_job_status')) {
+    function normalize_stored_job_status(string $status, ?string $resultUrl): string
+    {
+        if ($resultUrl) {
+            return 'success';
+        }
+        if (is_job_failed_status($status)) {
+            return strtoupper(trim($status)) !== '' ? strtoupper(trim($status)) : 'FAILED';
+        }
+        if (is_job_success_claim($status) || $status === '') {
+            return 'processing';
+        }
+        return $status;
+    }
 }
 
+// Kiểm tra deploy: GET /api/platform/job-create.php?probe=1
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && (string) ($_GET['probe'] ?? '') === '1') {
+    json_out(200, [
+        'success' => true,
+        'data' => [
+            'bridgeBuild' => JOB_CREATE_BRIDGE_BUILD,
+            'normalize_stored_job_status' => function_exists('normalize_stored_job_status'),
+            'file' => basename(__FILE__),
+        ],
+    ]);
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    json_out(405, [
+        'success' => false,
+        'message' => 'Method not allowed',
+        'bridgeBuild' => JOB_CREATE_BRIDGE_BUILD,
+    ]);
+}
 [$pdo, $user] = require_bearer_user();
 $body = read_json_body();
 
@@ -18,8 +112,8 @@ if (!is_array($fields)) {
     $fields = [];
 }
 
-if ($type !== 'image') {
-    json_out(400, ['success' => false, 'message' => 'Phase 1 chỉ hỗ trợ job type=image']);
+if ($type === '' || !preg_match('/^[a-z0-9-]+$/', $type)) {
+    json_out(400, ['success' => false, 'message' => 'job type không hợp lệ']);
 }
 if ($modelId === '') {
     json_out(400, ['success' => false, 'message' => 'Thiếu modelId']);
@@ -42,11 +136,9 @@ try {
 
     $providerJobId = extract_provider_job_id($envelope);
     $resultUrl = extract_result_url($envelope);
-    $status = extract_status($envelope);
-    if ($resultUrl) {
-        $status = 'success';
-    } elseif ($status === '') {
-        $status = $providerJobId ? 'processing' : 'pending';
+    $status = normalize_stored_job_status(extract_status($envelope), $resultUrl);
+    if ($status === 'processing' && !$providerJobId && !$resultUrl) {
+        $status = 'pending';
     }
 
     $prompt = trim((string) ($fields['prompt'] ?? ''));
@@ -59,6 +151,13 @@ try {
         return $v !== null && $v !== '';
     });
     $metaJson = $meta === [] ? null : json_encode($meta, JSON_UNESCAPED_UNICODE);
+
+    // Create đã fail ngay → hoàn credit trong cùng transaction.
+    $alreadyFailed = !$resultUrl && is_job_failed_status($status);
+    if ($alreadyFailed) {
+        refund_user_credits($pdo, (string) $user['id'], $cost);
+        $status = $status !== '' && $status !== 'processing' ? $status : 'FAILED';
+    }
 
     $pdo->prepare(
         'INSERT INTO platform_jobs (id, user_id, job_type, model_id, provider, provider_job_id, status, result_url, prompt, meta_json, cost_credits)
@@ -77,6 +176,16 @@ try {
         $cost,
     ]);
 
+    if ($alreadyFailed) {
+        try {
+            $pdo->prepare(
+                'UPDATE platform_jobs SET refunded_at = CURRENT_TIMESTAMP WHERE id = ? AND refunded_at IS NULL'
+            )->execute([$jobId]);
+        } catch (Throwable $ignored) {
+            // Cột refunded_at có thể chưa migrate — bỏ qua.
+        }
+    }
+
     $pdo->commit();
     $freshUser = find_user_by_id($pdo, (string) $user['id']);
 
@@ -87,11 +196,16 @@ try {
             'costCredits' => $cost,
             'credits' => (int) (($freshUser ?: $user)['credits']),
             'envelope' => $envelope,
+            'bridgeVersion' => JOB_CREATE_BRIDGE_BUILD,
         ],
     ]);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    json_out(500, ['success' => false, 'message' => 'Tạo job thất bại: ' . $e->getMessage()]);
+    json_out(500, [
+        'success' => false,
+        'message' => 'Tạo job thất bại: ' . $e->getMessage(),
+        'bridgeBuild' => JOB_CREATE_BRIDGE_BUILD,
+    ]);
 }

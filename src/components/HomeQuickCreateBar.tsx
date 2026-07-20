@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import type { GommoModel, JobType } from '../services/api';
 import type { JobSelections, ModelOption, ModelSchema } from '../services/modelSchema';
-import { defaultSelections, modelSlug } from '../services/modelSchema';
+import { mergeSelectionsForSchema, modelSlug } from '../services/modelSchema';
 import {
   buildQuickSchema,
   canQuickCreate,
@@ -164,14 +164,7 @@ export default function HomeQuickCreateBar() {
 
   useEffect(() => {
     if (!schema) return;
-    const defs = defaultSelections(schema);
-    setSelections((prev) => ({
-      ...prev,
-      ratio: prev.ratio || defs.ratio,
-      mode: prev.mode || defs.mode,
-      resolution: prev.resolution || defs.resolution,
-      duration: prev.duration || defs.duration,
-    }));
+    setSelections((prev) => mergeSelectionsForSchema(prev, schema));
   }, [schema]);
 
   useEffect(() => {

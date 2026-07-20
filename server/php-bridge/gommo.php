@@ -24,6 +24,73 @@ function gommo_post_form(string $path, array $fields): array
     return gommo_request_form($g['api_base'], $path, $fields);
 }
 
+/**
+ * Upload multipart (ảnh/video) qua token admin dùng chung.
+ *
+ * @param array<string, scalar> $fields
+ * @return array<string, mixed>
+ */
+function gommo_upload_multipart(
+    string $path,
+    array $fields,
+    string $fileField,
+    string $tmpPath,
+    string $fileName,
+    string $mime = ''
+): array {
+    $g = gommo_cfg();
+    if ($g['token'] === '') {
+        throw new RuntimeException('Chưa cấu hình gommo_access_token trên server');
+    }
+    if ($tmpPath === '' || !is_file($tmpPath)) {
+        throw new RuntimeException('File upload không hợp lệ');
+    }
+
+    $fields['domain'] = $fields['domain'] ?? $g['domain'];
+    $fields['project_id'] = $fields['project_id'] ?? $g['project_id'];
+    $fields['access_token'] = $g['token'];
+    $fields[$fileField] = new CURLFile(
+        $tmpPath,
+        $mime !== '' ? $mime : (mime_content_type($tmpPath) ?: 'application/octet-stream'),
+        $fileName !== '' ? $fileName : basename($tmpPath)
+    );
+
+    $url = rtrim($g['api_base'], '/') . $path;
+    $ch = curl_init($url);
+    if ($ch === false) {
+        throw new RuntimeException('curl init failed');
+    }
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $fields,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 180,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . $g['token'],
+            'Accept: application/json',
+        ],
+    ]);
+    $raw = curl_exec($ch);
+    $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+
+    if ($raw === false) {
+        throw new RuntimeException('Gommo upload failed: ' . $err);
+    }
+
+    $parsed = json_decode($raw, true);
+    if (!is_array($parsed)) {
+        throw new RuntimeException('Gommo upload response không phải JSON: ' . substr($raw, 0, 200));
+    }
+    if ($status >= 400 || ($parsed['success'] ?? true) === false) {
+        $msg = (string) ($parsed['message'] ?? ('HTTP ' . $status));
+        throw new RuntimeException($msg);
+    }
+
+    return $parsed;
+}
+
 /** POST form tới base tùy ý — luôn chèn access_token dùng chung của admin. */
 function gommo_request_form(string $base, string $path, array $fields): array
 {
@@ -149,6 +216,95 @@ function extract_status(array $envelope): string
         }
     }
     return '';
+}
+
+/** Status “thành công” chỉ khi có result_url thật. */
+function is_job_success_claim(string $status): bool
+{
+    $s = strtoupper(trim($status));
+    if ($s === '') {
+        return false;
+    }
+    return $s === 'SUCCESS'
+        || $s === 'SUCCEEDED'
+        || $s === 'DONE'
+        || $s === 'COMPLETED'
+        || $s === 'FINISH'
+        || $s === 'FINISHED'
+        || strpos($s, 'SUCCESS') === 0;
+}
+
+/** Status fail từ Gommo gateway / imageInfo. */
+function is_job_failed_status(string $status): bool
+{
+    $s = strtoupper(trim($status));
+    if ($s === '') {
+        return false;
+    }
+    static $failed = [
+        'FAILED',
+        'FAILURE',
+        'ERROR',
+        'CANCELLED',
+        'CANCELED',
+        'REJECTED',
+        'FAIL',
+        'NSFW',
+        'BLOCKED',
+        'DENIED',
+        'TIMEOUT',
+        'TIMED_OUT',
+        'MEDIA_GENERATION_STATUS_FAILED',
+        'MEDIA_GENERATION_STATUS_ERROR',
+        'MEDIA_GENERATION_STATUS_CANCELLED',
+    ];
+    if (in_array($s, $failed, true)) {
+        return true;
+    }
+    if (
+        strpos($s, 'PENDING') === 0
+        || strpos($s, 'SUCCESS') === 0
+        || strpos($s, 'PROCESS') === 0
+        || strpos($s, 'ACTIVE') !== false
+        || strpos($s, 'QUEUE') !== false
+        || $s === 'RUNNING'
+        || $s === 'FINISH'
+        || $s === 'FINISHED'
+        || $s === 'DONE'
+        || $s === 'COMPLETED'
+    ) {
+        return false;
+    }
+    if (
+        strpos($s, 'FAIL') !== false
+        || strpos($s, 'ERROR') !== false
+        || strpos($s, 'REJECT') !== false
+        || strpos($s, 'CANCEL') !== false
+        || strpos($s, 'DENIED') !== false
+        || strpos($s, 'BLOCK') !== false
+        || strpos($s, 'TIMEOUT') !== false
+    ) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Chuẩn hóa status lưu DB: không bao giờ ghi success nếu thiếu result_url.
+ */
+function normalize_stored_job_status(string $status, ?string $resultUrl): string
+{
+    if ($resultUrl) {
+        return 'success';
+    }
+    if (is_job_failed_status($status)) {
+        return strtoupper(trim($status)) !== '' ? strtoupper(trim($status)) : 'FAILED';
+    }
+    // Gommo báo SUCCESS/FINISH nhưng chưa có URL → vẫn đang xử lý
+    if (is_job_success_claim($status) || $status === '') {
+        return 'processing';
+    }
+    return $status;
 }
 
 function image_job_cost(): int

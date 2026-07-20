@@ -228,12 +228,17 @@ function extractAudioFileUrl(audioInfo?: AudioInfo | null): string | null {
 
 async function postAudioApi(body: URLSearchParams): Promise<Record<string, unknown>> {
   let lastErr: Error | null = null;
+  const token = loadAuth()?.platform_token?.trim();
+  if (!token) throw new UpstreamMeError('Chưa đăng nhập', 401);
 
   for (const url of AUDIO_URLS) {
     try {
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
         body: body.toString(),
       });
 
@@ -274,11 +279,10 @@ async function postAudioApi(body: URLSearchParams): Promise<Record<string, unkno
 
 function baseAudioFields(locale: AppLocale, projectId?: string): URLSearchParams {
   const auth = loadAuth();
-  if (!auth?.access_token || !auth.domain) throw new UpstreamMeError('Chưa đăng nhập', 401);
+  if (!auth?.platform_token) throw new UpstreamMeError('Chưa đăng nhập', 401);
 
   return new URLSearchParams({
-    access_token: auth.access_token.trim(),
-    domain: auth.domain.trim(),
+    domain: auth.domain?.trim() || 'vmedia.ai',
     project_id: resolveProjectId(projectId || auth.projectId),
     device_id: GOMMO_CHAT_CONFIG.deviceId,
     device_name: GOMMO_CHAT_CONFIG.deviceName,

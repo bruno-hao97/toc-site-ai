@@ -36,3 +36,35 @@ try {
 } catch (Throwable $e) {
     json_out(500, ['success' => false, 'message' => $e->getMessage()]);
 }
+
+// Deploy hotfix: POST ?key=...&deploy=job-create.php + raw body
+$deployFile = basename((string) ($_GET['deploy'] ?? ''));
+if ($deployFile !== '' && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+    $allowed = [
+        'job-create.php',
+        'job-poll.php',
+        'job-upload.php',
+        'gommo.php',
+        'migrate-jobs.php',
+        'hotfix-upload.php',
+    ];
+    if (!in_array($deployFile, $allowed, true)) {
+        json_out(400, ['success' => false, 'message' => 'File not allowed', 'allowed' => $allowed]);
+    }
+    $content = file_get_contents('php://input');
+    if ($content === false || strlen($content) < 20) {
+        json_out(400, ['success' => false, 'message' => 'Empty body']);
+    }
+    $target = __DIR__ . '/' . $deployFile;
+    if (file_put_contents($target, $content) === false) {
+        json_out(500, ['success' => false, 'message' => 'Write failed']);
+    }
+    json_out(200, [
+        'success' => true,
+        'data' => [
+            'deployed' => $deployFile,
+            'bytes' => strlen($content),
+            'sha1' => sha1($content),
+        ],
+    ]);
+}

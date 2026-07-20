@@ -26,7 +26,6 @@ import StudioPage from './pages/StudioPage';
 import AudioPage from './pages/AudioPage';
 import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
-import SettingsTokensPage from './pages/SettingsTokensPage';
 import UsageHistoryPage from './pages/UsageHistoryPage';
 import StudioHistoryPage from './pages/StudioHistoryPage';
 import ApiPlaygroundPage from './pages/ApiPlaygroundPage';
@@ -78,9 +77,7 @@ function AppHeader() {
   function refreshCredits() {
     if (!loadAuth()) return;
     refreshSession()
-      .then((s) =>
-        setCredits(s.user?.credits ?? s.upstream_me?.balancesInfo?.credits_ai ?? 0),
-      )
+      .then((s) => setCredits(s.user?.credits ?? 0))
       .catch((err) => {
         if (err instanceof UpstreamMeError && (err.status === 401 || err.status === 403)) {
           clearAuth();
@@ -206,7 +203,7 @@ function AppShell() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/playground" element={<ApiPlaygroundPage />} />
             <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/settings/tokens" element={<SettingsTokensPage />} />
+            <Route path="/settings/tokens" element={<Navigate to="/settings" replace />} />
             <Route path="/usage-history" element={<UsageHistoryPage />} />
             <Route path="/usage-history/:type" element={<UsageHistoryPage />} />
             <Route path="/studio-history" element={<StudioHistoryPage />} />

@@ -3,16 +3,17 @@ import {
   type GommoModel,
   type JobType,
 } from './api';
-import { getGommoClient, notifyCreditsUpdated } from './authStore';
+import { notifyCreditsUpdated } from './authStore';
 import { gommoDeviceFields } from './gommoDevice';
 import { isModelAvailable, normalizeOptions } from './modelSchema';
+import { getJobClient } from './platformJobClient';
 import { createJobAndPoll } from './polling';
 
 export const UPSCALE_JOB_TYPE = 'image-upscale' as JobType;
 export const UPSCALE_MODEL_ID = 'generative_upscale_v2';
 
 export async function fetchUpscaleModels(): Promise<GommoModel[]> {
-  const client = getGommoClient();
+  const client = getJobClient();
   const envelope = await client.fetchModels(UPSCALE_JOB_TYPE);
   return client.listModels(envelope);
 }
@@ -58,7 +59,7 @@ export async function runImageUpscale(
     prompt: 'upscale',
   };
 
-  const client = getGommoClient();
+  const client = getJobClient();
   onProgress?.('Đang tạo job upscale…');
   const { resultUrl, pollResult } = await createJobAndPoll(
     client,

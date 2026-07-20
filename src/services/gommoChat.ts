@@ -21,9 +21,9 @@ export interface AskOptions {
   config?: Partial<GommoChatConfig>;
 }
 
-/** Đã đăng nhập Gommo (có access_token) thì mới chat được. */
+/** Chat dùng JWT platform; gateway chèn token admin. */
 export function isGommoChatConfigured(): boolean {
-  return Boolean(loadAuth()?.access_token?.trim());
+  return Boolean(loadAuth()?.platform_token?.trim());
 }
 
 function uuid(): string {
@@ -46,14 +46,13 @@ function serializeMessages(history: ChatTurn[]): string {
 /** API 1 & 3 — lưu tin nhắn (best-effort, không chặn câu trả lời). */
 async function saveMessage(
   cfg: GommoChatConfig,
-  token: string,
+  platformToken: string,
   domain: string,
   args: { messageId: string; sessionId: string; role: 'user' | 'model'; text: string; metadata: Record<string, unknown> },
 ): Promise<void> {
   try {
     const form = new URLSearchParams();
     form.set('action', 'save_message');
-    form.set('access_token', token);
     form.set('domain', domain);
     form.set('message_id', args.messageId);
     form.set('session_id', args.sessionId);
@@ -66,7 +65,10 @@ async function saveMessage(
     form.set('device_name', cfg.deviceName);
     await fetch(`${cfg.baseUrl}/ai-chat-sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        Authorization: `Bearer ${platformToken}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
       body: form.toString(),
     });
   } catch (err) {
@@ -80,11 +82,11 @@ async function saveMessage(
  */
 export async function askGommo(userText: string, opts: AskOptions): Promise<string> {
   const auth = loadAuth();
-  if (!auth?.access_token) {
-    throw new Error('Chưa đăng nhập Gommo — không thể chat.');
+  if (!auth?.platform_token) {
+    throw new Error('Chưa đăng nhập — không thể chat.');
   }
   const cfg: GommoChatConfig = { ...GOMMO_CHAT_CONFIG, ...opts.config };
-  const token = auth.access_token;
+  const platformToken = auth.platform_token;
   const domain = auth.domain || DEFAULT_DOMAIN;
 
   const userMessageId = uuid();
@@ -109,7 +111,7 @@ export async function askGommo(userText: string, opts: AskOptions): Promise<stri
 
   try {
     if (cfg.persistHistory) {
-      await saveMessage(cfg, token, domain, {
+      await saveMessage(cfg, platformToken, domain, {
         messageId: userMessageId,
         sessionId: opts.sessionId,
         role: 'user',
@@ -120,7 +122,6 @@ export async function askGommo(userText: string, opts: AskOptions): Promise<stri
 
     const form = new URLSearchParams();
     form.set('action', 'stream');
-    form.set('access_token', token);
     form.set('domain', domain);
     form.set('server', cfg.server);
     form.set('model', cfg.model);
@@ -137,7 +138,10 @@ export async function askGommo(userText: string, opts: AskOptions): Promise<stri
 
     const res = await fetch(`${cfg.baseUrl}/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        Authorization: `Bearer ${platformToken}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
       body: form.toString(),
       signal: ac.signal,
     });
@@ -199,7 +203,7 @@ export async function askGommo(userText: string, opts: AskOptions): Promise<stri
     if (!done && buffer.trim()) consumeLine(buffer.trim());
 
     if (cfg.persistHistory) {
-      await saveMessage(cfg, token, domain, {
+      await saveMessage(cfg, platformToken, domain, {
         messageId: assistantMessageId,
         sessionId: opts.sessionId,
         role: 'model',

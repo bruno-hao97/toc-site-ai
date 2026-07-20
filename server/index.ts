@@ -7,6 +7,7 @@ import payosRoutes from './routes/payos.js';
 import authRoutes from './routes/auth.js';
 import creditsRoutes from './routes/credits.js';
 import jobsRoutes from './routes/jobs.js';
+import platformBridgeRoutes from './routes/platformBridge.js';
 import { config } from './config.js';
 import { migrateDatabase } from './db/migrate.js';
 import { isDatabaseConfigured } from './db/pool.js';
@@ -19,6 +20,9 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(gommoProxyRoutes);
 
 app.use(express.json({ limit: '25mb' }));
+
+// Local dev: job-create/job-poll qua Node (tránh PHP bridge cũ trên VPS)
+app.use('/api/platform', platformBridgeRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({

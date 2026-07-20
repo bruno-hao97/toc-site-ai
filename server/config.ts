@@ -2,6 +2,7 @@ import 'dotenv/config';
 import path from 'node:path';
 
 const appUrl = (process.env.APP_URL || 'http://localhost:5173').replace(/\/$/, '');
+const isProduction = process.env.NODE_ENV === 'production';
 
 export const config = {
   port: Number(process.env.PORT) || 3001,
@@ -13,7 +14,12 @@ export const config = {
   auth: {
     signupBonusCredits: Number(process.env.SIGNUP_BONUS_CREDITS) || 0,
     /** Khi MySQL chỉ mở localhost trên VPS — proxy auth qua PHP bridge */
-    bridgeUrl: (process.env.AUTH_BRIDGE_URL || '').trim().replace(/\/$/, ''),
+    bridgeUrl: (
+      process.env.AUTH_BRIDGE_URL ||
+      (!isProduction ? 'https://pro.agi.vn/api/platform' : '')
+    )
+      .trim()
+      .replace(/\/$/, ''),
   },
   db: {
     host: (process.env.DB_HOST || '').trim(),

@@ -1,10 +1,9 @@
 import { FormEvent, useState } from 'react';
-import { getDisplayUser, getUpstreamMe, loadAuth } from '../../services/authStore';
-import { gommoChangePassword } from '../../services/gommoAuth';
+import { getDisplayUser, loadAuth } from '../../services/authStore';
+import { PLATFORM_BRIDGE } from '../../services/platformBridge';
 
 export default function AccountSettingsPage() {
   const user = getDisplayUser();
-  const me = getUpstreamMe();
   const [name, setName] = useState(user.name || '');
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -38,23 +37,29 @@ export default function AccountSettingsPage() {
     }
 
     const auth = loadAuth();
-    if (!auth?.access_token) {
+    if (!auth?.platform_token) {
       setError('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
       return;
     }
 
     setIsChangingPassword(true);
     try {
-      const message = await gommoChangePassword({
-        accessToken: auth.access_token,
-        domain: auth.domain || '',
-        currentPassword: currentPw,
-        newPassword: newPw,
+      const res = await fetch(PLATFORM_BRIDGE.changePassword, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${auth.platform_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
       });
+      const parsed = (await res.json()) as { success?: boolean; message?: string };
+      if (!res.ok || parsed.success === false) {
+        throw new Error(parsed.message || `HTTP ${res.status}`);
+      }
       setCurrentPw('');
       setNewPw('');
       setConfirmPw('');
-      setNotice(message);
+      setNotice(parsed.message || 'Đổi mật khẩu thành công');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Đổi mật khẩu thất bại.');
     } finally {
@@ -75,7 +80,7 @@ export default function AccountSettingsPage() {
           </label>
           <label className="field">
             <span className="label">ĐỊA CHỈ EMAIL</span>
-            <input value={user.email || me?.userInfo?.email || ''} readOnly />
+            <input value={user.email || ''} readOnly />
           </label>
         </form>
       </section>

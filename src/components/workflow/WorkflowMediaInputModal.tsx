@@ -10,7 +10,8 @@ import {
   Video,
   X,
 } from 'lucide-react';
-import { getGommoClient, loadAuth } from '../../services/authStore';
+import { isLoggedIn } from '../../services/authStore';
+import { getJobClient } from '../../services/platformJobClient';
 import {
   clampRandomRange,
   MEDIA_INPUT_PORTS,
@@ -144,11 +145,11 @@ export default function WorkflowMediaInputModal({
       setError(kind === 'image' ? 'Chỉ chấp nhận file ảnh' : 'Chỉ chấp nhận file video');
       return false;
     }
-    if (!loadAuth()?.access_token) {
+    if (!isLoggedIn()) {
       setError('Cần đăng nhập để upload');
       return false;
     }
-    const client = getGommoClient();
+    const client = getJobClient();
     const { url } =
       kind === 'image' ? await client.uploadImage(file) : await client.uploadVideo(file);
     setDraft((d) => {

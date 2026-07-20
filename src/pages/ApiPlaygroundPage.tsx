@@ -2,7 +2,6 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { Link } from 'react-router-dom';
 import {
   BASE_URL,
-  GommoClient,
   GommoApiError,
   type GommoModel,
   type JobType,
@@ -22,8 +21,8 @@ import {
 import { DEFAULT_DOMAIN } from '../services/settingsStore';
 import { extractPollSnapshot } from '../services/mediaGenerationStatus';
 import { createJobAndPoll, type PollProgress } from '../services/polling';
-import { isLoggedIn, getGommoClient } from '../services/authStore';
-import { hasToken, loadSettings } from '../services/settingsStore';
+import { isLoggedIn, loadAuth } from '../services/authStore';
+import { getJobClient } from '../services/platformJobClient';
 import UrlField from '../components/UrlField';
 
 const JOB_TYPES: { value: JobType; label: string }[] = [
@@ -50,11 +49,7 @@ export default function ApiPlaygroundPage() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const client = useMemo(() => {
-    if (isLoggedIn()) return getGommoClient();
-    const s = loadSettings();
-    return new GommoClient(s);
-  }, []);
+  const client = useMemo(() => getJobClient(), []);
 
   const currentModel = useMemo(
     () => models.find((m) => modelSlug(m) === selectedSlug) ?? null,
@@ -62,8 +57,8 @@ export default function ApiPlaygroundPage() {
   );
 
   const loadModels = useCallback(async (type: JobType, force = false) => {
-    if (!isLoggedIn() && !hasToken()) {
-      setError('Chưa đăng nhập — dùng Access Token tại /login.');
+    if (!isLoggedIn()) {
+      setError('Chưa đăng nhập.');
       setModels([]);
       return;
     }
@@ -123,7 +118,10 @@ export default function ApiPlaygroundPage() {
       return;
     }
     try {
-      const { payload } = buildJobPayload(currentModel, jobType, selections, loadSettings());
+      const { payload } = buildJobPayload(currentModel, jobType, selections, {
+        domain: client.domain,
+        projectId: client.projectId,
+      });
       setRequestPreview(payload);
     } catch {
       setRequestPreview(null);
@@ -145,8 +143,8 @@ export default function ApiPlaygroundPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!hasToken()) {
-      setError('Chưa có token.');
+    if (!isLoggedIn()) {
+      setError('Chưa đăng nhập.');
       return;
     }
     if (!currentModel || !schema) {
@@ -165,7 +163,10 @@ export default function ApiPlaygroundPage() {
     setResultUrl(null);
 
     try {
-      const { payload } = buildJobPayload(currentModel, jobType, selections, loadSettings());
+      const { payload } = buildJobPayload(currentModel, jobType, selections, {
+        domain: client.domain,
+        projectId: client.projectId,
+      });
       const modelId = modelSlug(currentModel);
 
       const result = await createJobAndPoll(
@@ -240,9 +241,9 @@ export default function ApiPlaygroundPage() {
         </p>
       </div>
 
-      {!hasToken() && (
+      {!isLoggedIn() && (
         <div className="banner warn">
-          Chưa có token. <Link to="/settings">Vào Settings</Link> để nhập access_token.
+          Chưa đăng nhập. <Link to="/login">Đăng nhập</Link> để dùng playground.
         </div>
       )}
 
@@ -418,7 +419,7 @@ export default function ApiPlaygroundPage() {
               )}
 
               <div className="actions">
-                <button type="submit" className="btn primary btn-job" disabled={submitting || !hasToken()}>
+                <button type="submit" className="btn primary btn-job" disabled={submitting || !isLoggedIn()}>
                   {submitting ? 'Đang chạy…' : 'Tạo job & poll'}
                 </button>
                 {submitting && (
@@ -465,9 +466,9 @@ export default function ApiPlaygroundPage() {
             <pre>
               {JSON.stringify(
                 {
-                  domain: loadSettings().domain,
-                  project_id: loadSettings().projectId,
-                  Authorization: hasToken() ? 'Bearer ••••••••' : null,
+                  domain: client.domain,
+                  project_id: client.projectId,
+                  Authorization: loadAuth()?.platform_token ? 'Platform JWT ••••••••' : null,
                 },
                 null,
                 2,

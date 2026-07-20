@@ -207,7 +207,7 @@ const vi: TranslationMap = {
   'audio.noVoice': 'Vui lòng chọn giọng đọc.',
   'audio.noModel': 'Chưa có model TTS cho provider này.',
   'audio.noScript': 'Vui lòng nhập kịch bản.',
-  'audio.loginRequired': 'Cần đăng nhập bằng Access Token Gommo.',
+  'audio.loginRequired': 'Cần đăng nhập tài khoản hệ thống.',
   'audio.generateFailed': 'Tạo giọng đọc thất bại.',
   'audio.preview': 'Nghe thử',
   'audio.comingSoon': 'Sắp ra mắt',
