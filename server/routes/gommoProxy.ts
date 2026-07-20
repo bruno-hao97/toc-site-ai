@@ -1,13 +1,16 @@
 import express, { Router } from 'express';
 import { Readable } from 'node:stream';
+import fs from 'node:fs';
+import path from 'node:path';
+import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
-import { AuthError, getUserFromAuthHeader } from '../services/platformAuth.js';
+import { AuthError } from '../services/platformAuth.js';
+import { getGommoAdminToken } from '../services/gommoAdminClient.js';
 
 const router = Router();
 
 const rawBody = express.raw({ type: () => true, limit: '50mb' });
 
-/** Không forward — hop-by-hop hoặc sẽ set lại khi buffer body. */
 const SKIP_RESPONSE_HEADERS = new Set([
   'connection',
   'keep-alive',
@@ -19,8 +22,50 @@ const SKIP_RESPONSE_HEADERS = new Set([
   'upgrade',
   'host',
   'content-length',
-  'content-encoding', // fetch đã giải nén body — giữ header gzip làm browser lỗi parse
+  'content-encoding',
 ]);
+
+function readPhpJwtSecret(): string {
+  try {
+    const filePath = path.join(process.cwd(), 'server', 'php-bridge', 'config.local.php');
+    const text = fs.readFileSync(filePath, 'utf8');
+    return text.match(/'jwt_secret'\s*=>\s*'([^']*)'/)?.[1]?.trim() || '';
+  } catch {
+    return '';
+  }
+}
+
+function readPhpDomain(): string {
+  try {
+    const filePath = path.join(process.cwd(), 'server', 'php-bridge', 'config.local.php');
+    const text = fs.readFileSync(filePath, 'utf8');
+    return text.match(/'gommo_domain'\s*=>\s*'([^']*)'/)?.[1]?.trim() || '';
+  } catch {
+    return '';
+  }
+}
+
+/** JWT platform (HS256) — thử JWT_SECRET local rồi jwt_secret PHP bridge. */
+function isPlatformJwt(token: string): boolean {
+  if (!token || token.split('.').length !== 3) return false;
+  const secrets = [config.jwt.secret, readPhpJwtSecret()].filter(Boolean);
+  for (const secret of secrets) {
+    try {
+      jwt.verify(token, secret);
+      return true;
+    } catch {
+      // thử secret tiếp theo
+    }
+  }
+  return false;
+}
+
+function bearerFromReq(req: express.Request): string {
+  const raw = req.headers.authorization;
+  if (typeof raw !== 'string') return '';
+  const m = raw.match(/^Bearer\s+(\S+)/i);
+  return m?.[1]?.trim() || '';
+}
 
 function upstreamHeaders(req: express.Request, body?: Buffer): Record<string, string> {
   const out: Record<string, string> = {
@@ -42,12 +87,12 @@ function copyUpstreamHeaders(upstream: Response, res: express.Response): void {
 }
 
 function buildUpstreamUrl(upstreamBase: string, originalUrl: string, stripPrefix?: string): string {
-  let path = originalUrl;
-  if (stripPrefix && path.startsWith(stripPrefix)) {
-    path = path.slice(stripPrefix.length) || '/';
+  let p = originalUrl;
+  if (stripPrefix && p.startsWith(stripPrefix)) {
+    p = p.slice(stripPrefix.length) || '/';
   }
-  if (!path.startsWith('/')) path = `/${path}`;
-  return `${upstreamBase.replace(/\/$/, '')}${path}`;
+  if (!p.startsWith('/')) p = `/${p}`;
+  return `${upstreamBase.replace(/\/$/, '')}${p}`;
 }
 
 function shouldStreamResponse(req: express.Request, contentType: string): boolean {
@@ -55,6 +100,11 @@ function shouldStreamResponse(req: express.Request, contentType: string): boolea
   return req.originalUrl.includes('/chat');
 }
 
+/**
+ * Hai chế độ:
+ * 1) Bearer = JWT platform → thay bằng token admin.
+ * 2) Bearer = Gommo access_token → passthrough token user.
+ */
 async function proxyPass(
   req: express.Request,
   res: express.Response,
@@ -63,19 +113,31 @@ async function proxyPass(
 ): Promise<void> {
   const rawUrl = buildUpstreamUrl(upstreamBase, req.originalUrl, stripPrefix);
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
+  const bearer = bearerFromReq(req);
 
   try {
-    if (!config.gommo.accessToken) {
-      res.status(503).json({ success: false, message: 'Chưa cấu hình token admin trên server' });
+    const useAdmin = isPlatformJwt(bearer);
+    const domain = config.gommo.apiDomain || readPhpDomain() || 'vmedia.ai';
+    let gommoToken = '';
+
+    if (useAdmin) {
+      gommoToken = getGommoAdminToken() || config.gommo.accessToken;
+      if (!gommoToken) {
+        res.status(503).json({ success: false, message: 'Chưa cấu hình token admin trên server' });
+        return;
+      }
+    } else if (bearer) {
+      gommoToken = bearer;
+    } else {
+      res.status(401).json({ success: false, message: 'Thiếu token đăng nhập' });
       return;
     }
-    await getUserFromAuthHeader(
-      typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined,
-    );
 
     const urlObj = new URL(rawUrl);
-    urlObj.searchParams.set('access_token', config.gommo.accessToken);
-    urlObj.searchParams.set('domain', config.gommo.apiDomain);
+    if (useAdmin) {
+      urlObj.searchParams.set('access_token', gommoToken);
+      urlObj.searchParams.set('domain', domain);
+    }
 
     const contentType = String(req.headers['content-type'] || '').toLowerCase();
     let body: Buffer | undefined;
@@ -83,22 +145,35 @@ async function proxyPass(
       const raw = req.body as Buffer;
       if (contentType.includes('application/x-www-form-urlencoded')) {
         const form = new URLSearchParams(raw?.toString('utf8') || '');
-        form.set('access_token', config.gommo.accessToken);
-        form.set('domain', config.gommo.apiDomain);
+        if (useAdmin) {
+          form.set('access_token', gommoToken);
+          form.set('domain', domain);
+        } else if (!form.get('access_token')) {
+          form.set('access_token', gommoToken);
+        }
+        if (!form.get('domain') && domain) form.set('domain', domain);
         body = Buffer.from(form.toString());
       } else if (contentType.includes('application/json')) {
         let parsed: Record<string, unknown> = {};
         try {
           parsed = JSON.parse(raw?.toString('utf8') || '{}') as Record<string, unknown>;
         } catch {
-          // Upstream nhận object rỗng thay vì body JSON lỗi.
+          // ignore
         }
-        parsed.access_token = config.gommo.accessToken;
-        parsed.domain = config.gommo.apiDomain;
+        if (useAdmin) {
+          parsed.access_token = gommoToken;
+          parsed.domain = domain;
+        } else if (!parsed.access_token) {
+          parsed.access_token = gommoToken;
+        }
+        if (!parsed.domain && domain) parsed.domain = domain;
         body = Buffer.from(JSON.stringify(parsed));
       } else if (contentType.includes('multipart/form-data')) {
-        res.status(400).json({ success: false, message: 'Upload phải đi qua endpoint platform' });
-        return;
+        if (useAdmin) {
+          res.status(400).json({ success: false, message: 'Upload phải đi qua endpoint platform' });
+          return;
+        }
+        body = raw;
       } else if (raw?.length) {
         res.status(415).json({ success: false, message: 'Content-Type không được hỗ trợ' });
         return;
@@ -106,7 +181,7 @@ async function proxyPass(
     }
 
     const headers = upstreamHeaders(req, body);
-    headers.authorization = `Bearer ${config.gommo.accessToken}`;
+    headers.authorization = `Bearer ${gommoToken}`;
     const upstream = await fetch(urlObj.toString(), {
       method: req.method,
       headers,
@@ -114,7 +189,6 @@ async function proxyPass(
     });
 
     const responseContentType = upstream.headers.get('content-type') ?? '';
-
     res.status(upstream.status);
     copyUpstreamHeaders(upstream, res);
 
@@ -149,7 +223,14 @@ function mountProxy(mountPath: string, upstreamBase: string, stripPrefix?: strin
   });
 }
 
-/** Pass-through proxy che URL Gommo — giữ nguyên method/body/header/payload. */
+const GW = '/api/platform/gw.php';
+
+/** Frontend gọi qua gw.php — proxy local (tránh VPS gw.php cũ bắt JWT). */
+mountProxy(`${GW}/v2`, config.gommo.baseUrl, `${GW}/v2`);
+mountProxy(`${GW}/api/apps/go-mmo`, config.gommo.authBaseUrl, GW);
+mountProxy(`${GW}/api/v2`, config.gommo.authBaseUrl, GW);
+mountProxy(`${GW}/ai`, config.gommo.authBaseUrl, GW);
+
 mountProxy('/v2', config.gommo.baseUrl, '/v2');
 mountProxy('/ai', config.gommo.authBaseUrl);
 mountProxy('/api/v2', config.gommo.authBaseUrl);

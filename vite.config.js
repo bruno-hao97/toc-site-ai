@@ -17,12 +17,20 @@ export default defineConfig({
     allowedHosts: true,     // Cho phép Cloudflare Tunnel
 
     proxy: {
-      // Job hotfix local (Node) — trước proxy PHP bridge VPS
+      // Local Node — trước proxy PHP bridge VPS
       '/api/platform/job-create.php': {
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
       '/api/platform/job-poll.php': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/platform/token-me.php': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/platform/gw.php': {
         target: 'http://localhost:3001',
         changeOrigin: true,
       },

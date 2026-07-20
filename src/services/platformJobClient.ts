@@ -5,8 +5,9 @@ import {
   type JobType,
   type PollMedia,
 } from './api';
-import { loadAuth, saveAuth } from './authStore';
+import { loadAuth, getGommoClient, saveAuth } from './authStore';
 import { PLATFORM_BRIDGE } from './platformBridge';
+import { extractUploadUrl } from './uploadUrl';
 
 /** GommoClient qua server — trừ credit platform + token admin VMedia. */
 export class PlatformJobClient {
@@ -49,9 +50,11 @@ export class PlatformJobClient {
     file: File,
     fileName?: string,
   ): Promise<{ url: string; envelope: GommoEnvelope }> {
+    const name = fileName || file.name || (kind === 'video' ? 'video.mp4' : 'image.png');
     const form = new FormData();
     form.append('kind', kind);
-    form.append('file', file, fileName || file.name);
+    form.append('file', file, name);
+    form.append('file_name', name);
 
     const res = await fetch(PLATFORM_BRIDGE.jobUpload, {
       method: 'POST',
@@ -72,12 +75,18 @@ export class PlatformJobClient {
     } catch {
       throw new Error(text || `HTTP ${res.status}`);
     }
-    if (!res.ok || !parsed.success || !parsed.data?.url) {
+    if (!res.ok || !parsed.success) {
       throw new Error(parsed.message || 'Upload thất bại');
     }
+    const url =
+      parsed.data?.url ||
+      (parsed.data?.envelope ? extractUploadUrl(parsed.data.envelope) : null);
+    if (!url) {
+      throw new Error(parsed.message || 'Upload thành công nhưng không có URL');
+    }
     return {
-      url: parsed.data.url,
-      envelope: parsed.data.envelope || { success: true, data: { url: parsed.data.url } },
+      url,
+      envelope: parsed.data?.envelope || { success: true, data: { url } },
     };
   }
 
@@ -144,8 +153,9 @@ export function usesPlatformJobs(): boolean {
   return Boolean(loadAuth()?.platform_token?.trim());
 }
 
-export function getJobClient(): PlatformJobClient {
+export function getJobClient(): PlatformJobClient | GommoClient {
   const auth = loadAuth();
-  if (!auth?.platform_token?.trim()) throw new Error('Chưa đăng nhập');
-  return new PlatformJobClient();
+  if (auth?.platform_token?.trim()) return new PlatformJobClient();
+  if (auth?.access_token?.trim()) return getGommoClient();
+  throw new Error('Chưa đăng nhập');
 }

@@ -22,13 +22,13 @@ export default function ComposerMediaPickButton({
 }) {
   const anchorRef = useRef<HTMLButtonElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [albumOpen, setAlbumOpen] = useState(false);
-  const [linkOpen, setLinkOpen] = useState(false);
-
   const accept =
     kind === 'video' ? 'video/*' : kind === 'image' ? 'image/*' : 'image/*,video/*';
-  const albumKind = kind === 'video' ? 'video' : 'image';
+  const resolvedAlbumKind: 'image' | 'video' = kind === 'video' ? 'video' : 'image';
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [albumOpen, setAlbumOpen] = useState(false);
+  const [albumTab, setAlbumTab] = useState<'image' | 'video'>(resolvedAlbumKind);
+  const [linkOpen, setLinkOpen] = useState(false);
 
   return (
     <>
@@ -63,15 +63,32 @@ export default function ComposerMediaPickButton({
           anchorRef={anchorRef}
           onClose={() => setMenuOpen(false)}
           onUpload={() => fileRef.current?.click()}
-          onAlbum={() => setAlbumOpen(true)}
+          albumMode={kind === 'any' ? 'split' : 'single'}
+          onAlbum={kind === 'any' ? undefined : () => setAlbumOpen(true)}
+          onAlbumImage={
+            kind === 'any'
+              ? () => {
+                  setAlbumTab('image');
+                  setAlbumOpen(true);
+                }
+              : undefined
+          }
+          onAlbumVideo={
+            kind === 'any'
+              ? () => {
+                  setAlbumTab('video');
+                  setAlbumOpen(true);
+                }
+              : undefined
+          }
           onLink={() => setLinkOpen(true)}
         />
       )}
 
       <ComposerMediaAlbumModal
         open={albumOpen}
-        kind={albumKind}
-        allowBoth={kind === 'any'}
+        kind={kind === 'any' ? albumTab : resolvedAlbumKind}
+        allowBoth={false}
         onClose={() => setAlbumOpen(false)}
         onSelect={(url) => void onUrl(url)}
       />

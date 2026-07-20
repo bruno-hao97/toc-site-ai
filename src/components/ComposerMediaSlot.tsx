@@ -40,6 +40,7 @@ export default function ComposerMediaSlot({
   const fileRef = useRef<HTMLInputElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [albumOpen, setAlbumOpen] = useState(false);
+  const [albumTab, setAlbumTab] = useState<'image' | 'video'>(albumKind(kind));
   const [linkOpen, setLinkOpen] = useState(false);
 
   const previewKind =
@@ -98,15 +99,32 @@ export default function ComposerMediaSlot({
           anchorRef={anchorRef}
           onClose={() => setMenuOpen(false)}
           onUpload={() => fileRef.current?.click()}
-          onAlbum={() => setAlbumOpen(true)}
+          albumMode={kind === 'any' ? 'split' : 'single'}
+          onAlbum={kind === 'any' ? undefined : () => setAlbumOpen(true)}
+          onAlbumImage={
+            kind === 'any'
+              ? () => {
+                  setAlbumTab('image');
+                  setAlbumOpen(true);
+                }
+              : undefined
+          }
+          onAlbumVideo={
+            kind === 'any'
+              ? () => {
+                  setAlbumTab('video');
+                  setAlbumOpen(true);
+                }
+              : undefined
+          }
           onLink={() => setLinkOpen(true)}
         />
       )}
 
       <ComposerMediaAlbumModal
         open={albumOpen}
-        kind={albumKind(kind)}
-        allowBoth={kind === 'any'}
+        kind={kind === 'any' ? albumTab : albumKind(kind)}
+        allowBoth={false}
         onClose={() => setAlbumOpen(false)}
         onSelect={(url) => void onUrl(url)}
       />

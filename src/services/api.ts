@@ -1,5 +1,6 @@
 import { DEFAULT_DOMAIN } from './settingsStore';
 import { gommoDeviceFields } from './gommoDevice';
+import { extractUploadUrl } from './uploadUrl';
 
 /** Qua PHP proxy gw.php → v2.api.gommo.net (che URL). Local: Vite proxy /api/platform → pro.agi.vn. */
 export const BASE_URL = '/api/platform/gw.php/v2';
@@ -42,8 +43,10 @@ export interface GommoEnvelope<T = Record<string, unknown>> {
 }
 
 export interface GommoClientOptions {
-  /** JWT platform; không phải Gommo access_token. */
-  platformToken: string;
+  /** Gommo access_token — passthrough qua gw.php. */
+  accessToken?: string;
+  /** JWT platform — gateway dùng token admin phía server. */
+  platformToken?: string;
   domain?: string;
   projectId?: string;
 }
@@ -61,18 +64,32 @@ export class GommoApiError extends Error {
 }
 
 export class GommoClient {
+  accessToken: string;
   platformToken: string;
   domain: string;
   projectId: string;
 
-  constructor({ platformToken, domain = DEFAULT_DOMAIN, projectId = 'default' }: GommoClientOptions) {
+  constructor({
+    accessToken = '',
+    platformToken = '',
+    domain = DEFAULT_DOMAIN,
+    projectId = 'default',
+  }: GommoClientOptions) {
+    this.accessToken = accessToken;
     this.platformToken = platformToken;
     this.domain = domain;
     this.projectId = projectId;
   }
 
+  /** Bearer gửi lên gw.php — access token ưu tiên nếu có. */
+  private bearerToken(): string {
+    return this.accessToken.trim() || this.platformToken.trim();
+  }
+
   headers(extra: Record<string, string> = {}): Record<string, string> {
-    return { Authorization: `Bearer ${this.platformToken}`, ...extra };
+    const token = this.bearerToken();
+    if (!token) return { ...extra };
+    return { Authorization: `Bearer ${token}`, ...extra };
   }
 
   async parseResponse(res: Response): Promise<GommoEnvelope> {
@@ -186,9 +203,10 @@ export class GommoClient {
   }
 
   async uploadImage(file: File, fileName?: string): Promise<{ url: string; envelope: GommoEnvelope }> {
-    if (!this.platformToken) throw new GommoApiError('Chưa đăng nhập');
+    if (!this.bearerToken()) throw new GommoApiError('Chưa đăng nhập');
     const name = fileName || file.name || 'image.png';
     const form = new FormData();
+    if (this.accessToken) form.append('access_token', this.accessToken);
     form.append('domain', this.domain);
     form.append('project_id', this.projectId);
     form.append('file', file, name);
@@ -197,7 +215,7 @@ export class GommoClient {
 
     const res = await fetch(`${BASE_URL}/ai/upload/image`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${this.platformToken}` },
+      headers: this.headers(),
       body: form,
     });
     const envelope = await this.parseResponse(res);
@@ -207,23 +225,25 @@ export class GommoClient {
         envelope,
       });
     }
-    const data = envelope.data as Record<string, string> | undefined;
-    const url = data?.url || data?.result_url || data?.image_url || (envelope as { url?: string }).url;
+    const url = extractUploadUrl(envelope);
     if (!url) throw new GommoApiError('Upload thành công nhưng không có URL', { envelope });
     return { url, envelope };
   }
 
   async uploadVideo(file: File, fileName?: string): Promise<{ url: string; envelope: GommoEnvelope }> {
-    if (!this.platformToken) throw new GommoApiError('Chưa đăng nhập');
+    if (!this.bearerToken()) throw new GommoApiError('Chưa đăng nhập');
     const name = fileName || file.name || 'video.mp4';
     const form = new FormData();
+    if (this.accessToken) form.append('access_token', this.accessToken);
     form.append('domain', this.domain);
     form.append('project_id', this.projectId);
     form.append('video_file', file, name);
+    form.append('file_name', name);
+    form.append('size', String(file.size ?? 0));
 
     const res = await fetch(`${BASE_URL}/ai/upload/video`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${this.platformToken}` },
+      headers: this.headers(),
       body: form,
     });
     const envelope = await this.parseResponse(res);
@@ -233,8 +253,7 @@ export class GommoClient {
         envelope,
       });
     }
-    const data = envelope.data as Record<string, string> | undefined;
-    const url = data?.url || data?.result_url || data?.video_url;
+    const url = extractUploadUrl(envelope);
     if (!url) throw new GommoApiError('Upload video thành công nhưng không có URL', { envelope });
     return { url, envelope };
   }

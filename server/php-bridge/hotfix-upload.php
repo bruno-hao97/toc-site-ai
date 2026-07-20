@@ -28,6 +28,8 @@ $allowed = [
     'job-poll.php',
     'job-upload.php',
     'gommo.php',
+    'gw.php',
+    'token-me.php',
     'migrate-jobs.php',
     'hotfix-upload.php',
 ];

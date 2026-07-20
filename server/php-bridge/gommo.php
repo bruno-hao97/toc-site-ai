@@ -200,6 +200,40 @@ function extract_result_url(array $envelope): ?string
     return null;
 }
 
+/** URL sau upload multipart — bao phủ mọi key Gommo thường trả. */
+function extract_upload_url(array $envelope): ?string
+{
+    $data = $envelope['data'] ?? [];
+    $raw = $envelope['raw'] ?? [];
+    if (!is_array($data)) {
+        $data = [];
+    }
+    if (!is_array($raw)) {
+        $raw = [];
+    }
+    $imageInfo = is_array($raw['imageInfo'] ?? null) ? $raw['imageInfo'] : [];
+    $videoInfo = is_array($raw['videoInfo'] ?? null) ? $raw['videoInfo'] : [];
+
+    $candidates = [
+        $data['url'] ?? null,
+        $data['result_url'] ?? null,
+        $data['image_url'] ?? null,
+        $data['video_url'] ?? null,
+        $imageInfo['url'] ?? null,
+        $imageInfo['result_url'] ?? null,
+        $videoInfo['url'] ?? null,
+        $videoInfo['result_url'] ?? null,
+        $envelope['url'] ?? null,
+    ];
+    foreach ($candidates as $url) {
+        if (is_string($url) && preg_match('/^https?:\\/\\//i', $url)) {
+            return $url;
+        }
+    }
+
+    return extract_result_url($envelope);
+}
+
 function extract_status(array $envelope): string
 {
     $data = $envelope['data'] ?? [];

@@ -37,13 +37,12 @@ export function normalizeDomain(domain?: string | null): string {
 }
 
 export interface GommoSettings {
+  accessToken: string;
   domain: string;
   projectId: string;
 }
 
 export function loadSettings(): GommoSettings {
-  // Xóa token Gommo cá nhân từ các phiên bản cũ.
-  localStorage.removeItem(KEYS.token);
   const domain = normalizeDomain(localStorage.getItem(KEYS.domain) || DEFAULT_DOMAIN);
   if (localStorage.getItem(KEYS.domain) !== domain) {
     localStorage.setItem(KEYS.domain, domain);
@@ -54,13 +53,18 @@ export function loadSettings(): GommoSettings {
     localStorage.setItem(KEYS.projectId, projectId);
   }
   return {
+    accessToken: localStorage.getItem(KEYS.token) || '',
     domain,
     projectId,
   };
 }
 
 export function saveSettings(partial: Partial<GommoSettings>): void {
-  localStorage.removeItem(KEYS.token);
+  if (partial.accessToken != null) {
+    const token = partial.accessToken.trim();
+    if (token) localStorage.setItem(KEYS.token, token);
+    else localStorage.removeItem(KEYS.token);
+  }
   if (partial.domain != null) {
     localStorage.setItem(KEYS.domain, normalizeDomain(partial.domain) || DEFAULT_DOMAIN);
   }

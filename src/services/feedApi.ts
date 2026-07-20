@@ -28,7 +28,7 @@ async function feedRequest<T extends { success?: boolean; message?: string }>(
   fields: Record<string, string>,
 ): Promise<T> {
   const auth = loadAuth();
-  const token = auth?.platform_token?.trim();
+  const token = auth?.platform_token?.trim() || auth?.access_token?.trim();
   if (!token) throw new UpstreamMeError('Chưa đăng nhập', 401);
   const body = new URLSearchParams({
     domain: auth?.domain?.trim() || 'vmedia.ai',
@@ -58,10 +58,20 @@ async function parseFeedRes<T extends { success?: boolean; message?: string }>(
   try {
     parsed = JSON.parse(text) as T;
   } catch {
-    throw new UpstreamMeError(text || `HTTP ${res.status}`, res.status);
+    const isHtml = /^\s*</.test(text) || /<!doctype|<br\s*\/?>|<b>Fatal/i.test(text);
+    throw new UpstreamMeError(
+      isHtml
+        ? 'Gateway lỗi (VPS gw.php cũ). Restart npm run dev hoặc upload gw.php mới lên VPS.'
+        : text.slice(0, 200) || `HTTP ${res.status}`,
+      res.status,
+    );
   }
   if (!res.ok || parsed.success === false) {
     throw new UpstreamMeError(parsed.message || `HTTP ${res.status}`, res.status);
+  }
+  const softErr = (parsed as { error?: number }).error;
+  if (typeof softErr === 'number' && softErr !== 0) {
+    throw new UpstreamMeError(parsed.message || `Upstream error ${softErr}`, res.status);
   }
   return parsed;
 }

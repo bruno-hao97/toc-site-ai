@@ -153,4 +153,70 @@ router.post('/job-poll.php', async (req, res) => {
   }
 });
 
+/** Đăng nhập Access Token — gọi Gommo /ai/me bằng token user (không cần JWT platform). */
+router.post('/token-me.php', async (req, res) => {
+  try {
+    const accessToken = String(req.body?.access_token ?? '').trim();
+    const domain = String(req.body?.domain ?? config.gommo.apiDomain ?? 'vmedia.ai').trim();
+    if (!accessToken) {
+      res.status(400).json({ success: false, message: 'Thiếu access_token' });
+      return;
+    }
+
+    const authBase = (config.gommo.authBaseUrl || 'https://api.gommo.net').replace(/\/$/, '');
+    const authPath = (config.gommo.authPath || '/api/apps/go-mmo').replace(/\/$/, '');
+    const url = `${authBase}${authPath}/ai/me`;
+    const body = new URLSearchParams({
+      access_token: accessToken,
+      domain,
+    });
+
+    const upstream = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body,
+    });
+
+    const text = await upstream.text();
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      res.status(502).json({
+        success: false,
+        message: text.trimStart().startsWith('<!')
+          ? 'Upstream trả HTML — kiểm tra token / mạng'
+          : text.slice(0, 200) || `HTTP ${upstream.status}`,
+      });
+      return;
+    }
+
+    if (!upstream.ok || parsed.success === false) {
+      res.status(upstream.status >= 400 ? upstream.status : 401).json({
+        success: false,
+        message: String(parsed.message || `HTTP ${upstream.status}`),
+      });
+      return;
+    }
+
+    const userInfo = (parsed.userInfo ?? {}) as Record<string, unknown>;
+    if (!userInfo.id_base && !userInfo.email) {
+      res.status(401).json({ success: false, message: 'Token hợp lệ nhưng thiếu userInfo' });
+      return;
+    }
+
+    res.json({ success: true, data: parsed });
+  } catch (err) {
+    console.error('[platformBridge/token-me]', err);
+    res.status(500).json({
+      success: false,
+      message: err instanceof Error ? err.message : 'Xác thực token thất bại',
+    });
+  }
+});
+
 export default router;

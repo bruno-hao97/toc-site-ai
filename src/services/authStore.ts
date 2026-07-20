@@ -1,5 +1,5 @@
 import { GommoClient } from './api';
-import type { UpstreamMeResponse } from './upstreamMe';
+import { fetchUpstreamMe, type UpstreamMeResponse } from './upstreamMe';
 import { GOMMO_CHAT_CONFIG } from './gommoChatConfig';
 import { PLATFORM_BRIDGE } from './platformBridge';
 import { loadSettings, normalizeDomain, saveSettings } from './settingsStore';
@@ -21,7 +21,7 @@ export interface AuthState {
   /** JWT session owned by our platform (MySQL users). */
   platform_token?: string;
   user?: PlatformUser;
-  /** Legacy only; load/save luôn xóa để client không thể chọn token Gommo khác. */
+  /** Gommo access token (đăng nhập Token / liên kết VMedia). */
   access_token?: string;
   domain?: string;
   projectId: string;
@@ -38,12 +38,11 @@ export interface DisplayUser {
 function pickProjectId(id?: string | null): string | null {
   const trimmed = id?.trim();
   if (!trimmed || trimmed === DEFAULT_PROJECT_ID) return null;
-  // Project chat Moon Agent — không dùng cho job ảnh/video/library.
   if (trimmed === GOMMO_CHAT_CONFIG.projectId) return null;
   return trimmed;
 }
 
-/** project_id media — không fallback sang project chat (tránh job chỉ thấy trên white-label). */
+/** project_id media — không fallback sang project chat. */
 export function resolveProjectId(override?: string): string {
   return (
     pickProjectId(override) ||
@@ -59,11 +58,6 @@ export function loadAuth(): AuthState | null {
   try {
     const state = JSON.parse(raw) as AuthState;
     let dirty = false;
-    if (state.access_token || state.upstream_me) {
-      delete state.access_token;
-      delete state.upstream_me;
-      dirty = true;
-    }
     if (state.domain) {
       const domain = normalizeDomain(state.domain);
       if (domain !== state.domain) {
@@ -71,7 +65,6 @@ export function loadAuth(): AuthState | null {
         dirty = true;
       }
     }
-    // Session cũ từng dính project chat → media job lệch khỏi thư viện vmedia mặc định.
     if (state.projectId === GOMMO_CHAT_CONFIG.projectId) {
       state.projectId = DEFAULT_PROJECT_ID;
       dirty = true;
@@ -85,49 +78,64 @@ export function loadAuth(): AuthState | null {
 
 export function saveAuth(state: AuthState): void {
   const projectId = pickProjectId(state.projectId) || DEFAULT_PROJECT_ID;
-  const sanitized: AuthState = {
-    platform_token: state.platform_token?.trim(),
-    user: state.user,
+  const next: AuthState = {
+    ...state,
+    platform_token: state.platform_token?.trim() || undefined,
+    access_token: state.access_token?.trim() || undefined,
     domain: normalizeDomain(state.domain),
     projectId,
   };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(sanitized));
+  localStorage.setItem(SESSION_KEY, JSON.stringify(next));
   saveSettings({
-    domain: sanitized.domain || loadSettings().domain,
-    projectId: sanitized.projectId,
+    accessToken: next.access_token || '',
+    domain: next.domain || loadSettings().domain,
+    projectId: next.projectId,
   });
 }
 
 export function clearAuth(): void {
   localStorage.removeItem(SESSION_KEY);
-  loadSettings(); // đồng thời dọn token Gommo legacy
+  saveSettings({ accessToken: '' });
 }
 
 export function isLoggedIn(): boolean {
-  return Boolean(loadAuth()?.platform_token?.trim());
+  const auth = loadAuth();
+  return Boolean(auth?.platform_token?.trim() || auth?.access_token?.trim());
 }
 
-/** Khóa localStorage theo user platform. */
+/** Khóa localStorage theo user platform hoặc Gommo. */
 export function authUserKey(): string {
   const auth = loadAuth();
-  const id = auth?.user?.id || auth?.user?.email;
+  const id =
+    auth?.user?.id ||
+    auth?.upstream_me?.userInfo?.id_base ||
+    auth?.upstream_me?.userInfo?.email ||
+    auth?.user?.email;
   return id || 'anon';
 }
 
 /**
- * Client đi qua gateway server. Giá trị bearer là JWT platform;
- * gateway thay bằng token admin trước khi gọi Gommo.
+ * Client Gommo qua gw.php.
+ * - access_token → passthrough token người dùng
+ * - platform_token → gateway dùng token admin phía server
  */
 export function getGommoClient(): GommoClient {
   const auth = loadAuth();
-  if (!auth?.platform_token) {
-    throw new Error('Chưa đăng nhập');
+  if (auth?.access_token?.trim()) {
+    return new GommoClient({
+      accessToken: auth.access_token,
+      domain: auth.domain || loadSettings().domain,
+      projectId: resolveProjectId(auth.projectId),
+    });
   }
-  return new GommoClient({
-    platformToken: auth.platform_token,
-    domain: auth.domain || 'vmedia.ai',
-    projectId: resolveProjectId(auth.projectId),
-  });
+  if (auth?.platform_token?.trim()) {
+    return new GommoClient({
+      platformToken: auth.platform_token,
+      domain: auth.domain || 'vmedia.ai',
+      projectId: resolveProjectId(auth.projectId),
+    });
+  }
+  throw new Error('Chưa đăng nhập');
 }
 
 export function getDisplayUser(): DisplayUser {
@@ -140,13 +148,22 @@ export function getDisplayUser(): DisplayUser {
       username: auth.user.email?.split('@')[0] || null,
     };
   }
+  const u = auth?.upstream_me?.userInfo;
+  if (u) {
+    return {
+      name: u.name?.trim() || u.username?.trim() || null,
+      email: u.email?.trim() || '',
+      avatar: u.avatar || null,
+      username: u.username || null,
+    };
+  }
   return { name: null, email: '', avatar: null, username: null };
 }
 
 export function getCreditsAi(): number {
   const auth = loadAuth();
   if (typeof auth?.user?.credits === 'number') return auth.user.credits;
-  return 0;
+  return auth?.upstream_me?.balancesInfo?.credits_ai ?? 0;
 }
 
 /** Thông báo số dư credit vừa thay đổi (vd sau khi tạo job) để header tự refresh. */
@@ -155,7 +172,7 @@ export function notifyCreditsUpdated(): void {
 }
 
 export function getUpstreamMe(): UpstreamMeResponse | null {
-  return null;
+  return loadAuth()?.upstream_me ?? null;
 }
 
 export async function loginWithPlatformSession(
@@ -171,31 +188,55 @@ export async function loginWithPlatformSession(
   return state;
 }
 
+export async function loginWithGommoToken(
+  accessToken: string,
+  domain: string,
+): Promise<AuthState> {
+  const upstream_me = await fetchUpstreamMe(accessToken, normalizeDomain(domain));
+  const prev = loadAuth();
+  const state: AuthState = {
+    platform_token: prev?.platform_token,
+    user: prev?.user,
+    access_token: accessToken.trim(),
+    domain: normalizeDomain(domain),
+    projectId: resolveProjectId(loadSettings().projectId),
+    upstream_me,
+  };
+  saveAuth(state);
+  return state;
+}
+
 export async function refreshSession(): Promise<AuthState> {
   const auth = loadAuth();
   if (!auth) throw new Error('Chưa đăng nhập');
 
-  if (!auth.platform_token) {
-    throw new Error('Chưa đăng nhập');
+  if (auth.platform_token) {
+    const res = await fetch(PLATFORM_BRIDGE.me, {
+      headers: { Authorization: `Bearer ${auth.platform_token}` },
+    });
+    const text = await res.text();
+    let parsed: { success?: boolean; message?: string; data?: { user: PlatformUser } };
+    try {
+      parsed = JSON.parse(text) as typeof parsed;
+    } catch {
+      throw new Error(text || `HTTP ${res.status}`);
+    }
+    if (!res.ok || !parsed.success || !parsed.data?.user) {
+      throw new Error(parsed.message || 'Không làm mới được phiên đăng nhập');
+    }
+    const next = { ...auth, user: parsed.data.user };
+    saveAuth(next);
+    return next;
   }
-  const res = await fetch(PLATFORM_BRIDGE.me, {
-    headers: { Authorization: `Bearer ${auth.platform_token}` },
-  });
-  const text = await res.text();
-  let parsed: { success?: boolean; message?: string; data?: { user: PlatformUser } };
-  try {
-    parsed = JSON.parse(text) as typeof parsed;
-  } catch {
-    throw new Error(text || `HTTP ${res.status}`);
-  }
-  if (!res.ok || !parsed.success || !parsed.data?.user) {
-    throw new Error(parsed.message || 'Không làm mới được phiên đăng nhập');
-  }
-  const next = { ...auth, user: parsed.data.user };
+
+  if (!auth.access_token || !auth.domain) throw new Error('Chưa đăng nhập');
+  const upstream_me = await fetchUpstreamMe(auth.access_token, auth.domain);
+  const next = { ...auth, upstream_me };
   saveAuth(next);
   return next;
 }
 
 export function getToken(): string | null {
-  return loadAuth()?.platform_token || null;
+  const auth = loadAuth();
+  return auth?.platform_token || auth?.access_token || null;
 }

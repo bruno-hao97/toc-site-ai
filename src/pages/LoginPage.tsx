@@ -1,15 +1,34 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { KeyRound, Lock, User, X } from 'lucide-react';
-import { loginWithPlatformSession } from '../services/authStore';
+import { ArrowLeft, ChevronRight, KeyRound, KeySquare, Lock, User, X } from 'lucide-react';
+import { loginWithGommoToken, loginWithPlatformSession } from '../services/authStore';
+import { gommoResetPassword, GommoAuthError } from '../services/gommoAuth';
 import { platformLogin, PlatformAuthError } from '../services/platformAuth';
+import { UpstreamMeError } from '../services/upstreamMe';
+import { DEFAULT_DOMAIN } from '../services/settingsStore';
+
+type Step = 'menu' | 'account' | 'token' | 'reset';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [step, setStep] = useState<Step>('menu');
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const [accessToken, setAccessToken] = useState('');
+  const [tokenLoading, setTokenLoading] = useState(false);
+
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState('');
+
+  function goStep(next: Step) {
+    setError('');
+    setResetSuccess('');
+    setStep(next);
+  }
 
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
@@ -28,6 +47,40 @@ export default function LoginPage() {
     }
   }
 
+  async function handleResetPassword(e: FormEvent) {
+    e.preventDefault();
+    setResetLoading(true);
+    setError('');
+    setResetSuccess('');
+    try {
+      const message = await gommoResetPassword(email, DEFAULT_DOMAIN);
+      setResetSuccess(message);
+    } catch (err) {
+      setError(err instanceof GommoAuthError || err instanceof Error ? err.message : String(err));
+    } finally {
+      setResetLoading(false);
+    }
+  }
+
+  async function handleTokenLogin(e: FormEvent) {
+    e.preventDefault();
+    setTokenLoading(true);
+    setError('');
+    try {
+      const token = accessToken.trim();
+      if (!token) {
+        setError('Vui lòng dán Access Token');
+        return;
+      }
+      await loginWithGommoToken(token, DEFAULT_DOMAIN);
+      navigate('/home');
+    } catch (err) {
+      setError(err instanceof UpstreamMeError || err instanceof Error ? err.message : String(err));
+    } finally {
+      setTokenLoading(false);
+    }
+  }
+
   return (
     <div className="page auth-page auth-login">
       <div className="auth-card auth-card-79">
@@ -43,7 +96,44 @@ export default function LoginPage() {
           <p>Nền tảng AI tập trung ALL in One</p>
         </div>
 
-        <form onSubmit={handleLogin} className="form">
+        {step === 'menu' && (
+          <div className="auth-methods">
+            <button type="button" className="auth-method" onClick={() => goStep('account')}>
+              <span className="auth-method-icon teal">
+                <User size={18} />
+              </span>
+              <span className="auth-method-text">
+                <strong>Đăng nhập bằng tài khoản</strong>
+                <small>Email / username và mật khẩu</small>
+              </span>
+              <ChevronRight size={18} className="auth-method-arrow" />
+            </button>
+
+            <button type="button" className="auth-method" onClick={() => goStep('token')}>
+              <span className="auth-method-icon purple">
+                <KeySquare size={18} />
+              </span>
+              <span className="auth-method-text">
+                <strong>Đăng nhập bằng Token</strong>
+                <small>Access Token nâng cao</small>
+              </span>
+              <ChevronRight size={18} className="auth-method-arrow" />
+            </button>
+          </div>
+        )}
+
+        {step === 'account' && (
+          <>
+            <div className="auth-switch">
+              <button type="button" className="auth-back" onClick={() => goStep('menu')}>
+                <ArrowLeft size={14} /> Quay lại
+              </button>
+              <button type="button" className="auth-switch-link" onClick={() => goStep('token')}>
+                ĐĂNG NHẬP BẰNG TOKEN
+              </button>
+            </div>
+
+            <form onSubmit={handleLogin} className="form">
               <label className="field">
                 <span className="label">Email / hoặc username</span>
                 <span className="auth-input">
@@ -72,11 +162,93 @@ export default function LoginPage() {
                   />
                 </span>
               </label>
+              <button type="button" className="auth-forgot" onClick={() => goStep('reset')}>
+                Quên mật khẩu?
+              </button>
               {error && <p className="error">{error}</p>}
               <button type="submit" className="btn auth-submit" disabled={loading}>
                 {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
               </button>
-        </form>
+            </form>
+          </>
+        )}
+
+        {step === 'reset' && (
+          <>
+            <div className="auth-switch">
+              <button type="button" className="auth-back" onClick={() => goStep('account')}>
+                <ArrowLeft size={14} /> Quay lại
+              </button>
+              <span className="auth-switch-link auth-switch-current">Reset mật khẩu</span>
+            </div>
+
+            <form onSubmit={handleResetPassword} className="form">
+              <p className="lead sm">
+                Nhập email tài khoản, hệ thống sẽ gửi email hỗ trợ reset mật khẩu.
+              </p>
+              <label className="field">
+                <span className="label">Email</span>
+                <span className="auth-input">
+                  <User size={16} className="auth-input-icon" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    required
+                  />
+                </span>
+              </label>
+              {error && <p className="error">{error}</p>}
+              {resetSuccess && (
+                <p className="account-transfer-feedback success">{resetSuccess}</p>
+              )}
+              <button type="submit" className="btn auth-submit" disabled={resetLoading}>
+                {resetLoading ? 'Đang gửi…' : 'Gửi email reset'}
+              </button>
+            </form>
+          </>
+        )}
+
+        {step === 'token' && (
+          <>
+            <div className="auth-switch">
+              <button type="button" className="auth-back" onClick={() => goStep('menu')}>
+                <ArrowLeft size={14} /> Quay lại
+              </button>
+              <button type="button" className="auth-switch-link" onClick={() => goStep('account')}>
+                ĐĂNG NHẬP BẰNG TÀI KHOẢN
+              </button>
+            </div>
+
+            <form onSubmit={handleTokenLogin} className="form">
+              <label className="field">
+                <span className="label">Access Token</span>
+                <span className="auth-input">
+                  <KeySquare size={16} className="auth-input-icon" />
+                  <input
+                    type="text"
+                    value={accessToken}
+                    onChange={(e) => setAccessToken(e.target.value)}
+                    placeholder="Dán Access Token của bạn"
+                    autoComplete="off"
+                    required
+                  />
+                </span>
+              </label>
+              <p className="lead sm">
+                Lấy Access Token trong phần Cài đặt tài khoản trên hệ thống.
+              </p>
+              {error && <p className="error">{error}</p>}
+              <button type="submit" className="btn auth-submit" disabled={tokenLoading}>
+                {tokenLoading ? 'Đang xác thực…' : 'Đăng nhập bằng token'}
+              </button>
+            </form>
+          </>
+        )}
+
+        {step === 'menu' && error && <p className="error">{error}</p>}
 
         <p className="auth-register">
           Chưa có tài khoản? <Link to="/register">Đăng ký ngay</Link>

@@ -122,6 +122,7 @@ export default function HomeQuickCreateBar() {
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
   const [prompt, setPrompt] = useState('');
+  const [startFrame, setStartFrame] = useState<string | null>(null);
   const [refs, setRefs] = useState<string[]>([]);
   const [qty, setQty] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -133,6 +134,7 @@ export default function HomeQuickCreateBar() {
   const typeRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const mediaPickTargetRef = useRef<'start' | 'add'>('add');
   const abortRef = useRef<AbortController | null>(null);
 
   const currentModel = useMemo(
@@ -185,12 +187,23 @@ export default function HomeQuickCreateBar() {
   const update = <K extends keyof JobSelections>(key: K, value: JobSelections[K]) =>
     setSelections((s) => ({ ...s, [key]: value }));
 
+  const openMediaPicker = (target: 'start' | 'add') => {
+    mediaPickTargetRef.current = target;
+    fileRef.current?.click();
+  };
+
   const onPickMedia = async (file: File | null) => {
-    if (!file || refs.length >= MAX_MEDIA) return;
+    if (!file) return;
+    if (mediaPickTargetRef.current === 'add' && refs.length >= MAX_MEDIA) return;
     setError('');
     try {
       const url = await uploadQuickImage(file);
-      if (url) setRefs((prev) => [...prev, url]);
+      if (!url) return;
+      if (mediaPickTargetRef.current === 'start') {
+        setStartFrame(url);
+      } else {
+        setRefs((prev) => [...prev, url]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -207,7 +220,7 @@ export default function HomeQuickCreateBar() {
       return;
     }
     const text = prompt.trim();
-    if (!text && refs.length === 0) {
+    if (!text && refs.length === 0 && !startFrame) {
       setError('Nhập mô tả trước khi tạo.');
       return;
     }
@@ -221,7 +234,7 @@ export default function HomeQuickCreateBar() {
       text: type === 'tts' ? text : selections.text,
       name: type === 'music' ? text.slice(0, 60) || 'Quick track' : selections.name,
       references: refs.length ? refs : undefined,
-      images: refs.length ? refs : undefined,
+      images: startFrame ? [startFrame] : undefined,
     };
 
     setSubmitting(true);
@@ -281,10 +294,42 @@ export default function HomeQuickCreateBar() {
           <div className="qc-sb-group">
             <span className="qc-sb-title">KHUNG HÌNH</span>
             <div className="qc-sb-frames">
-              <button type="button" className="qc-sb-frame qc-sb-start">
-                <Plus size={16} />
-                <span>START</span>
-              </button>
+              {startFrame ? (
+                <div
+                  className="qc-sb-frame qc-sb-media qc-sb-start"
+                  role="button"
+                  tabIndex={0}
+                  title="Đổi ảnh start frame"
+                  onClick={() => openMediaPicker('start')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      openMediaPicker('start');
+                    }
+                  }}
+                >
+                  <img src={startFrame} alt="Start frame" />
+                  <button
+                    type="button"
+                    className="qc-sb-remove"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setStartFrame(null);
+                    }}
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="qc-sb-frame qc-sb-start"
+                  onClick={() => openMediaPicker('start')}
+                >
+                  <Plus size={16} />
+                  <span>START</span>
+                </button>
+              )}
             </div>
           </div>
           <div className="qc-sb-group">
@@ -308,7 +353,7 @@ export default function HomeQuickCreateBar() {
                 <button
                   type="button"
                   className="qc-sb-frame qc-sb-add"
-                  onClick={() => fileRef.current?.click()}
+                  onClick={() => openMediaPicker('add')}
                 >
                   <Plus size={16} />
                   <span>ADD</span>
