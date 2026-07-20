@@ -1,6 +1,7 @@
 import express, { Router } from 'express';
 import { Readable } from 'node:stream';
 import { config } from '../config.js';
+import { AuthError, getUserFromAuthHeader } from '../services/platformAuth.js';
 
 const router = Router();
 
@@ -21,23 +22,13 @@ const SKIP_RESPONSE_HEADERS = new Set([
   'content-encoding', // fetch đã giải nén body — giữ header gzip làm browser lỗi parse
 ]);
 
-const SKIP_REQUEST_HEADERS = new Set([
-  'connection',
-  'keep-alive',
-  'host',
-  'content-length',
-  'transfer-encoding',
-  'accept-encoding', // luôn gửi identity tới upstream
-]);
-
 function upstreamHeaders(req: express.Request, body?: Buffer): Record<string, string> {
-  const out: Record<string, string> = { 'accept-encoding': 'identity' };
-  for (const [key, value] of Object.entries(req.headers)) {
-    const lower = key.toLowerCase();
-    if (SKIP_REQUEST_HEADERS.has(lower)) continue;
-    if (typeof value === 'string') out[key] = value;
-    else if (Array.isArray(value)) out[key] = value.join(', ');
-  }
+  const out: Record<string, string> = {
+    accept: 'application/json, text/event-stream',
+    'accept-encoding': 'identity',
+  };
+  const contentType = req.headers['content-type'];
+  if (typeof contentType === 'string') out['content-type'] = contentType;
   if (body?.length) out['content-length'] = String(body.length);
   return out;
 }
@@ -70,24 +61,64 @@ async function proxyPass(
   upstreamBase: string,
   stripPrefix?: string,
 ): Promise<void> {
-  const url = buildUpstreamUrl(upstreamBase, req.originalUrl, stripPrefix);
+  const rawUrl = buildUpstreamUrl(upstreamBase, req.originalUrl, stripPrefix);
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
-  const bodyBuf = hasBody ? (req.body as Buffer) : undefined;
-  const body = bodyBuf?.length ? bodyBuf : undefined;
 
   try {
-    const upstream = await fetch(url, {
+    if (!config.gommo.accessToken) {
+      res.status(503).json({ success: false, message: 'Chưa cấu hình token admin trên server' });
+      return;
+    }
+    await getUserFromAuthHeader(
+      typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined,
+    );
+
+    const urlObj = new URL(rawUrl);
+    urlObj.searchParams.set('access_token', config.gommo.accessToken);
+    urlObj.searchParams.set('domain', config.gommo.apiDomain);
+
+    const contentType = String(req.headers['content-type'] || '').toLowerCase();
+    let body: Buffer | undefined;
+    if (hasBody) {
+      const raw = req.body as Buffer;
+      if (contentType.includes('application/x-www-form-urlencoded')) {
+        const form = new URLSearchParams(raw?.toString('utf8') || '');
+        form.set('access_token', config.gommo.accessToken);
+        form.set('domain', config.gommo.apiDomain);
+        body = Buffer.from(form.toString());
+      } else if (contentType.includes('application/json')) {
+        let parsed: Record<string, unknown> = {};
+        try {
+          parsed = JSON.parse(raw?.toString('utf8') || '{}') as Record<string, unknown>;
+        } catch {
+          // Upstream nhận object rỗng thay vì body JSON lỗi.
+        }
+        parsed.access_token = config.gommo.accessToken;
+        parsed.domain = config.gommo.apiDomain;
+        body = Buffer.from(JSON.stringify(parsed));
+      } else if (contentType.includes('multipart/form-data')) {
+        res.status(400).json({ success: false, message: 'Upload phải đi qua endpoint platform' });
+        return;
+      } else if (raw?.length) {
+        res.status(415).json({ success: false, message: 'Content-Type không được hỗ trợ' });
+        return;
+      }
+    }
+
+    const headers = upstreamHeaders(req, body);
+    headers.authorization = `Bearer ${config.gommo.accessToken}`;
+    const upstream = await fetch(urlObj.toString(), {
       method: req.method,
-      headers: upstreamHeaders(req, body),
+      headers,
       body,
     });
 
-    const contentType = upstream.headers.get('content-type') ?? '';
+    const responseContentType = upstream.headers.get('content-type') ?? '';
 
     res.status(upstream.status);
     copyUpstreamHeaders(upstream, res);
 
-    if (shouldStreamResponse(req, contentType) && upstream.body) {
+    if (shouldStreamResponse(req, responseContentType) && upstream.body) {
       const stream = Readable.fromWeb(upstream.body as import('stream/web').ReadableStream);
       stream.on('error', () => {
         if (!res.headersSent) res.status(502).end();
@@ -102,6 +133,10 @@ async function proxyPass(
     res.send(payload);
   } catch (err) {
     if (res.headersSent) return;
+    if (err instanceof AuthError) {
+      res.status(err.status).json({ success: false, message: err.message });
+      return;
+    }
     const message = err instanceof Error ? err.message : String(err);
     console.error('[gommo-proxy]', req.method, req.originalUrl, '→', message);
     res.status(502).json({ success: false, message: message || 'Upstream proxy error' });

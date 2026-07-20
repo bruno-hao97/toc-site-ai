@@ -28,15 +28,18 @@ async function feedRequest<T extends { success?: boolean; message?: string }>(
   fields: Record<string, string>,
 ): Promise<T> {
   const auth = loadAuth();
-  if (!auth?.access_token || !auth.domain) throw new UpstreamMeError('Chưa đăng nhập', 401);
+  const token = auth?.platform_token?.trim();
+  if (!token) throw new UpstreamMeError('Chưa đăng nhập', 401);
   const body = new URLSearchParams({
-    access_token: auth.access_token.trim(),
-    domain: auth.domain.trim(),
+    domain: auth?.domain?.trim() || 'vmedia.ai',
     ...fields,
   }).toString();
   const res = await fetch(gommoUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
     body,
   });
   return parseFeedRes<T>(res);

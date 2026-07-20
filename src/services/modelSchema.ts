@@ -113,6 +113,15 @@ export function normalizeOptions(list: unknown): ModelOption[] {
   });
 }
 
+/** Giữ selection cũ chỉ khi còn trong options của model hiện tại. */
+export function pickAllowedOption(
+  current: string | undefined,
+  options: ModelOption[],
+): string | undefined {
+  if (current && options.some((o) => o.value === current)) return current;
+  return options[0]?.value;
+}
+
 function getModesList(model: GommoModel): ModelOption[] {
   if (Array.isArray(model.modes) && model.modes.length) return normalizeOptions(model.modes);
   if (Array.isArray(model.mode) && model.mode.length) return normalizeOptions(model.mode);
@@ -219,10 +228,23 @@ export function buildJobPayload(
     if (selections.gender != null) payload.gender = selections.gender;
   }
 
-  if (selections.ratio) payload.ratio = selections.ratio;
-  if (selections.mode) payload.mode = selections.mode;
-  if (selections.resolution) payload.resolution = selections.resolution;
-  if (selections.duration) payload.duration = selections.duration;
+  const ratio = schema.fields.ratio
+    ? pickAllowedOption(selections.ratio, schema.options.ratios)
+    : undefined;
+  const mode = schema.fields.mode
+    ? pickAllowedOption(selections.mode, schema.options.modes)
+    : undefined;
+  const resolution = schema.fields.resolution
+    ? pickAllowedOption(selections.resolution, schema.options.resolutions)
+    : undefined;
+  const duration = schema.fields.duration
+    ? pickAllowedOption(selections.duration, schema.options.durations)
+    : undefined;
+
+  if (ratio) payload.ratio = ratio;
+  if (mode) payload.mode = mode;
+  if (resolution) payload.resolution = resolution;
+  if (duration) payload.duration = duration;
   if (selections.template_id) payload.template_id = selections.template_id;
 
   const images = (selections.images || []).filter(Boolean);
@@ -280,12 +302,29 @@ export function pollMediaForJobType(jobType: JobType): (typeof POLL_MEDIA)[JobTy
 }
 
 export function defaultSelections(schema: ModelSchema): Partial<JobSelections> {
-  const pick = (opts: ModelOption[]) => (opts.length ? opts[0].value : undefined);
   return {
-    ratio: pick(schema.options.ratios),
-    mode: pick(schema.options.modes),
-    resolution: pick(schema.options.resolutions),
-    duration: pick(schema.options.durations),
+    ratio: pickAllowedOption(undefined, schema.options.ratios),
+    mode: pickAllowedOption(undefined, schema.options.modes),
+    resolution: pickAllowedOption(undefined, schema.options.resolutions),
+    duration: pickAllowedOption(undefined, schema.options.durations),
+  };
+}
+
+/** Merge selection cũ với schema mới — bỏ enum không còn hợp lệ. */
+export function mergeSelectionsForSchema(
+  prev: JobSelections,
+  schema: ModelSchema,
+  extras?: Partial<JobSelections>,
+): JobSelections {
+  const defs = defaultSelections(schema);
+  return {
+    ...prev,
+    ...extras,
+    ratio: pickAllowedOption(prev.ratio, schema.options.ratios) ?? defs.ratio,
+    mode: pickAllowedOption(prev.mode, schema.options.modes) ?? defs.mode,
+    resolution:
+      pickAllowedOption(prev.resolution, schema.options.resolutions) ?? defs.resolution,
+    duration: pickAllowedOption(prev.duration, schema.options.durations) ?? defs.duration,
   };
 }
 

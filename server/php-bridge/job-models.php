@@ -11,8 +11,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 require_bearer_user();
 
 $type = trim((string) ($_GET['type'] ?? 'image'));
-if ($type !== 'image') {
-    json_out(400, ['success' => false, 'message' => 'Phase 1 chỉ hỗ trợ type=image']);
+if ($type === '' || !preg_match('/^[a-z0-9-]+$/', $type)) {
+    json_out(400, ['success' => false, 'message' => 'type không hợp lệ']);
 }
 
 try {

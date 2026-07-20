@@ -4,13 +4,13 @@ declare(strict_types=1);
 require __DIR__ . '/bootstrap.php';
 
 $key = (string) ($_GET['key'] ?? '');
-$expected = (string) ($CONFIG['migrate_key'] ?? '');
+$expected = (string) (platform_config()['migrate_key'] ?? '');
 if ($expected === '' || !hash_equals($expected, $key)) {
     json_out(403, ['success' => false, 'message' => 'Forbidden']);
 }
 
 try {
-    $pdo = db($CONFIG);
+    $pdo = db();
     $done = [];
 
     $col = $pdo->query(

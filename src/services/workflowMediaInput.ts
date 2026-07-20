@@ -1,5 +1,5 @@
 import type { Edge } from '@xyflow/react';
-import { getGommoClient } from './authStore';
+import { getJobClient } from './platformJobClient';
 
 export type MediaInputKind = 'image' | 'video';
 export type MediaSourceTab = 'upload' | 'library' | 'extra' | 'url';
@@ -154,7 +154,7 @@ export async function extractVideoFirstFrame(videoUrl: string): Promise<string> 
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
     if (!blob) return videoUrl;
     const file = new File([blob], 'first-frame.jpg', { type: 'image/jpeg' });
-    const { url } = await getGommoClient().uploadImage(file);
+    const { url } = await getJobClient().uploadImage(file);
     return url;
   } catch {
     return videoUrl;

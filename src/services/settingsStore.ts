@@ -5,6 +5,9 @@ const KEYS = {
   projectId: 'gommo_project_id',
 } as const;
 
+/** Project chat Moon Agent (không dùng cho media job). */
+const CHAT_PROJECT_ID = '55004151b482b646';
+
 /** Domain Gommo cho login, gen media, feed, me… */
 export const DEFAULT_DOMAIN = 'vmedia.ai';
 /** Domain Gommo cho plans + create_payment (cùng DEFAULT_DOMAIN) */
@@ -34,36 +37,34 @@ export function normalizeDomain(domain?: string | null): string {
 }
 
 export interface GommoSettings {
-  accessToken: string;
   domain: string;
   projectId: string;
 }
 
 export function loadSettings(): GommoSettings {
+  // Xóa token Gommo cá nhân từ các phiên bản cũ.
+  localStorage.removeItem(KEYS.token);
   const domain = normalizeDomain(localStorage.getItem(KEYS.domain) || DEFAULT_DOMAIN);
   if (localStorage.getItem(KEYS.domain) !== domain) {
     localStorage.setItem(KEYS.domain, domain);
   }
+  let projectId = localStorage.getItem(KEYS.projectId) || DEFAULT_PROJECT_ID;
+  if (projectId === CHAT_PROJECT_ID) {
+    projectId = DEFAULT_PROJECT_ID;
+    localStorage.setItem(KEYS.projectId, projectId);
+  }
   return {
-    accessToken: localStorage.getItem(KEYS.token) || '',
     domain,
-    projectId: localStorage.getItem(KEYS.projectId) || DEFAULT_PROJECT_ID,
+    projectId,
   };
 }
 
 export function saveSettings(partial: Partial<GommoSettings>): void {
-  if (partial.accessToken != null) {
-    if (partial.accessToken) localStorage.setItem(KEYS.token, partial.accessToken);
-    else localStorage.removeItem(KEYS.token);
-  }
+  localStorage.removeItem(KEYS.token);
   if (partial.domain != null) {
     localStorage.setItem(KEYS.domain, normalizeDomain(partial.domain) || DEFAULT_DOMAIN);
   }
   if (partial.projectId != null) {
     localStorage.setItem(KEYS.projectId, partial.projectId || DEFAULT_PROJECT_ID);
   }
-}
-
-export function hasToken(): boolean {
-  return Boolean(loadSettings().accessToken?.trim());
 }

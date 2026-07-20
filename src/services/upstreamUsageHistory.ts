@@ -1,4 +1,5 @@
-import { GOMMO_AUTH_BASE, GOMMO_AUTH_PATH, UpstreamMeError } from './upstreamMe';
+import { GOMMO_AUTH_PATH, UpstreamMeError } from './upstreamMe';
+import { loadAuth } from './authStore';
 
 export interface UsageHistoryItem {
   id: string;
@@ -24,19 +25,22 @@ export interface UsageHistoryQuery {
 
 async function upstreamPost<T>(
   path: string,
-  accessToken: string,
   domain: string,
   extra: Record<string, string> = {},
 ): Promise<T> {
   const body = new URLSearchParams({
-    access_token: accessToken.trim(),
     domain: domain.trim(),
     ...extra,
   }).toString();
 
+  const platformToken = loadAuth()?.platform_token?.trim();
+  if (!platformToken) throw new UpstreamMeError('Chưa đăng nhập', 401);
   const res = await fetch(`${GOMMO_AUTH_PATH}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      Authorization: `Bearer ${platformToken}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
     body,
   });
 
@@ -128,7 +132,6 @@ const PATHS = [
 ];
 
 export async function fetchUpstreamUsageHistory(
-  accessToken: string,
   domain: string,
   query: UsageHistoryQuery = {},
 ): Promise<{ items: UsageHistoryItem[]; source: 'upstream' | 'empty' }> {
@@ -143,7 +146,7 @@ export async function fetchUpstreamUsageHistory(
 
   for (const path of PATHS) {
     try {
-      const parsed = await upstreamPost<Record<string, unknown>>(path, accessToken, domain, extra);
+      const parsed = await upstreamPost<Record<string, unknown>>(path, domain, extra);
       const items = extractRows(parsed);
       if (items.length > 0) return { items, source: 'upstream' };
       if (parsed.success !== false) return { items: [], source: 'upstream' };

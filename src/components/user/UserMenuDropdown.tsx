@@ -5,7 +5,7 @@ import {
   getDisplayUser,
 } from '../../services/authStore';
 import { loadTheme, saveTheme, type ThemeMode } from '../../services/themeStore';
-import { Check, ChevronDown, CircleHelp, ClipboardList, Clock, CreditCard, Gift, KeyRound, LayoutDashboard, LogOut, Moon, Pencil, Settings, Shield, Sun, Trash2, User, Users, Wallet } from 'lucide-react';
+import { Check, ChevronDown, CircleHelp, ClipboardList, Clock, CreditCard, Gift, LayoutDashboard, LogOut, Moon, Pencil, Settings, Shield, Sun, Trash2, User, Users, Wallet } from 'lucide-react';
 import { APP_SITE_URL } from '../../services/settingsStore';
 import {
   countByProject,
@@ -264,9 +264,6 @@ export default function UserMenuDropdown({ credits, onCreditsRefresh }: Props) {
             </Link>
             <Link to="/usage-history" className="user-menu-item" onClick={() => setOpen(false)}>
               <Clock {...ICON} /> Lịch sử sử dụng
-            </Link>
-            <Link to="/settings/tokens" className="user-menu-item" onClick={() => setOpen(false)}>
-              <KeyRound {...ICON} /> Access Token
             </Link>
             <Link to="/account" className="user-menu-item" onClick={() => setOpen(false)}>
               <Shield {...ICON} /> Quản lý tài khoản

@@ -17,6 +17,7 @@ try {
     if (!$row || !password_verify($password, (string) $row['password_hash'])) {
         json_out(401, ['success' => false, 'message' => 'Email hoặc mật khẩu không đúng']);
     }
+    $row = sync_admin_flag($pdo, $row);
 
     json_out(200, [
         'success' => true,

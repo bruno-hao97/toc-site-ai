@@ -1,7 +1,7 @@
 import { loadAuth } from './authStore';
 import { gommoDeviceFields } from './gommoDevice';
 import { PRICING_DOMAIN } from './settingsStore';
-import { GOMMO_AUTH_BASE, GOMMO_AUTH_PATH } from './upstreamMe';
+import { GOMMO_AUTH_PATH } from './upstreamMe';
 
 export type SubscriptionPlanType = 'image' | 'video' | 'combo';
 
@@ -131,19 +131,21 @@ function parsePlansPayload(input: unknown): PlansPayload {
 
 export async function fetchSubscriptionPlans(type: SubscriptionPlanType): Promise<SubscriptionPlan[]> {
   const auth = loadAuth();
-  if (!auth?.access_token) throw new Error('Chưa đăng nhập — thiếu access token');
+  if (!auth?.platform_token) throw new Error('Chưa đăng nhập');
 
   const body = new URLSearchParams({
     action_type: 'plans',
     type,
     domain: PRICING_DOMAIN,
-    access_token: auth.access_token.trim(),
     ...gommoDeviceFields(),
   }).toString();
 
   const res = await fetch(PLANS_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      Authorization: `Bearer ${auth.platform_token}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
     body,
   });
   const text = await res.text();
@@ -377,11 +379,10 @@ export async function createSubscriptionPayment(
   }
 
   const auth = loadAuth();
-  if (!auth?.access_token) throw new Error('Chưa đăng nhập — thiếu access token');
+  if (!auth?.platform_token) throw new Error('Chưa đăng nhập');
   if (!input.planId?.trim()) throw new Error('Thiếu plan_id');
 
   const body = new URLSearchParams({
-    access_token: auth.access_token.trim(),
     domain: PRICING_DOMAIN,
     plan_id: input.planId.trim(),
     subscribe_type: input.subscribeType || 'MEMBER_PLAN_AI',
@@ -392,7 +393,10 @@ export async function createSubscriptionPayment(
 
   const res = await fetch(CREATE_PAYMENT_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      Authorization: `Bearer ${auth.platform_token}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
     body,
   });
   const text = await res.text();

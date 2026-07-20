@@ -40,6 +40,23 @@ function platform_config(): array
     return $cfg;
 }
 
+/** Hệ thống chỉ cho phép đúng một email admin trong cấu hình. */
+function configured_admin_email(): string
+{
+    $cfg = platform_config();
+    $emails = $cfg['admin_emails'] ?? [];
+    if (!is_array($emails)) {
+        throw new RuntimeException('admin_emails phải là mảng gồm đúng một email');
+    }
+    $normalized = array_values(array_filter(array_map(static function ($email) {
+        return strtolower(trim((string) $email));
+    }, $emails)));
+    if (count($normalized) !== 1 || strpos($normalized[0], '@') === false) {
+        throw new RuntimeException('Phải cấu hình đúng một admin_email hợp lệ');
+    }
+    return $normalized[0];
+}
+
 function json_out(int $status, array $payload): void
 {
     http_response_code($status);
@@ -203,40 +220,42 @@ function require_bearer_user(): array
 
 function sync_admin_flag(PDO $pdo, array $user): array
 {
-    $cfg = platform_config();
-    $emails = $cfg['admin_emails'] ?? [];
-    if (!is_array($emails)) {
-        return $user;
+    $adminEmail = configured_admin_email();
+    $admin = find_user_by_email($pdo, $adminEmail);
+    if (!$admin) {
+        throw new RuntimeException('Tài khoản admin cấu hình chưa tồn tại trong DB');
     }
-    $emails = array_map(static function ($e) {
-        return strtolower(trim((string) $e));
-    }, $emails);
-    $shouldAdmin = in_array(strtolower((string) $user['email']), $emails, true);
-    $isAdmin = !empty($user['is_admin']);
-    if ($shouldAdmin && !$isAdmin) {
-        $stmt = $pdo->prepare('UPDATE users SET is_admin = 1 WHERE id = ?');
-        $stmt->execute([$user['id']]);
-        $user['is_admin'] = 1;
+
+    $stmt = $pdo->query('SELECT id, email FROM users WHERE is_admin = 1');
+    $admins = $stmt->fetchAll();
+    $alreadyCorrect =
+        count($admins) === 1 &&
+        strtolower((string) $admins[0]['email']) === $adminEmail;
+
+    if (!$alreadyCorrect) {
+        $pdo->beginTransaction();
+        try {
+            $pdo->exec('UPDATE users SET is_admin = 0 WHERE is_admin <> 0');
+            $update = $pdo->prepare('UPDATE users SET is_admin = 1 WHERE LOWER(email) = ?');
+            $update->execute([$adminEmail]);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
     }
+
+    $user['is_admin'] =
+        strtolower((string) $user['email']) === $adminEmail ? 1 : 0;
     return $user;
 }
 
 function user_is_admin(array $user): bool
 {
-    if (!empty($user['is_admin'])) {
-        return true;
-    }
-    $cfg = platform_config();
-    $emails = $cfg['admin_emails'] ?? [];
-    if (!is_array($emails)) {
-        return false;
-    }
-    foreach ($emails as $e) {
-        if (strtolower(trim((string) $e)) === strtolower((string) $user['email'])) {
-            return true;
-        }
-    }
-    return false;
+    return !empty($user['is_admin'])
+        && strtolower((string) $user['email']) === configured_admin_email();
 }
 
 function uuid_v4(): string

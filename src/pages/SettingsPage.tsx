@@ -49,17 +49,6 @@ export default function SettingsPage() {
             </div>
             <span className="settings-79-domain">{domain}</span>
           </div>
-          <div className="settings-79-row">
-            <div>
-              <div className="settings-79-row-title">API Access Token</div>
-              <div className="settings-79-row-desc">
-                Sử dụng token này để kết nối với các ứng dụng bên thứ 3.
-              </div>
-            </div>
-            <Link to="/settings/tokens" className="btn secondary sm">
-              Sao chép &amp; Tạo mới
-            </Link>
-          </div>
         </section>
 
         <section className="panel settings-79-section">

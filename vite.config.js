@@ -17,7 +17,16 @@ export default defineConfig({
     allowedHosts: true,     // Cho phép Cloudflare Tunnel
 
     proxy: {
-      // PHP bridge trên VPS — ưu tiên trước /api → Node
+      // Job hotfix local (Node) — trước proxy PHP bridge VPS
+      '/api/platform/job-create.php': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/platform/job-poll.php': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      // PHP bridge trên VPS — các endpoint còn lại
       '/api/platform': {
         target: 'https://pro.agi.vn',
         changeOrigin: true,

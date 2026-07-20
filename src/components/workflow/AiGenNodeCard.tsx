@@ -12,6 +12,7 @@ import type { GommoModel, JobType } from '../../services/api';
 import {
   analyzeModel,
   defaultSelections,
+  pickAllowedOption,
   modelSlug,
   type ModelOption,
   type ModelSchema,
@@ -219,13 +220,12 @@ export function AiGenNodeCard({
           if (def) {
             const slug = modelSlug(def);
             const schema = analyzeModel(def, jobType);
-            const defs = defaultSelections(schema);
             update({
               modelId: slug,
-              ratio: data.ratio || defs.ratio,
-              mode: data.mode || defs.mode,
-              resolution: data.resolution || defs.resolution,
-              duration: data.duration || defs.duration,
+              ratio: pickAllowedOption(data.ratio, schema.options.ratios),
+              mode: pickAllowedOption(data.mode, schema.options.modes),
+              resolution: pickAllowedOption(data.resolution, schema.options.resolutions),
+              duration: pickAllowedOption(data.duration, schema.options.durations),
             });
           }
         }
@@ -250,12 +250,15 @@ export function AiGenNodeCard({
 
   useEffect(() => {
     if (!schema) return;
-    const defs = defaultSelections(schema);
+    const nextRatio = pickAllowedOption(data.ratio, schema.options.ratios);
+    const nextMode = pickAllowedOption(data.mode, schema.options.modes);
+    const nextResolution = pickAllowedOption(data.resolution, schema.options.resolutions);
+    const nextDuration = pickAllowedOption(data.duration, schema.options.durations);
     const patch: Partial<AiGenNodeData> = {};
-    if (!data.ratio && defs.ratio) patch.ratio = defs.ratio;
-    if (!data.mode && defs.mode) patch.mode = defs.mode;
-    if (!data.resolution && defs.resolution) patch.resolution = defs.resolution;
-    if (!data.duration && defs.duration) patch.duration = defs.duration;
+    if (nextRatio && nextRatio !== data.ratio) patch.ratio = nextRatio;
+    if (nextMode && nextMode !== data.mode) patch.mode = nextMode;
+    if (nextResolution && nextResolution !== data.resolution) patch.resolution = nextResolution;
+    if (nextDuration && nextDuration !== data.duration) patch.duration = nextDuration;
     if (Object.keys(patch).length) update(patch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schema?.slug]);

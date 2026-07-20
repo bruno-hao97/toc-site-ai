@@ -1,16 +1,18 @@
 <?php
 declare(strict_types=1);
 
+require __DIR__ . '/bootstrap.php';
+require __DIR__ . '/gommo.php';
+
 /**
- * Gommo pass-through proxy (che URL upstream) — thay cho Node gommoProxy khi
- * chỉ có PHP/FTP trên VPS. Dùng PATH_INFO để giữ nguyên path + query của client.
+ * Gommo gateway dùng duy nhất token admin phía server.
+ * Client chỉ được xác thực bằng JWT platform; access_token do client gửi luôn bị bỏ.
  *
  *   /api/platform/gw.php/v2/ai/models   → https://v2.api.gommo.net/ai/models
  *   /api/platform/gw.php/api/apps/go-mmo/ai/me → https://api.gommo.net/api/apps/go-mmo/ai/me
  *   /api/platform/gw.php/api/v2/chat    → https://api.gommo.net/api/v2/chat
  *   /api/platform/gw.php/ai/...         → https://api.gommo.net/ai/...
  *
- * Token của người dùng đi qua header Authorization / body — KHÔNG chèn merchant token.
  */
 
 header('Access-Control-Allow-Origin: *');
@@ -21,6 +23,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
     http_response_code(204);
     exit;
 }
+
+require_bearer_user();
 
 function gw_fail(int $status, string $msg): void
 {
@@ -57,24 +61,58 @@ if (strpos($pi, '/api/apps/go-mmo') === 0) {
     gw_fail(404, 'gw: route không hỗ trợ ' . $pi);
 }
 
-$qs = $_SERVER['QUERY_STRING'] ?? '';
-$url = $base . $path . ($qs !== '' ? ('?' . $qs) : '');
-
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 $reqBody = file_get_contents('php://input');
 if ($reqBody === false) {
     $reqBody = '';
 }
 
+$g = gommo_cfg();
+if ($g['token'] === '') {
+    gw_fail(503, 'Chưa cấu hình token admin trên server');
+}
+
+// Query/body tuyệt đối không được phép ghi đè token hoặc tenant admin.
+$query = [];
+parse_str((string) ($_SERVER['QUERY_STRING'] ?? ''), $query);
+unset($query['access_token']);
+$query['access_token'] = $g['token'];
+$query['domain'] = $g['domain'];
+$qs = http_build_query($query);
+$url = $base . $path . ($qs !== '' ? ('?' . $qs) : '');
+
 $fwdHeaders = ['Accept: application/json'];
 $ct = $_SERVER['CONTENT_TYPE'] ?? ($_SERVER['HTTP_CONTENT_TYPE'] ?? '');
-if ($ct !== '') {
-    $fwdHeaders[] = 'Content-Type: ' . $ct;
+$lowerCt = strtolower($ct);
+if (strpos($lowerCt, 'application/x-www-form-urlencoded') !== false) {
+    $fields = [];
+    parse_str($reqBody, $fields);
+    unset($fields['access_token']);
+    $fields['access_token'] = $g['token'];
+    $fields['domain'] = $g['domain'];
+    $reqBody = http_build_query($fields);
+    $fwdHeaders[] = 'Content-Type: application/x-www-form-urlencoded';
+} elseif (strpos($lowerCt, 'application/json') !== false) {
+    $fields = json_decode($reqBody, true);
+    if (!is_array($fields)) {
+        $fields = [];
+    }
+    unset($fields['access_token']);
+    $fields['access_token'] = $g['token'];
+    $fields['domain'] = $g['domain'];
+    $reqBody = json_encode($fields, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $fwdHeaders[] = 'Content-Type: application/json';
+} elseif ($ct !== '') {
+    gw_fail(
+        strpos($lowerCt, 'multipart/form-data') !== false ? 400 : 415,
+        strpos($lowerCt, 'multipart/form-data') !== false
+            ? 'Upload phải đi qua endpoint platform'
+            : 'Content-Type không được hỗ trợ'
+    );
+} elseif ($reqBody !== '') {
+    gw_fail(415, 'Content-Type không được hỗ trợ');
 }
-$authz = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
-if ($authz !== '') {
-    $fwdHeaders[] = 'Authorization: ' . $authz;
-}
+$fwdHeaders[] = 'Authorization: Bearer ' . $g['token'];
 
 $ch = curl_init($url);
 if ($ch === false) {

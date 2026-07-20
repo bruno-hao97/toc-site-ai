@@ -42,7 +42,8 @@ export interface GommoEnvelope<T = Record<string, unknown>> {
 }
 
 export interface GommoClientOptions {
-  accessToken: string;
+  /** JWT platform; không phải Gommo access_token. */
+  platformToken: string;
   domain?: string;
   projectId?: string;
 }
@@ -60,18 +61,18 @@ export class GommoApiError extends Error {
 }
 
 export class GommoClient {
-  accessToken: string;
+  platformToken: string;
   domain: string;
   projectId: string;
 
-  constructor({ accessToken, domain = DEFAULT_DOMAIN, projectId = 'default' }: GommoClientOptions) {
-    this.accessToken = accessToken;
+  constructor({ platformToken, domain = DEFAULT_DOMAIN, projectId = 'default' }: GommoClientOptions) {
+    this.platformToken = platformToken;
     this.domain = domain;
     this.projectId = projectId;
   }
 
   headers(extra: Record<string, string> = {}): Record<string, string> {
-    return { Authorization: `Bearer ${this.accessToken}`, ...extra };
+    return { Authorization: `Bearer ${this.platformToken}`, ...extra };
   }
 
   async parseResponse(res: Response): Promise<GommoEnvelope> {
@@ -185,10 +186,9 @@ export class GommoClient {
   }
 
   async uploadImage(file: File, fileName?: string): Promise<{ url: string; envelope: GommoEnvelope }> {
-    if (!this.accessToken) throw new GommoApiError('Chưa có access token');
+    if (!this.platformToken) throw new GommoApiError('Chưa đăng nhập');
     const name = fileName || file.name || 'image.png';
     const form = new FormData();
-    form.append('access_token', this.accessToken);
     form.append('domain', this.domain);
     form.append('project_id', this.projectId);
     form.append('file', file, name);
@@ -197,7 +197,7 @@ export class GommoClient {
 
     const res = await fetch(`${BASE_URL}/ai/upload/image`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${this.accessToken}` },
+      headers: { Authorization: `Bearer ${this.platformToken}` },
       body: form,
     });
     const envelope = await this.parseResponse(res);
@@ -214,17 +214,16 @@ export class GommoClient {
   }
 
   async uploadVideo(file: File, fileName?: string): Promise<{ url: string; envelope: GommoEnvelope }> {
-    if (!this.accessToken) throw new GommoApiError('Chưa có access token');
+    if (!this.platformToken) throw new GommoApiError('Chưa đăng nhập');
     const name = fileName || file.name || 'video.mp4';
     const form = new FormData();
-    form.append('access_token', this.accessToken);
     form.append('domain', this.domain);
     form.append('project_id', this.projectId);
     form.append('video_file', file, name);
 
     const res = await fetch(`${BASE_URL}/ai/upload/video`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${this.accessToken}` },
+      headers: { Authorization: `Bearer ${this.platformToken}` },
       body: form,
     });
     const envelope = await this.parseResponse(res);

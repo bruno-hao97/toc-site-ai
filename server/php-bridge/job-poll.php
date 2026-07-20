@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
 require __DIR__ . '/gommo.php';
+require __DIR__ . '/load-job-status-helpers.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_out(405, ['success' => false, 'message' => 'Method not allowed']);
@@ -44,12 +45,7 @@ try {
     $envelope = gommo_post_form($path, []);
 
     $resultUrl = extract_result_url($envelope);
-    $status = extract_status($envelope);
-    if ($resultUrl) {
-        $status = 'success';
-    } elseif ($status === '') {
-        $status = 'processing';
-    }
+    $status = normalize_stored_job_status(extract_status($envelope), $resultUrl);
 
     $pdo->prepare(
         'UPDATE platform_jobs SET status = ?, result_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'

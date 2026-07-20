@@ -20,6 +20,7 @@ return [
     'signup_bonus_credits' => 1000,
     'transfer_min' => 1000,
     'transfer_max' => 20000000,
+    // Bắt buộc đúng một email; DB sẽ tự gỡ quyền admin khỏi mọi user khác.
     'admin_emails' => [
         'you@gmail.com',
     ],

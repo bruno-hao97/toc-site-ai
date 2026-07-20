@@ -38,15 +38,50 @@ export class PlatformJobClient {
       throw new Error(text || `HTTP ${res.status}`);
     }
     if (!res.ok || parsed.success === false) {
-      throw new Error((parsed as { message?: string }).message || `HTTP ${res.status}`);
+      const errMsg = (parsed as { message?: string }).message || `HTTP ${res.status}`;
+      throw new Error(errMsg);
     }
     return parsed;
   }
 
-  async fetchModels(type: JobType): Promise<GommoEnvelope> {
-    if (type !== 'image') {
-      throw new Error('Platform job proxy phase 1 chỉ hỗ trợ image');
+  private async upload(
+    kind: 'image' | 'video',
+    file: File,
+    fileName?: string,
+  ): Promise<{ url: string; envelope: GommoEnvelope }> {
+    const form = new FormData();
+    form.append('kind', kind);
+    form.append('file', file, fileName || file.name);
+
+    const res = await fetch(PLATFORM_BRIDGE.jobUpload, {
+      method: 'POST',
+      headers: {
+        ...this.authHeaders(),
+        Accept: 'application/json',
+      },
+      body: form,
+    });
+    const text = await res.text();
+    let parsed: {
+      success?: boolean;
+      message?: string;
+      data?: { url?: string; envelope?: GommoEnvelope };
+    };
+    try {
+      parsed = JSON.parse(text) as typeof parsed;
+    } catch {
+      throw new Error(text || `HTTP ${res.status}`);
     }
+    if (!res.ok || !parsed.success || !parsed.data?.url) {
+      throw new Error(parsed.message || 'Upload thất bại');
+    }
+    return {
+      url: parsed.data.url,
+      envelope: parsed.data.envelope || { success: true, data: { url: parsed.data.url } },
+    };
+  }
+
+  async fetchModels(type: JobType): Promise<GommoEnvelope> {
     const res = await fetch(`${PLATFORM_BRIDGE.jobModels}?type=${encodeURIComponent(type)}`, {
       headers: this.authHeaders(),
     });
@@ -64,7 +99,7 @@ export class PlatformJobClient {
   }
 
   listModels(envelope: GommoEnvelope): GommoModel[] {
-    return new GommoClient({ accessToken: 'x' }).listModels(envelope);
+    return new GommoClient({ platformToken: 'parser-only' }).listModels(envelope);
   }
 
   async createJob(
@@ -96,28 +131,21 @@ export class PlatformJobClient {
     return parsed.data.envelope;
   }
 
-  async uploadImage(): Promise<{ url: string; envelope: GommoEnvelope }> {
-    throw new Error('Upload ảnh qua platform chưa hỗ trợ — dùng text-to-image hoặc đăng nhập Token');
+  async uploadImage(file: File, fileName?: string): Promise<{ url: string; envelope: GommoEnvelope }> {
+    return this.upload('image', file, fileName);
+  }
+
+  async uploadVideo(file: File, fileName?: string): Promise<{ url: string; envelope: GommoEnvelope }> {
+    return this.upload('video', file, fileName);
   }
 }
 
 export function usesPlatformJobs(): boolean {
-  const auth = loadAuth();
-  return Boolean(auth?.platform_token?.trim() && !auth?.access_token?.trim());
+  return Boolean(loadAuth()?.platform_token?.trim());
 }
 
-export function getJobClient(): GommoClient | PlatformJobClient {
+export function getJobClient(): PlatformJobClient {
   const auth = loadAuth();
-  if (!auth) throw new Error('Chưa đăng nhập');
-  if (auth.access_token?.trim()) {
-    return new GommoClient({
-      accessToken: auth.access_token,
-      domain: auth.domain || 'vmedia.ai',
-      projectId: auth.projectId,
-    });
-  }
-  if (auth.platform_token?.trim()) {
-    return new PlatformJobClient();
-  }
-  throw new Error('Chưa đăng nhập');
+  if (!auth?.platform_token?.trim()) throw new Error('Chưa đăng nhập');
+  return new PlatformJobClient();
 }
