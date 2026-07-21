@@ -2768,8 +2768,7 @@ function Flow() {
           const selections: JobSelections = {
             prompt: promptText || undefined,
             images: [imageUrl],
-            references: [imageUrl, audioUrl],
-            subjects: [imageUrl],
+            subjects: [imageUrl, audioUrl],
             extra: { audio_url: audioUrl, audio: audioUrl },
           };
           updateNode(node.id, { status: 'running', statusText: 'Bắt đầu…' });
@@ -3033,8 +3032,8 @@ function Flow() {
             selections.prompt = promptText;
           }
 
-          if (type === 'image') {
-            const references = resolveImageReferencesForJob({
+          if (type === 'image' || type === 'video') {
+            const refUrls = resolveImageReferencesForJob({
               prompt: promptText,
               nodes,
               outputs,
@@ -3044,11 +3043,12 @@ function Flow() {
               resolveEdgeOutput,
               fallbackUrl: refWire || upUrl,
             });
-            if (references.length) selections.references = references;
-          } else if (type === 'video') {
-            const frameUrl = refWire || upUrl;
-            if (frameUrl && /^https?:\/\//i.test(frameUrl)) {
-              selections.images = [frameUrl];
+            const refUrl = refUrls[0] || refWire || upUrl;
+            if (refUrl && /^https?:\/\//i.test(refUrl)) {
+              selections.subjects = refUrls.length ? refUrls : [refUrl];
+              if (type === 'video') {
+                selections.images = [refUrl];
+              }
             }
           }
 

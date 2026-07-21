@@ -36,12 +36,11 @@ function buildSelections(nodeType: string, wire: ProcessJobWireInput): JobSelect
 
   if (image) {
     selections.images = [image];
-    selections.references = [image];
     selections.subjects = [image];
   }
   if (video) {
     if (!selections.images?.length) selections.images = [video];
-    selections.references = [...(selections.references || []), video];
+    selections.subjects = [...(selections.subjects || []), video];
     selections.extra = {
       ...(selections.extra || {}),
       video_url: video,
@@ -53,7 +52,7 @@ function buildSelections(nodeType: string, wire: ProcessJobWireInput): JobSelect
       audio_url: audio,
       audio,
     };
-    selections.references = [...(selections.references || []), audio];
+    selections.subjects = [...(selections.subjects || []), audio];
   }
 
   if (nodeType === 'cut') {

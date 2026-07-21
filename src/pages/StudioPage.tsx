@@ -73,6 +73,7 @@ import {
   analyzeModel,
   buildJobPayload,
   mergeSelectionsForSchema,
+  normalizeComponentSelections,
   modelSlug,
   parseModelsList,
   type JobSelections,
@@ -1085,7 +1086,7 @@ export default function StudioPage({
                 setSelections({
                   ...defaultSelectionsForType('video'),
                   prompt: item.prompt || '',
-                  references: [mediaUrl],
+                  subjects: [mediaUrl],
                 });
                 onClosePreview();
               }
@@ -1096,7 +1097,7 @@ export default function StudioPage({
               setSelections({
                 ...defaultSelectionsForType('image'),
                 prompt: item.prompt || '',
-                references: [mediaUrl],
+                subjects: [mediaUrl],
               });
               onClosePreview();
             }
@@ -1179,14 +1180,14 @@ export default function StudioPage({
     setSchema(s);
     setSelections((prev) => {
       const defaults = defaultSelectionsForType(jobType);
-      return mergeSelectionsForSchema(prev, s, {
-        prompt: prev.prompt || defaults.prompt,
-        text: prev.text || defaults.text,
-        name: prev.name || defaults.name,
-        ...(prev.images?.length ? { images: prev.images } : {}),
-        ...(prev.references?.length ? { references: prev.references } : {}),
-        ...(prev.subjects?.length ? { subjects: prev.subjects } : {}),
-      });
+      return normalizeComponentSelections(
+        mergeSelectionsForSchema(prev, s, {
+          prompt: prev.prompt || defaults.prompt,
+          text: prev.text || defaults.text,
+          name: prev.name || defaults.name,
+          ...(prev.images?.length ? { images: prev.images } : {}),
+        }),
+      );
     });
   }, [currentModel, jobType]);
 
@@ -1276,14 +1277,11 @@ export default function StudioPage({
     modelOverride?: GommoModel,
   ): Promise<boolean> {
     const model = modelOverride ?? currentModel!;
-    const jobSchema = modelOverride ? analyzeModel(model, jobType) : schema!;
     const runSelections: JobSelections = { ...selections, prompt, ...overrides };
     if (refUrl) {
-      if (jobSchema.fields.references) runSelections.references = [refUrl];
-      else if (jobSchema.fields.subjects) runSelections.subjects = [refUrl];
-      else runSelections.images = [refUrl];
+      runSelections.subjects = [refUrl];
     }
-    const { payload } = buildJobPayload(model, jobType, runSelections, {
+    const { payload } = buildJobPayload(model, jobType, normalizeComponentSelections(runSelections), {
       domain: auth?.domain || client?.domain,
       projectId: client?.projectId,
     });
@@ -1339,10 +1337,10 @@ export default function StudioPage({
     if (
       !isMotionView &&
       !isEditView &&
-      schema.fields.references &&
+      (schema.fields.subjects) &&
       (!schema.fields.startFrame || inputMode === 'component')
     ) {
-      const refs = (selections.references || []).filter(Boolean);
+      const refs = (selections.subjects || []).filter(Boolean);
       const imgC = refs.filter((u) => urlMediaKind(u) !== 'video').length;
       const vidC = refs.filter((u) => urlMediaKind(u) === 'video').length;
       const limits = getReferenceLimits(currentModel, schema, jobType);
@@ -1871,51 +1869,49 @@ export default function StudioPage({
   // Khối nhập media: model có thể hỗ trợ Ảnh Frame (start/end) và/hoặc Thành phần (tham chiếu).
   const hasFrame = !isMotionView && !isEditView && Boolean(schema?.fields.startFrame);
   const hasComponent =
-    !isMotionView && !isEditView && Boolean(schema?.fields.references || schema?.fields.subjects);
+    !isMotionView && !isEditView && Boolean(schema?.fields.subjects);
   const showInputTabs = hasFrame && hasComponent;
   const inputView: 'frame' | 'component' = showInputTabs
     ? inputMode
     : hasFrame
       ? 'frame'
       : 'component';
-  const componentKey: 'references' | 'subjects' = schema?.fields.references ? 'references' : 'subjects';
   const refLimits = getReferenceLimits(currentModel, schema, jobType);
-  const maxComponents = schema?.fields.references
-    ? refLimits.image + refLimits.video || schema.limits.maxReference || 4
-    : schema?.limits.maxSubject || 1;
-  const componentList = (selections[componentKey] || []).filter(Boolean);
+  const maxComponents =
+    refLimits.image + refLimits.video ||
+    schema?.limits.maxSubject ||
+    schema?.limits.maxReference ||
+    4;
+  const componentList = (selections.subjects || []).filter(Boolean);
   const componentImageCount = componentList.filter((u) => urlMediaKind(u) !== 'video').length;
   const componentVideoCount = componentList.filter((u) => urlMediaKind(u) === 'video').length;
   const canAddComponentImage =
-    componentKey === 'references'
-      ? refLimits.image > 0 && componentImageCount < refLimits.image
+    refLimits.image > 0
+      ? componentImageCount < refLimits.image
       : componentList.length < maxComponents;
-  const canAddComponentVideo =
-    componentKey === 'references' && refLimits.video > 0 && componentVideoCount < refLimits.video;
+  const canAddComponentVideo = refLimits.video > 0 && componentVideoCount < refLimits.video;
   const canAddComponentAny = canAddComponentImage || canAddComponentVideo;
 
   const addComponent = (url: string, kind: 'image' | 'video') => {
     setSelections((s) => {
-      const list = (s[componentKey] || []).filter(Boolean);
-      if (componentKey === 'references') {
-        const imgC = list.filter((u) => urlMediaKind(u) !== 'video').length;
-        const vidC = list.filter((u) => urlMediaKind(u) === 'video').length;
-        if (kind === 'video') {
-          if (vidC >= refLimits.video) return s;
-        } else if (imgC >= refLimits.image) {
-          return s;
-        }
+      const list = (s.subjects || []).filter(Boolean);
+      const imgC = list.filter((u) => urlMediaKind(u) !== 'video').length;
+      const vidC = list.filter((u) => urlMediaKind(u) === 'video').length;
+      if (kind === 'video') {
+        if (vidC >= refLimits.video) return s;
+      } else if (refLimits.image > 0) {
+        if (imgC >= refLimits.image) return s;
       } else if (list.length >= maxComponents) {
         return s;
       }
-      return { ...s, [componentKey]: [...list, url] };
+      return normalizeComponentSelections({ ...s, subjects: [...list, url] });
     });
   };
   const removeComponent = (idx: number) => {
     setSelections((s) => {
-      const list = [...(s[componentKey] || [])];
+      const list = [...(s.subjects || [])];
       list.splice(idx, 1);
-      return { ...s, [componentKey]: list };
+      return normalizeComponentSelections({ ...s, subjects: list });
     });
   };
 
@@ -2506,31 +2502,26 @@ export default function StudioPage({
               {inputView === 'component' && (
                 <>
                   <div className="composer-label-row composer-ref-row">
-                    <span className="composer-label">
-                      {componentKey === 'references'
-                        ? t('composer.references')
-                        : t('composer.subject')}
-                    </span>
+                    <span className="composer-label">{t('composer.references')}</span>
                     <span className="composer-ref-count">
-                      {componentKey === 'references' ? (
-                        <>
-                          {refLimits.image > 0 && (
-                            <span title="Ảnh tham chiếu">
-                              {componentImageCount}/{refLimits.image}
-                            </span>
-                          )}
-                          {refLimits.video > 0 && (
-                            <span title="Video tham chiếu">
-                              {refLimits.image > 0 ? ' ' : ''}
-                              {componentVideoCount}/{refLimits.video}
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          {componentList.length}/{maxComponents}
-                        </>
-                      )}
+                      <>
+                        {refLimits.image > 0 && (
+                          <span title="Ảnh tham chiếu">
+                            {componentImageCount}/{refLimits.image}
+                          </span>
+                        )}
+                        {refLimits.video > 0 && (
+                          <span title="Video tham chiếu">
+                            {refLimits.image > 0 ? ' ' : ''}
+                            {componentVideoCount}/{refLimits.video}
+                          </span>
+                        )}
+                        {refLimits.image <= 0 && refLimits.video <= 0 && (
+                          <span>
+                            {componentList.length}/{maxComponents}
+                          </span>
+                        )}
+                      </>
                     </span>
                   </div>
 
@@ -3613,20 +3604,9 @@ export default function StudioPage({
                   }}
                 />
               )}
-              {schema.fields.references && (
-                <UrlField
-                  label={`Reference URL (max ${schema.limits.maxReference})`}
-                  value={selections.references?.[0] || ''}
-                  onChange={(v) => updateUrlList('references', 0, v)}
-                  onUpload={async (f) => {
-                    const uploaded = await handleUpload(f, 'image');
-                    if (uploaded) updateUrlList('references', 0, uploaded);
-                  }}
-                />
-              )}
               {schema.fields.subjects && (
                 <UrlField
-                  label={`Subject URL (max ${schema.limits.maxSubject})`}
+                  label={`Subject URL (max ${schema.limits.maxSubject || schema.limits.maxReference})`}
                   value={selections.subjects?.[0] || ''}
                   onChange={(v) => updateUrlList('subjects', 0, v)}
                   onUpload={async (f) => {

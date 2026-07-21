@@ -44,13 +44,27 @@ export function extractStatus(envelope: JsonRecord): string {
 export function flattenFormFields(value: unknown, prefix = ''): Record<string, string> {
   const out: Record<string, string> = {};
   if (value == null) return out;
-  if (typeof value !== 'object' || Array.isArray(value)) {
-    if (value !== '' && value != null) out[prefix] = String(value);
+
+  if (Array.isArray(value)) {
+    value.forEach((item, i) => {
+      const k = prefix ? `${prefix}[${i}]` : String(i);
+      if (item != null && typeof item === 'object') {
+        Object.assign(out, flattenFormFields(item, k));
+      } else if (item != null && item !== '') {
+        out[k] = String(item);
+      }
+    });
     return out;
   }
+
+  if (typeof value !== 'object') {
+    if (value !== '' && prefix) out[prefix] = String(value);
+    return out;
+  }
+
   for (const [key, item] of Object.entries(value as JsonRecord)) {
     const k = prefix ? `${prefix}[${key}]` : key;
-    if (item != null && typeof item === 'object' && !Array.isArray(item)) {
+    if (item != null && typeof item === 'object') {
       Object.assign(out, flattenFormFields(item, k));
     } else if (item != null && item !== '') {
       out[k] = String(item);

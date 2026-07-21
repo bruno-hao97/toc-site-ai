@@ -13,6 +13,7 @@ import {
   defaultSelections,
   getCachedModels,
   modelSlug,
+  normalizeComponentSelections,
   parseModelsList,
   setCachedModels,
   type JobSelections,
@@ -118,10 +119,15 @@ export default function ApiPlaygroundPage() {
       return;
     }
     try {
-      const { payload } = buildJobPayload(currentModel, jobType, selections, {
-        domain: client.domain,
-        projectId: client.projectId,
-      });
+      const { payload } = buildJobPayload(
+        currentModel,
+        jobType,
+        normalizeComponentSelections(selections),
+        {
+          domain: client.domain,
+          projectId: client.projectId,
+        },
+      );
       setRequestPreview(payload);
     } catch {
       setRequestPreview(null);
@@ -163,10 +169,15 @@ export default function ApiPlaygroundPage() {
     setResultUrl(null);
 
     try {
-      const { payload } = buildJobPayload(currentModel, jobType, selections, {
-        domain: client.domain,
-        projectId: client.projectId,
-      });
+      const { payload } = buildJobPayload(
+        currentModel,
+        jobType,
+        normalizeComponentSelections(selections),
+        {
+          domain: client.domain,
+          projectId: client.projectId,
+        },
+      );
       const modelId = modelSlug(currentModel);
 
       const result = await createJobAndPoll(
@@ -406,14 +417,14 @@ export default function ApiPlaygroundPage() {
                 />
               )}
 
-              {schema.fields.references && (
+              {schema.fields.subjects && (
                 <UrlField
-                  label={`Reference URL (max ${schema.limits.maxReference})`}
-                  value={selections.references?.[0] || ''}
-                  onChange={(v) => updateUrlList('references', 0, v)}
+                  label={`Subject URL (max ${schema.limits.maxSubject || schema.limits.maxReference})`}
+                  value={selections.subjects?.[0] || ''}
+                  onChange={(v) => updateUrlList('subjects', 0, v)}
                   onUpload={async (f) => {
                     const url = await handleUpload(f, 'image');
-                    if (url) updateUrlList('references', 0, url);
+                    if (url) updateUrlList('subjects', 0, url);
                   }}
                 />
               )}

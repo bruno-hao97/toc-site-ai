@@ -269,7 +269,7 @@ export function AiGenNodeCard({
   );
   const creditBadge = formatCreditBadge(creditCost);
 
-  const hasRef = Boolean(schema?.fields.references && currentModel?.withReference);
+  const hasRef = Boolean(schema?.fields.subjects);
   const running = data.status === 'running';
   const done = data.status === 'done';
   const editing = !running && !done;

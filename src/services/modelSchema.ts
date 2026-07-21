@@ -147,6 +147,31 @@ function getReferenceLimitsFromModel(model: GommoModel): {
   return { image, video, total: image + (video || 0) };
 }
 
+/** Gom/vmedia: thành phần tham chiếu (ảnh/video/audio) luôn gửi qua `subjects[]`. */
+export function componentMediaField(
+  _model: GommoModel,
+  _schema: ModelSchema,
+): 'subjects' {
+  return 'subjects';
+}
+
+/** Gộp subjects + references cũ (state legacy) thành một danh sách URL. */
+export function collectComponentUrls(selections: JobSelections): string[] {
+  return [
+    ...new Set([...(selections.subjects || []), ...(selections.references || [])].filter(Boolean)),
+  ];
+}
+
+/** Chuẩn hóa state composer — chỉ giữ `subjects`, bỏ `references`. */
+export function normalizeComponentSelections(selections: JobSelections): JobSelections {
+  const urls = collectComponentUrls(selections);
+  const next = { ...selections };
+  if (urls.length) next.subjects = urls;
+  else delete next.subjects;
+  delete next.references;
+  return next;
+}
+
 export function analyzeModel(model: GommoModel, jobType: JobType): ModelSchema {
   const ratios = normalizeOptions(model.ratios);
   const modes = getModesList(model);
@@ -154,7 +179,10 @@ export function analyzeModel(model: GommoModel, jobType: JobType): ModelSchema {
   const durations = normalizeOptions(model.durations || model.duration);
   const refLimits = getReferenceLimitsFromModel(model);
   const refLimit = refLimits.image || refLimits.total;
-  const maxSubject = Number(model.maxSubject) || 0;
+  const maxSubjectRaw = Number(model.maxSubject) || 0;
+  const maxSubject = Math.max(maxSubjectRaw, refLimits.image || 0, refLimit || 0);
+  const hasComponentMedia =
+    maxSubject > 0 || refLimit > 0 || Boolean(model.withSubject) || Boolean(model.withReference);
   const configs = model.configs || {};
 
   return {
@@ -184,8 +212,8 @@ export function analyzeModel(model: GommoModel, jobType: JobType): ModelSchema {
       resolution: resolutions.length > 0,
       duration: durations.length > 0,
       templateId: Boolean((configs.templates as { enabled?: boolean })?.enabled),
-      subjects: Boolean(model.withSubject) && maxSubject > 0,
-      references: refLimit > 0 || Boolean(model.withReference),
+      subjects: hasComponentMedia,
+      references: false,
       startFrame: Boolean(model.startImage),
       endFrame: Boolean(model.startImageAndEnd),
       motion: Boolean(model.withMotion),
@@ -255,14 +283,9 @@ export function buildJobPayload(
     }
   }
 
-  const refs = (selections.references || []).filter(Boolean);
-  if (schema.fields.references && refs.length) {
-    payload.references = refs.map((url) => ({ url }));
-  }
-
-  const subjects = (selections.subjects || []).filter(Boolean);
-  if (schema.fields.subjects && subjects.length) {
-    payload.subjects = subjects.map((url) => ({ url }));
+  const componentUrls = collectComponentUrls(selections);
+  if (componentUrls.length) {
+    payload.subjects = componentUrls.map((url) => ({ url }));
   }
 
   Object.assign(payload, selections.extra || {});
@@ -317,7 +340,7 @@ export function mergeSelectionsForSchema(
   extras?: Partial<JobSelections>,
 ): JobSelections {
   const defs = defaultSelections(schema);
-  return {
+  const merged: JobSelections = {
     ...prev,
     ...extras,
     ratio: pickAllowedOption(prev.ratio, schema.options.ratios) ?? defs.ratio,
@@ -326,6 +349,7 @@ export function mergeSelectionsForSchema(
       pickAllowedOption(prev.resolution, schema.options.resolutions) ?? defs.resolution,
     duration: pickAllowedOption(prev.duration, schema.options.durations) ?? defs.duration,
   };
+  return normalizeComponentSelections(merged);
 }
 
 const MODELS_CACHE = new Map<string, { at: number; models: GommoModel[] }>();
