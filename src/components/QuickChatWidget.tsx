@@ -34,6 +34,12 @@ export default function QuickChatWidget() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, thinking]);
 
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener('quick-chat:open', onOpen);
+    return () => window.removeEventListener('quick-chat:open', onOpen);
+  }, []);
+
   const resetChat = () => {
     setMessages([]);
     setInput('');

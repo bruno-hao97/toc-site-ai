@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
+  Bot,
   ChevronDown,
   ChevronUp,
   Clapperboard,
   Clock,
+  FileText,
   Image as ImageIcon,
+  LayoutGrid,
   Loader2,
+  Mic,
   Monitor,
   Music,
   Plus,
@@ -16,6 +21,7 @@ import {
   Volume2,
   X,
 } from 'lucide-react';
+import ComposerMediaPickButton from './ComposerMediaPickButton';
 import type { GommoModel, JobType } from '../services/api';
 import type { JobSelections, ModelOption, ModelSchema } from '../services/modelSchema';
 import { mergeSelectionsForSchema, modelSlug, normalizeComponentSelections } from '../services/modelSchema';
@@ -25,26 +31,51 @@ import {
   loadQuickModels,
   quickGenerate,
   uploadQuickImage,
+  uploadQuickMedia,
 } from '../services/quickCreate';
 import { notifyCreditsUpdated } from '../services/authStore';
+import { resolveModelPrice } from '../services/modelPricing';
 
-interface TypeDef {
-  type: JobType;
+type QuickMenuId = 'chat' | 'script' | 'video' | 'image' | 'tts' | 'music' | 'audio' | 'apps';
+
+interface QuickMenuItem {
+  id: QuickMenuId;
   label: string;
   icon: typeof ImageIcon;
+  jobType?: JobType;
+  href?: string;
+  action?: 'open-chat';
+  fixedCount?: number;
 }
 
-const TYPES: TypeDef[] = [
-  { type: 'video', label: 'Tạo video', icon: Clapperboard },
-  { type: 'image', label: 'Tạo ảnh', icon: ImageIcon },
-  { type: 'tts', label: 'Tạo giọng đọc', icon: Volume2 },
-  { type: 'music', label: 'Tạo nhạc', icon: Music },
+const QUICK_MENU: QuickMenuItem[] = [
+  { id: 'chat', label: 'Novix Chat', icon: Bot, action: 'open-chat', fixedCount: 1 },
+  { id: 'script', label: 'Tạo kịch bản', icon: FileText, href: '/video', fixedCount: 1 },
+  { id: 'video', label: 'Tạo video', icon: Clapperboard, jobType: 'video' },
+  { id: 'image', label: 'Tạo ảnh', icon: ImageIcon, jobType: 'image' },
+  { id: 'tts', label: 'Tạo giọng đọc', icon: Volume2, jobType: 'tts' },
+  { id: 'music', label: 'Tạo nhạc', icon: Music, jobType: 'music' },
+  { id: 'audio', label: 'Âm thanh', icon: Mic, href: '/audio', fixedCount: 1 },
+  { id: 'apps', label: 'Ứng dụng', icon: LayoutGrid, href: '/workflow', fixedCount: 1 },
 ];
+
+const JOB_TYPES: JobType[] = ['video', 'image', 'tts', 'music'];
 
 const MAX_MEDIA = 4;
 
-function typeLabel(type: JobType): string {
-  return TYPES.find((t) => t.type === type)?.label ?? type;
+function typeShortLabel(type: JobType): string {
+  switch (type) {
+    case 'video':
+      return 'VIDEO';
+    case 'image':
+      return 'ẢNH';
+    case 'tts':
+      return 'GIỌNG';
+    case 'music':
+      return 'NHẠC';
+    default:
+      return type.toUpperCase();
+  }
 }
 
 function promptPlaceholder(type: JobType): string {
@@ -60,6 +91,10 @@ function promptPlaceholder(type: JobType): string {
     default:
       return 'Mô tả nội dung…';
   }
+}
+
+function urlMediaKind(url: string): 'image' | 'video' {
+  return /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url) ? 'video' : 'image';
 }
 
 interface MiniDropdownProps {
@@ -114,8 +149,10 @@ function MiniDropdown({ icon, options, value, onChange }: MiniDropdownProps) {
 }
 
 export default function HomeQuickCreateBar() {
+  const navigate = useNavigate();
   const [type, setType] = useState<JobType>('video');
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
+  const [typeCounts, setTypeCounts] = useState<Partial<Record<JobType, number>>>({});
   const [expanded, setExpanded] = useState(false);
   const [models, setModels] = useState<GommoModel[]>([]);
   const [modelSlugSel, setModelSlugSel] = useState('');
@@ -132,7 +169,6 @@ export default function HomeQuickCreateBar() {
 
   const typeRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<HTMLDivElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const currentModel = useMemo(
@@ -143,7 +179,14 @@ export default function HomeQuickCreateBar() {
     () => (currentModel ? buildQuickSchema(currentModel, type) : null),
     [currentModel, type],
   );
-  const cost = (currentModel?.price ?? 0) * qty;
+  const unitCost = useMemo(() => {
+    if (!currentModel) return 0;
+    return (
+      resolveModelPrice(currentModel, selections.mode || '', selections.resolution || '') ||
+      (currentModel.price ?? 0)
+    );
+  }, [currentModel, selections.mode, selections.resolution]);
+  const cost = unitCost * qty;
 
   useEffect(() => {
     let active = true;
@@ -161,6 +204,26 @@ export default function HomeQuickCreateBar() {
       active = false;
     };
   }, [type]);
+
+  useEffect(() => {
+    if (!canQuickCreate()) return;
+    let active = true;
+    void Promise.all(
+      JOB_TYPES.map(async (jobType) => {
+        try {
+          const list = await loadQuickModels(jobType);
+          return [jobType, list.length] as const;
+        } catch {
+          return [jobType, 0] as const;
+        }
+      }),
+    ).then((rows) => {
+      if (active) setTypeCounts(Object.fromEntries(rows));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!schema) return;
@@ -185,16 +248,22 @@ export default function HomeQuickCreateBar() {
   const update = <K extends keyof JobSelections>(key: K, value: JobSelections[K]) =>
     setSelections((s) => ({ ...s, [key]: value }));
 
-  const openMediaPicker = () => {
-    fileRef.current?.click();
+  const mediaPickKind = type === 'video' ? 'any' : 'image';
+
+  const ingestMediaUrl = (url: string) => {
+    if (refs.length >= MAX_MEDIA) return;
+    setError('');
+    setRefs((prev) => [...prev, url]);
   };
 
-  const onPickMedia = async (file: File | null) => {
-    if (!file) return;
+  const ingestMediaFile = async (file: File) => {
     if (refs.length >= MAX_MEDIA) return;
     setError('');
     try {
-      const url = await uploadQuickImage(file);
+      const url =
+        type === 'video'
+          ? await uploadQuickMedia(file)
+          : await uploadQuickImage(file);
       if (!url) return;
       setRefs((prev) => [...prev, url]);
     } catch (err) {
@@ -261,6 +330,28 @@ export default function HomeQuickCreateBar() {
 
   const showStoryboard = expanded && (type === 'video' || type === 'image');
 
+  const menuCount = (item: QuickMenuItem): number | null => {
+    if (item.fixedCount != null) return item.fixedCount;
+    if (item.jobType) return typeCounts[item.jobType] ?? null;
+    return null;
+  };
+
+  const onMenuSelect = (item: QuickMenuItem) => {
+    setTypeMenuOpen(false);
+    if (item.action === 'open-chat') {
+      window.dispatchEvent(new CustomEvent('quick-chat:open'));
+      return;
+    }
+    if (item.href) {
+      navigate(item.href);
+      return;
+    }
+    if (item.jobType) {
+      setType(item.jobType);
+      setResult(null);
+    }
+  };
+
   return (
     <div className={`qc-bar${expanded ? ' expanded' : ''}`}>
       {result && (
@@ -290,7 +381,11 @@ export default function HomeQuickCreateBar() {
             <div className="qc-sb-frames">
               {refs.map((url, i) => (
                 <div key={i} className="qc-sb-frame qc-sb-media">
-                  <img src={url} alt={`media ${i + 1}`} />
+                  {urlMediaKind(url) === 'video' ? (
+                    <video src={url} muted loop playsInline />
+                  ) : (
+                    <img src={url} alt={`media ${i + 1}`} />
+                  )}
                   <button
                     type="button"
                     className="qc-sb-remove"
@@ -301,10 +396,16 @@ export default function HomeQuickCreateBar() {
                 </div>
               ))}
               {refs.length < MAX_MEDIA && (
-                <button type="button" className="qc-sb-frame qc-sb-add" onClick={openMediaPicker}>
+                <ComposerMediaPickButton
+                  kind={mediaPickKind}
+                  className="qc-sb-frame qc-sb-add"
+                  title="Thêm media"
+                  onFile={ingestMediaFile}
+                  onUrl={ingestMediaUrl}
+                >
                   <Plus size={16} />
                   <span>ADD</span>
-                </button>
+                </ComposerMediaPickButton>
               )}
             </div>
           </div>
@@ -312,16 +413,6 @@ export default function HomeQuickCreateBar() {
       )}
 
       <div className="qc-prompt-row">
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(e) => {
-            void onPickMedia(e.target.files?.[0] ?? null);
-            e.target.value = '';
-          }}
-        />
         <button
           type="button"
           className="qc-expand-toggle"
@@ -355,25 +446,27 @@ export default function HomeQuickCreateBar() {
             className="qc-type-trigger"
             onClick={() => setTypeMenuOpen((v) => !v)}
           >
-            <span className="qc-dot" /> {typeLabel(type).replace('Tạo ', '').toUpperCase()}
+            <span className="qc-dot" /> {typeShortLabel(type)}
             <ChevronUp size={12} />
           </button>
           {typeMenuOpen && (
-            <div className="qc-type-menu">
-              {TYPES.map((t) => {
-                const Icon = t.icon;
+            <div className="qc-type-menu" role="menu">
+              {QUICK_MENU.map((item) => {
+                const Icon = item.icon;
+                const count = menuCount(item);
+                const active = item.jobType === type;
                 return (
                   <button
-                    key={t.type}
+                    key={item.id}
                     type="button"
-                    className={t.type === type ? 'active' : ''}
-                    onClick={() => {
-                      setType(t.type);
-                      setTypeMenuOpen(false);
-                      setResult(null);
-                    }}
+                    role="menuitem"
+                    className={`qc-type-item${active ? ' active' : ''}`}
+                    onClick={() => onMenuSelect(item)}
                   >
-                    <Icon size={15} /> {t.label}
+                    <span className="qc-type-accent" aria-hidden />
+                    <Icon size={16} className="qc-type-icon" />
+                    <span className="qc-type-label">{item.label}</span>
+                    {count != null && <span className="qc-type-count">{count}</span>}
                   </button>
                 );
               })}

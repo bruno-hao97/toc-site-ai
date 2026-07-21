@@ -31,6 +31,22 @@ export async function uploadQuickImage(file: File): Promise<string | null> {
   return url;
 }
 
+export async function uploadQuickVideo(file: File): Promise<string | null> {
+  if (!loadAuth()) return null;
+  const { url } = await getJobClient().uploadVideo(file);
+  return url;
+}
+
+/** Tải ảnh hoặc video tùy MIME — dùng cho quick bar khi mode video. */
+export async function uploadQuickMedia(file: File): Promise<string | null> {
+  if (!loadAuth()) return null;
+  const client = getJobClient();
+  const { url } = file.type.startsWith('video/')
+    ? await client.uploadVideo(file)
+    : await client.uploadImage(file);
+  return url;
+}
+
 export interface QuickGenerateArgs {
   type: JobType;
   model: GommoModel;

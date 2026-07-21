@@ -2888,7 +2888,8 @@ a.user-pill:hover { color: var(--text); }
   border-color: var(--border, #23262d);
 }
 
-.qc-sb-media img {
+.qc-sb-media img,
+.qc-sb-media video {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -2980,21 +2981,84 @@ a.user-pill:hover { color: var(--text); }
 
 .qc-type-menu {
   position: absolute;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 8px);
   left: 0;
-  min-width: 180px;
-  background: #15181f;
-  border: 1px solid #262a33;
-  border-radius: 12px;
-  padding: 0.35rem;
+  min-width: 248px;
+  max-height: min(420px, 52vh);
+  overflow-y: auto;
+  background: rgba(22, 24, 30, 0.98);
+  border: 1px solid #2a2e38;
+  border-radius: 14px;
+  padding: 0.45rem;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  gap: 0.12rem;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55);
   z-index: 5;
 }
 
-.qc-type-menu button,
+.qc-type-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.55rem 0.65rem 0.55rem 0.8rem;
+  border: none;
+  background: transparent;
+  color: #d8dade;
+  font-size: 0.84rem;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.qc-type-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+}
+
+.qc-type-item.active {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.qc-type-accent {
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 2px;
+  background: #fff;
+  opacity: 0;
+}
+
+.qc-type-item.active .qc-type-accent {
+  opacity: 1;
+}
+
+.qc-type-icon {
+  flex-shrink: 0;
+  color: #b6bac2;
+}
+
+.qc-type-item.active .qc-type-icon {
+  color: #fff;
+}
+
+.qc-type-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.qc-type-count {
+  flex-shrink: 0;
+  color: #8b8f98;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .qc-model-menu button,
 .qc-mini-menu button {
   display: flex;
@@ -3011,10 +3075,8 @@ a.user-pill:hover { color: var(--text); }
   text-align: left;
 }
 
-.qc-type-menu button:hover,
 .qc-model-menu button:hover,
 .qc-mini-menu button:hover,
-.qc-type-menu button.active,
 .qc-model-menu button.active,
 .qc-mini-menu button.active {
   background: rgba(56, 189, 248, 0.1);

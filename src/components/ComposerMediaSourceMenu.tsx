@@ -34,9 +34,12 @@ export default function ComposerMediaSourceMenu({
     if (!el) return;
     const r = el.getBoundingClientRect();
     const width = albumMode === 'split' ? 196 : 168;
+    const itemCount = albumMode === 'split' ? 4 : 3;
+    const estimatedHeight = itemCount * 36 + 12;
     let left = r.left + r.width / 2 - width / 2;
     left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
-    setPos({ top: r.bottom + 6, left });
+    const top = Math.max(8, r.top - estimatedHeight - 6);
+    setPos({ top, left });
   }, [anchorRef, albumMode]);
 
   useEffect(() => {
