@@ -59,7 +59,6 @@ import {
   loadAuth,
   notifyCreditsUpdated,
 } from '../services/authStore';
-import { refreshDisplayCredits } from '../services/displayCredits';
 import { useDisplayCredits } from '../hooks/useDisplayCredits';
 import { getJobClient } from '../services/platformJobClient';
 
