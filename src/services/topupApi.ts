@@ -45,7 +45,7 @@ export interface CreditPackage {
 }
 
 export async function fetchCreditPackages(): Promise<CreditPackage[]> {
-  const res = await fetch('/api/payos/credit-packages');
+  const res = await fetch('/api/platform/credit-packages.php');
   const text = await res.text();
   let raw: { success?: boolean; message?: string; data?: CreditPackage[] };
   try {
