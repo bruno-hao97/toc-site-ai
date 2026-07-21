@@ -24,6 +24,10 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
+      '/api/platform/admin-vmedia-balance.php': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
       '/api/platform/gw.php': {
         target: 'http://localhost:3001',
         changeOrigin: true,

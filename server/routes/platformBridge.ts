@@ -7,7 +7,7 @@ import {
   extractStatus,
   resolveJobCost,
 } from '../services/gommoEnvelope.js';
-import { gommoAdminPostForm } from '../services/gommoAdminClient.js';
+import { gommoAdminPostForm, getGommoAdminToken } from '../services/gommoAdminClient.js';
 import { normalizeStoredJobStatus } from '../services/jobStatusHelpers.js';
 
 const router = Router();
@@ -29,14 +29,14 @@ function authHeader(req: import('express').Request): string {
   return raw;
 }
 
-async function fetchBridgeUser(auth: string): Promise<{ id: string; credits: number }> {
+async function fetchBridgeUser(auth: string): Promise<{ id: string; credits: number; isAdmin: boolean }> {
   const res = await fetch(`${bridgeBase()}/me.php`, {
     headers: { Authorization: auth, Accept: 'application/json' },
   });
   const parsed = (await res.json()) as {
     success?: boolean;
     message?: string;
-    data?: { user?: { id?: string; credits?: number } };
+    data?: { user?: { id?: string; credits?: number; isAdmin?: boolean } };
   };
   if (!res.ok || !parsed.success || !parsed.data?.user?.id) {
     throw new Error(parsed.message || 'Token không hợp lệ');
@@ -44,6 +44,7 @@ async function fetchBridgeUser(auth: string): Promise<{ id: string; credits: num
   return {
     id: String(parsed.data.user.id),
     credits: Number(parsed.data.user.credits ?? 0),
+    isAdmin: Boolean(parsed.data.user.isAdmin),
   };
 }
 
@@ -215,6 +216,79 @@ router.post('/token-me.php', async (req, res) => {
     res.status(500).json({
       success: false,
       message: err instanceof Error ? err.message : 'Xác thực token thất bại',
+    });
+  }
+});
+
+/** Admin — số dư credits_ai thật trên VMedia (token merchant server-side). */
+router.get('/admin-vmedia-balance.php', async (req, res) => {
+  try {
+    const auth = authHeader(req);
+    const user = await fetchBridgeUser(auth);
+    if (!user.isAdmin) {
+      res.status(403).json({ success: false, message: 'Chỉ admin được xem số dư VMedia thật' });
+      return;
+    }
+
+    const token = getGommoAdminToken();
+    if (!token) {
+      res.status(503).json({ success: false, message: 'Chưa cấu hình GOMMO_ACCESS_TOKEN trên server' });
+      return;
+    }
+
+    const domain = (config.gommo.apiDomain || 'vmedia.ai').trim();
+    const authBase = (config.gommo.authBaseUrl || 'https://api.gommo.net').replace(/\/$/, '');
+    const authPath = (config.gommo.authPath || '/api/apps/go-mmo').replace(/\/$/, '');
+    const url = `${authBase}${authPath}/ai/me`;
+    const body = new URLSearchParams({ access_token: token, domain });
+
+    const upstream = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body,
+    });
+
+    const text = await upstream.text();
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      res.status(502).json({
+        success: false,
+        message: text.trimStart().startsWith('<!')
+          ? 'Upstream trả HTML — kiểm tra token admin / mạng'
+          : text.slice(0, 200) || `HTTP ${upstream.status}`,
+      });
+      return;
+    }
+
+    if (!upstream.ok || parsed.success === false) {
+      res.status(upstream.status >= 400 ? upstream.status : 502).json({
+        success: false,
+        message: String(parsed.message || `HTTP ${upstream.status}`),
+      });
+      return;
+    }
+
+    const balances = (parsed.balancesInfo ?? {}) as Record<string, unknown>;
+    res.json({
+      success: true,
+      data: {
+        credits_ai: Number(balances.credits_ai ?? 0),
+        domain,
+        updated_time:
+          typeof balances.updated_time === 'number' ? balances.updated_time : null,
+      },
+    });
+  } catch (err) {
+    console.error('[platformBridge/admin-vmedia-balance]', err);
+    res.status(500).json({
+      success: false,
+      message: err instanceof Error ? err.message : 'Không lấy được số dư VMedia',
     });
   }
 });

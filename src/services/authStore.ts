@@ -166,6 +166,17 @@ export function getCreditsAi(): number {
   return auth?.upstream_me?.balancesInfo?.credits_ai ?? 0;
 }
 
+export function isAdminUser(): boolean {
+  return Boolean(loadAuth()?.user?.isAdmin);
+}
+
+/** Credit nội bộ platform (user thường thấy trên UI). */
+export function getPlatformCredits(): number {
+  const auth = loadAuth();
+  if (typeof auth?.user?.credits === 'number') return auth.user.credits;
+  return auth?.upstream_me?.balancesInfo?.credits_ai ?? 0;
+}
+
 /** Thông báo số dư credit vừa thay đổi (vd sau khi tạo job) để header tự refresh. */
 export function notifyCreditsUpdated(): void {
   document.dispatchEvent(new CustomEvent('credits:updated'));

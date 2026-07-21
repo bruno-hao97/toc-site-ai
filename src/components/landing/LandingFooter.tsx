@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import BrandLogo from '../BrandLogo';
 
 const footerLinks = {
   'Nền tảng': [
@@ -23,9 +23,9 @@ export default function LandingFooter() {
       <div className="container">
         <div className="footer-grid">
           <div className="footer-logo-col">
-            <Link to="/" className="logo-row" style={{ marginBottom: 12 }}>
-              <img src="/logo.png" alt="AI Center" className="logo-img" />
-            </Link>
+            <div className="logo-row" style={{ marginBottom: 12 }}>
+              <BrandLogo to="/" />
+            </div>
             <p className="footer-tagline">
               Nền tảng AI đa phương thức — ảnh, video, âm nhạc, text và code trong một cổng API thống nhất.
             </p>
@@ -50,7 +50,7 @@ export default function LandingFooter() {
         </div>
 
         <div className="footer-bottom">
-          <span className="copyright">© {new Date().getFullYear()} AI Center. All rights reserved.</span>
+          <span className="copyright">© {new Date().getFullYear()} AGI Center. All rights reserved.</span>
         </div>
       </div>
     </footer>

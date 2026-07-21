@@ -40,7 +40,7 @@ export default function RegisterPage() {
     <div className="page auth-page">
       <div className="auth-card panel">
         <h1>Đăng ký</h1>
-        <p className="lead">Tạo tài khoản AI Center miễn phí.</p>
+        <p className="lead">Tạo tài khoản AGI Center miễn phí.</p>
 
         <form onSubmit={handleSubmit} className="form">
           <label className="field">

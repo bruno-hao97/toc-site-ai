@@ -21,7 +21,7 @@ return [
         'admin@gmail.com',
     ],
     'migrate_key' => 'toc-migrate-2026',
-    'gommo_access_token' => 'k1mfUEylQJwxVmp4tbArw/IkHm3/N67jFYI5h9Obbxi8k2nnPQxQRVprePVZSTT1iio409XZ8kQYv4mzY2g94JYv6J/utyr996ldQYju2rexrhmItbcm8Uz0sKItMGSRmCQt4w6ryKxs5F6oJZyxNmbSvRH0TQTIQUC9SUDjY+wNH1hzTWg/XmUHeGk6dIqVB0u7CvdeaThDTVh7m4lijg==',
+    'gommo_access_token' => 'lBpTbSuMr3/40jzN3+PRd0bTDPGFGIcSqzHN4b5VwFoYUXGbrvYpcVPPqCKPOdkm5X4y/QZW7zx+IaO2vJ84OPw2bWu7V3ZEyw2lPbV29UYnBHgDWAlcemEwkP5KvZrXdMkd99/DKWqblb0rftLQ59fsv++Or/HTSKSq5YV+b0UrVr4NRRpH5RkcqXw2at8nGf23Rug1DoCUdB38YVIRcw==',
     'gommo_domain' => 'vmedia.ai',
     'gommo_project_id' => 'default',
     'gommo_api_base' => 'https://v2.api.gommo.net',

@@ -28,10 +28,12 @@ const EXTERNAL = {
 
 interface Props {
   credits: number;
+  /** Admin đang xem số dư VMedia thật (không phải credit nội bộ). */
+  isAdmin?: boolean;
   onCreditsRefresh?: () => void;
 }
 
-export default function UserMenuDropdown({ credits, onCreditsRefresh }: Props) {
+export default function UserMenuDropdown({ credits, isAdmin = false, onCreditsRefresh }: Props) {
   const navigate = useNavigate();
   const user = getDisplayUser();
   const [open, setOpen] = useState(false);
@@ -144,7 +146,7 @@ export default function UserMenuDropdown({ credits, onCreditsRefresh }: Props) {
           >
             <span className="user-menu-balance-left">
               <Wallet {...ICON} />
-              Số dư
+              {isAdmin ? 'Số dư VMedia' : 'Số dư'}
             </span>
             <strong>{credits.toLocaleString('vi-VN')}</strong>
           </button>

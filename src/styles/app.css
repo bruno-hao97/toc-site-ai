@@ -98,7 +98,27 @@ code {
   text-decoration: none;
   display: inline-flex;
   align-items: center;
+  gap: 0.5rem;
+  height: var(--logo-height);
   flex-shrink: 0;
+}
+
+.brand-logo--icon {
+  height: var(--logo-height);
+  width: var(--logo-height);
+  object-fit: contain;
+  border-radius: calc(var(--logo-height) * 0.22);
+  display: block;
+  flex-shrink: 0;
+}
+
+.brand-name {
+  font-size: calc(var(--logo-height) * 0.41);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  color: var(--text);
 }
 
 .brand-logo,
@@ -12593,9 +12613,18 @@ input.wf-gen-pill--select {
   .app-header-inner {
     gap: 0.75rem;
   }
+  .brand {
+    gap: 0.4rem;
+    height: var(--logo-height-sm);
+  }
+  .brand-logo--icon,
   .brand-logo,
   .landing-page .logo-img {
     height: var(--logo-height-sm);
+  }
+  .brand-logo--icon {
+    width: var(--logo-height-sm);
+    border-radius: calc(var(--logo-height-sm) * 0.22);
   }
   .nav-main {
     position: absolute;

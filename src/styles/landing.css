@@ -71,6 +71,10 @@
   flex-shrink: 0;
 }
 
+.landing-page .brand-name {
+  color: var(--text-primary);
+}
+
 /* Kích thước logo: dùng --logo-height / --logo-height-sm trong app.css (.brand-logo, .logo-img) */
 
 .landing-page .nav-links {

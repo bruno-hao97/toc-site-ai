@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Zap } from 'lucide-react';
+import BrandLogo from '../BrandLogo';
 import { getCreditsAi, getDisplayUser, isLoggedIn } from '../../services/authStore';
 import { NAV_LINKS, appEntryPath } from '../../lib/landingConfig';
 
@@ -12,9 +13,9 @@ export default function LandingNavbar() {
   return (
     <nav className="landing-nav">
       <div className="container">
-        <Link to="/" className="logo-row">
-          <img src="/logo.png" alt="AI Center" className="logo-img" />
-        </Link>
+        <div className="logo-row">
+          <BrandLogo to="/" />
+        </div>
 
         <div className="nav-links">
           {NAV_LINKS.map((item) => (

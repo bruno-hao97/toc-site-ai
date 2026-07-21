@@ -10,6 +10,7 @@ export const PLATFORM_BRIDGE = {
   changePassword: '/api/platform/change-password.php',
   transfer: '/api/platform/transfer.php',
   grant: '/api/platform/grant.php',
+  adminVmediaBalance: '/api/platform/admin-vmedia-balance.php',
   jobModels: '/api/platform/job-models.php',
   jobCreate: '/api/platform/job-create.php',
   jobPoll: '/api/platform/job-poll.php',
