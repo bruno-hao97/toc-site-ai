@@ -13,5 +13,5 @@ deploy/ftp.local.ps1
 deploy/ftp-upload/
 deploy/bridge-upload/
 
-# Reference-only Next.js project (has its own git history)
-landing/
+# Reference-only Next.js project at repo root (has its own git history)
+/landing/
