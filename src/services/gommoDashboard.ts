@@ -3,7 +3,7 @@ import {
   fetchMyImages,
   type FeedItem,
 } from './feedApi';
-import { getCreditsAi } from './authStore';
+import { getDisplayCreditsSync } from './displayCredits';
 import type {
   CreditTransaction,
   DashboardPeriod,
@@ -124,11 +124,13 @@ export async function fetchGommoDashboardStats(
       created_at: new Date(itemTime(it) * 1000).toISOString(),
     }));
 
+  const displayBalance = getDisplayCreditsSync().credits;
+
   return {
-    balance: getCreditsAi(),
+    balance: displayBalance,
     period,
     kpis: {
-      balance: getCreditsAi(),
+      balance: displayBalance,
       images_success: imagesInPeriod.filter((it) => isSuccess(it.status)).length,
       videos_success: videosInPeriod.filter((it) => isSuccess(it.status)).length,
       credits_consumed_net: creditsConsumed,

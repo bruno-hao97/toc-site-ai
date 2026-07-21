@@ -5,6 +5,7 @@ import {
   type Job,
 } from '../services/dashboardTypes';
 import { fetchGommoDashboardStats } from '../services/gommoDashboard';
+import { useDisplayCredits } from '../hooks/useDisplayCredits';
 import {
   formatBucketStepLabel,
   MAX_CHART_COLUMNS,
@@ -145,6 +146,7 @@ function BarChart({
 
 export default function DashboardPage() {
   const { locale, t } = useLocale();
+  const { credits: displayBalance, isAdminVmedia } = useDisplayCredits();
   const [period, setPeriod] = useState<DashboardPeriod>('7d');
   const [activityTab, setActivityTab] = useState<ActivityTab>('all');
   const [activityPage, setActivityPage] = useState(1);
@@ -225,8 +227,10 @@ export default function DashboardPage() {
         <>
           <div className="kpi-grid">
             <div className="kpi-card panel">
-              <span className="kpi-label">{t('dashboard.kpi.balance')}</span>
-              <span className="kpi-value">{stats.kpis.balance}</span>
+              <span className="kpi-label">
+                {isAdminVmedia ? 'Số dư VMedia' : t('dashboard.kpi.balance')}
+              </span>
+              <span className="kpi-value">{displayBalance.toLocaleString(numberLocale)}</span>
             </div>
             <div className="kpi-card panel">
               <span className="kpi-label">{t('dashboard.kpi.images')}</span>

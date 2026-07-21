@@ -3,15 +3,12 @@ import { Link, NavLink, Navigate, Route, Routes, useLocation, useParams } from '
 import { Coins, Globe, Menu, X } from 'lucide-react';
 import {
   clearAuth,
-  getPlatformCredits,
   isAdminUser,
   isLoggedIn,
-  loadAuth,
-  refreshSession,
 } from './services/authStore';
-import { fetchAdminVmediaBalance } from './services/adminVmediaBalance';
 import { UpstreamMeError } from './services/upstreamMe';
 import { useCreditsUpdated } from './hooks/useCreditsUpdated';
+import { useDisplayCredits } from './hooks/useDisplayCredits';
 import type { JobType } from './services/api';
 import BrandLogo from './components/BrandLogo';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -67,40 +64,23 @@ function StudioHistoryRedirect() {
 
 function AppHeader() {
   const { t, locale, toggleLocale } = useLocale();
-  const [credits, setCredits] = useState(getPlatformCredits());
-  const [vmediaCredits, setVmediaCredits] = useState<number | null>(null);
+  const { credits: displayCredits, isAdminVmedia, refresh } = useDisplayCredits();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const loggedIn = isLoggedIn();
   const isAdmin = isAdminUser();
   const location = useLocation();
-  const displayCredits = isAdmin && vmediaCredits != null ? vmediaCredits : credits;
 
   useEffect(() => {
     setMobileNavOpen(false);
   }, [location.pathname]);
 
   function refreshCredits() {
-    if (!loadAuth()) return;
-    refreshSession()
-      .then(async (s) => {
-        setCredits(s.user?.credits ?? getPlatformCredits());
-        if (s.user?.isAdmin) {
-          try {
-            const data = await fetchAdminVmediaBalance();
-            setVmediaCredits(data?.credits_ai ?? null);
-          } catch {
-            setVmediaCredits(null);
-          }
-        } else {
-          setVmediaCredits(null);
-        }
-      })
-      .catch((err) => {
-        if (err instanceof UpstreamMeError && (err.status === 401 || err.status === 403)) {
-          clearAuth();
-          window.location.href = '/login';
-        }
-      });
+    void refresh().catch((err) => {
+      if (err instanceof UpstreamMeError && (err.status === 401 || err.status === 403)) {
+        clearAuth();
+        window.location.href = '/login';
+      }
+    });
   }
 
   useEffect(() => {
@@ -162,7 +142,7 @@ function AppHeader() {
               </Link>
               <div className="header-balance">
                 <span className="header-balance-label">
-                  {isAdmin && vmediaCredits != null ? 'VMedia' : t('header.balance')}
+                  {isAdmin && isAdminVmedia ? 'VMedia' : t('header.balance')}
                 </span>
                 <span className="header-credit-pill">
                   {displayCredits.toLocaleString('vi-VN')}
@@ -170,7 +150,7 @@ function AppHeader() {
               </div>
               <UserMenuDropdown
                 credits={displayCredits}
-                isAdmin={isAdmin && vmediaCredits != null}
+                isAdmin={isAdmin && isAdminVmedia}
                 onCreditsRefresh={refreshCredits}
               />
             </div>

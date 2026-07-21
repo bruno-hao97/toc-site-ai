@@ -307,7 +307,7 @@ export default function PricingPage() {
         planId: confirmPlan.id_base,
         planName: confirmPlan.name,
         amount: confirmPlan.price,
-        gateway: 'payos',
+        gateway: 'pay2s',
       });
       setPaymentPlanName(confirmPlan.name);
       setPaymentPlanPrice(confirmPlan.price);

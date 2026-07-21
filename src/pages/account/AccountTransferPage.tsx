@@ -1,7 +1,7 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeftRight, Coins, MessageSquare, User } from 'lucide-react';
 import {
-  getCreditsAi,
+  getPlatformCredits,
   loadAuth,
   loginWithPlatformSession,
   notifyCreditsUpdated,
@@ -33,7 +33,7 @@ export default function AccountTransferPage() {
   const [success, setSuccess] = useState('');
 
   const minAmount = mode === 'grant' ? 1 : MIN_TRANSFER_CREDIT;
-  const balance = useMemo(() => getCreditsAi(), [success, loading]);
+  const balance = useMemo(() => getPlatformCredits(), [success, loading]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

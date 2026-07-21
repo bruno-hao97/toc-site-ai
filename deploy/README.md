@@ -26,7 +26,7 @@ npm run build:prod
 
 # 2. Env
 cp deploy/env.production.example .env
-# Sửa JWT_SECRET, GOMMO_ACCESS_TOKEN, PayOS...
+# Sửa JWT_SECRET, GOMMO_ACCESS_TOKEN, Pay2S...
 
 # 3. Chạy API bằng PM2
 pm2 start deploy/ecosystem.config.cjs

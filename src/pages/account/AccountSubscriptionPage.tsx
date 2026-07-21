@@ -1,9 +1,10 @@
-import { getCreditsAi, getUpstreamMe } from '../../services/authStore';
+import { useDisplayCredits } from '../../hooks/useDisplayCredits';
+import { getUpstreamMe } from '../../services/authStore';
 import { Link } from 'react-router-dom';
 
 export default function AccountSubscriptionPage() {
   const me = getUpstreamMe();
-  const credits = getCreditsAi();
+  const { credits, isAdminVmedia } = useDisplayCredits();
   const active = me?.userInfo?.activate === 1;
 
   return (
@@ -17,7 +18,7 @@ export default function AccountSubscriptionPage() {
           </span>
         </div>
         <div className="account-detail-row-inline">
-          <span>Credits hiện tại</span>
+          <span>{isAdminVmedia ? 'Credits VMedia hiện tại' : 'Credits hiện tại'}</span>
           <strong>{credits.toLocaleString('vi-VN')}</strong>
         </div>
         <Link

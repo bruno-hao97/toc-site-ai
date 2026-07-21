@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchGommoDashboardStats } from '../services/gommoDashboard';
 import type { CreditTransaction } from '../services/dashboardTypes';
-import { getCreditsAi } from '../services/authStore';
+import { useDisplayCredits } from '../hooks/useDisplayCredits';
 
 const TX_LABELS: Record<string, string> = {
   signup_bonus: 'Bonus đăng ký',
@@ -21,18 +21,26 @@ function formatDate(iso: string) {
 }
 
 export default function WalletPage() {
-  const [balance, setBalance] = useState(getCreditsAi());
+  const { credits: displayBalance, isAdminVmedia, refresh: refreshDisplay } = useDisplayCredits();
+  const [balance, setBalance] = useState(displayBalance);
   const [consumed, setConsumed] = useState(0);
   const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    setBalance(displayBalance);
+  }, [displayBalance]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const stats = await fetchGommoDashboardStats('all');
-      setBalance(stats.balance);
+      const [display, stats] = await Promise.all([
+        refreshDisplay(),
+        fetchGommoDashboardStats('all'),
+      ]);
+      setBalance(display.credits);
       setConsumed(stats.credits.consumed_net);
       setTransactions(stats.recent_transactions);
     } catch (err) {
@@ -40,7 +48,7 @@ export default function WalletPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshDisplay]);
 
   useEffect(() => {
     void load();
@@ -52,8 +60,9 @@ export default function WalletPage() {
         <p className="kicker">Ví credit</p>
         <h1>Ví credit</h1>
         <p className="lead">
-          Số dư: <strong>{balance} credit</strong>
-          <> · Đã tiêu: <strong>{consumed} credit</strong></>
+          Số dư: <strong>{balance.toLocaleString('vi-VN')} credit</strong>
+          {isAdminVmedia && <> (VMedia)</>}
+          <> · Đã tiêu: <strong>{consumed.toLocaleString('vi-VN')} credit</strong></>
         </p>
       </div>
 

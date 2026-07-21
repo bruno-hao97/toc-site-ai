@@ -52,10 +52,38 @@ export const config = {
     planCancelUrl: `${appUrl}/pricing`,
     apiBaseUrl: 'https://api-merchant.payos.vn',
   },
+  pay2s: {
+    partnerCode: (process.env.PAY2S_PARTNER_CODE || '').trim().replace(/\r/g, ''),
+    accessKey: (process.env.PAY2S_ACCESS_KEY || '').trim().replace(/\r/g, ''),
+    secretKey: (process.env.PAY2S_SECRET_KEY || '').trim().replace(/\r/g, ''),
+    partnerName: (process.env.PAY2S_PARTNER_NAME || 'LN AI').trim().replace(/\r/g, ''),
+    apiCreateUrl: (
+      process.env.PAY2S_API_CREATE_URL ||
+      (process.env.PAY2S_SANDBOX === '1' || process.env.PAY2S_SANDBOX === 'true'
+        ? 'https://sandbox-payment.pay2s.vn/v1/gateway/api/create'
+        : 'https://payment.pay2s.vn/v1/gateway/api/create')
+    )
+      .trim()
+      .replace(/\r/g, ''),
+    bankAccountNumber: (process.env.PAY2S_BANK_ACCOUNT || '').trim().replace(/\r/g, ''),
+    bankId: (process.env.PAY2S_BANK_ID || 'ACB').trim().replace(/\r/g, ''),
+    redirectUrl: (process.env.PAY2S_REDIRECT_URL || `${appUrl}/pricing`).trim().replace(/\r/g, ''),
+    ipnUrl: (process.env.PAY2S_IPN_URL || `${appUrl}/api/pay2s/ipn`).trim().replace(/\r/g, ''),
+  },
 };
 
 export function isPayOsConfigured(): boolean {
   return Boolean(config.payos.clientId && config.payos.apiKey && config.payos.checksumKey);
+}
+
+export function isPay2sConfigured(): boolean {
+  return Boolean(
+    config.pay2s.partnerCode &&
+      config.pay2s.accessKey &&
+      config.pay2s.secretKey &&
+      config.pay2s.bankAccountNumber &&
+      config.pay2s.bankId,
+  );
 }
 
 export function isGommoMerchantConfigured(): boolean {

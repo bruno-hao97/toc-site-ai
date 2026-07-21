@@ -15,11 +15,11 @@ import {
   Zap,
 } from 'lucide-react';
 import {
-  getCreditsAi,
   getDisplayUser,
   getUpstreamMe,
   refreshSession,
 } from '../services/authStore';
+import { useDisplayCredits } from '../hooks/useDisplayCredits';
 import { listHistory } from '../services/historyStore';
 import { APP_SITE_URL } from '../services/settingsStore';
 
@@ -137,7 +137,7 @@ function StatCard({
 
 export default function ProfilePage() {
   const [me, setMe] = useState(getUpstreamMe());
-  const [credits, setCredits] = useState(getCreditsAi());
+  const { credits, isAdminVmedia, refresh: refreshCredits } = useDisplayCredits();
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [chartDays, setChartDays] = useState(14);
@@ -149,11 +149,11 @@ export default function ProfilePage() {
     try {
       const s = await refreshSession();
       setMe(s.upstream_me ?? null);
-      setCredits(s.user?.credits ?? s.upstream_me?.balancesInfo?.credits_ai ?? 0);
+      await refreshCredits();
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshCredits]);
 
   useEffect(() => {
     void refresh();
@@ -253,7 +253,7 @@ export default function ProfilePage() {
               accent="#4ADE80"
               icon={Zap}
               value={credits.toLocaleString('vi-VN')}
-              label="Credits khả dụng"
+              label={isAdminVmedia ? 'Credits VMedia khả dụng' : 'Credits khả dụng'}
               badge="Live"
             />
             <StatCard

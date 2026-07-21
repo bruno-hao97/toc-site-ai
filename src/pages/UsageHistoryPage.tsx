@@ -12,7 +12,8 @@ import {
   TrendingUp,
   Video,
 } from 'lucide-react';
-import { getCreditsAi, loadAuth } from '../services/authStore';
+import { loadAuth } from '../services/authStore';
+import { useDisplayCredits } from '../hooks/useDisplayCredits';
 import {
   fetchUpstreamUsageHistory,
   type UsageHistoryItem,
@@ -164,6 +165,7 @@ function UsageAreaChart({ items, days }: { items: UsageHistoryItem[]; days: numb
 
 export default function UsageHistoryPage() {
   const { type: typeParam } = useParams<{ type?: string }>();
+  const { credits: displayCredits, isAdminVmedia } = useDisplayCredits();
 
   const [items, setItems] = useState<UsageHistoryItem[]>([]);
   const [source, setSource] = useState<'upstream' | 'local' | 'empty'>('empty');
@@ -319,8 +321,8 @@ export default function UsageHistoryPage() {
           <span className="uh-card-sub">bản ghi</span>
         </div>
         <div className="uh-card">
-          <span className="uh-card-label">Số dư credit</span>
-          <span className="uh-card-value accent">{getCreditsAi().toLocaleString('vi-VN')}</span>
+          <span className="uh-card-label">{isAdminVmedia ? 'Số dư VMedia' : 'Số dư credit'}</span>
+          <span className="uh-card-value accent">{displayCredits.toLocaleString('vi-VN')}</span>
           <span className="uh-card-sub">khả dụng</span>
         </div>
         <div className="uh-card">

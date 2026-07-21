@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import gommoProxyRoutes from './routes/gommoProxy.js';
-import payosRoutes from './routes/payos.js';
+import pay2sRoutes from './routes/pay2s.js';
 import authRoutes from './routes/auth.js';
 import creditsRoutes from './routes/credits.js';
 import jobsRoutes from './routes/jobs.js';
@@ -29,7 +29,7 @@ app.get('/api/health', (_req, res) => {
     success: true,
     data: {
       ok: true,
-      mode: 'platform-auth-payos',
+      mode: 'platform-auth-pay2s',
       database: isDatabaseConfigured(),
     },
   });
@@ -38,7 +38,9 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/credits', creditsRoutes);
 app.use('/api/jobs', jobsRoutes);
-app.use('/api/payos', payosRoutes);
+app.use('/api/pay2s', pay2sRoutes);
+/** Giữ alias /api/payos → Pay2S để client cũ không gãy. */
+app.use('/api/payos', pay2sRoutes);
 
 const isProduction = process.env.NODE_ENV === 'production';
 const distDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist');
@@ -64,7 +66,7 @@ async function start() {
 
   app.listen(config.port, () => {
     console.log(
-      `API server http://localhost:${config.port} (platform auth + Gommo proxy + PayOS${isProduction ? ' + static dist' : ''})`,
+      `API server http://localhost:${config.port} (platform auth + Gommo proxy + Pay2S${isProduction ? ' + static dist' : ''})`,
     );
   });
 }

@@ -1,3 +1,4 @@
+import { getCachedAdminVmediaCredits, clearAdminVmediaCreditsCache } from './creditsCache';
 import { GommoClient } from './api';
 import { fetchUpstreamMe, type UpstreamMeResponse } from './upstreamMe';
 import { GOMMO_CHAT_CONFIG } from './gommoChatConfig';
@@ -105,6 +106,7 @@ export function saveAuth(state: AuthState): void {
 export function clearAuth(): void {
   localStorage.removeItem(SESSION_KEY);
   saveSettings({ accessToken: '' });
+  clearAdminVmediaCreditsCache();
 }
 
 export function isLoggedIn(): boolean {
@@ -171,6 +173,10 @@ export function getDisplayUser(): DisplayUser {
 
 export function getCreditsAi(): number {
   const auth = loadAuth();
+  if (auth?.user?.isAdmin) {
+    const cached = getCachedAdminVmediaCredits();
+    if (cached != null) return cached;
+  }
   if (typeof auth?.user?.credits === 'number') return auth.user.credits;
   return auth?.upstream_me?.balancesInfo?.credits_ai ?? 0;
 }
@@ -179,7 +185,7 @@ export function isAdminUser(): boolean {
   return Boolean(loadAuth()?.user?.isAdmin);
 }
 
-/** Credit nội bộ platform (user thường thấy trên UI). */
+/** Credit nội bộ platform (DB) — chuyển/cấp credit, không phải VMedia admin. */
 export function getPlatformCredits(): number {
   const auth = loadAuth();
   if (typeof auth?.user?.credits === 'number') return auth.user.credits;

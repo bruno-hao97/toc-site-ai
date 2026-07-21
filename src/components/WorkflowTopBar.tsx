@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, FolderOpen, Home, Pin, Plus, Save, Trash2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getCreditsAi } from '../services/authStore';
-import { useCreditsUpdated } from '../hooks/useCreditsUpdated';
+import { useDisplayCredits } from '../hooks/useDisplayCredits';
 import UserMenuDropdown from './user/UserMenuDropdown';
 import type { WorkflowTab } from '../services/workflowTabsStore';
 
@@ -35,8 +34,7 @@ export default function WorkflowTopBar({
 }: Props) {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
-  const [credits, setCredits] = useState(getCreditsAi());
-  useCreditsUpdated(() => setCredits(getCreditsAi()));
+  const { credits, isAdminVmedia, refresh } = useDisplayCredits();
 
   const activeTab = tabs.find((t) => t.id === activeId);
 
@@ -114,7 +112,11 @@ export default function WorkflowTopBar({
               <span>Ghim</span>
             </button>
             <span className="credit-pill wf-tb-credit">{credits.toLocaleString('vi-VN')}</span>
-            <UserMenuDropdown credits={credits} onCreditsRefresh={() => setCredits(getCreditsAi())} />
+            <UserMenuDropdown
+              credits={credits}
+              isAdmin={isAdminVmedia}
+              onCreditsRefresh={() => void refresh()}
+            />
           </div>
         </div>
       )}

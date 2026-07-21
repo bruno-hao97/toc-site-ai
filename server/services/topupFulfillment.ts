@@ -85,3 +85,75 @@ export async function fulfillTopupFromWebhook(body: Record<string, unknown>): Pr
     return { ok: true, message: `Đã nhận webhook — lỗi cộng credit: ${errMsg}`, orderCode };
   }
 }
+
+/** Pay2S IPN — resultCode=0 nghĩa là thanh toán thành công. */
+export async function fulfillTopupFromPay2sIpn(body: Record<string, unknown>): Promise<{
+  ok: boolean;
+  message: string;
+  orderCode?: number;
+}> {
+  const resultCode = Number(body.resultCode);
+  const orderCode = Number(body.orderId);
+  const amount = Number(body.amount);
+
+  if (!Number.isFinite(resultCode) || (resultCode !== 0 && resultCode !== 9000)) {
+    return {
+      ok: true,
+      message: `IPN chưa thành công (resultCode=${body.resultCode}, message=${body.message ?? ''})`,
+    };
+  }
+
+  if (!Number.isFinite(orderCode) || orderCode <= 0) {
+    return { ok: true, message: 'IPN bỏ qua — orderId không hợp lệ' };
+  }
+
+  const order = await getTopupOrder(orderCode);
+  if (!order) {
+    return { ok: true, message: `IPN đã nhận — chưa có đơn pending #${orderCode}`, orderCode };
+  }
+
+  if (order.status === 'credited') {
+    return { ok: true, message: `Đơn #${orderCode} đã cộng credit trước đó`, orderCode };
+  }
+
+  if (Number.isFinite(amount) && amount > 0 && amount !== order.amountVnd) {
+    await updateTopupOrder(orderCode, {
+      status: 'failed',
+      error: `Số tiền Pay2S (${amount}) không khớp đơn (${order.amountVnd})`,
+    });
+    console.error('[pay2s/ipn] amount mismatch', orderCode, amount, order.amountVnd);
+    return { ok: true, message: 'Số tiền thanh toán không khớp đơn pending — đã ghi log', orderCode };
+  }
+
+  await updateTopupOrder(orderCode, {
+    status: 'paid',
+    paidAt: new Date().toISOString(),
+    payosReference: String(body.transId || body.requestId || ''),
+  });
+
+  const credits = order.credits || vndToCredits(order.amountVnd);
+  const message = `Pay2S topup #${orderCode}`;
+
+  try {
+    await merchantSendBalances({
+      username: order.username,
+      value: credits,
+      message,
+    });
+    await updateTopupOrder(orderCode, {
+      status: 'credited',
+      creditedAt: new Date().toISOString(),
+      error: undefined,
+    });
+    return {
+      ok: true,
+      message: `Đã cộng ${credits} credit cho @${order.username}`,
+      orderCode,
+    };
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    await updateTopupOrder(orderCode, { status: 'failed', error: errMsg });
+    console.error('[pay2s/ipn] sendBalances failed', orderCode, errMsg);
+    return { ok: true, message: `Đã nhận IPN — lỗi cộng credit: ${errMsg}`, orderCode };
+  }
+}

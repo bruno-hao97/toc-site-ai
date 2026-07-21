@@ -312,13 +312,13 @@ function normalizePaymentError(message?: string): string {
   return message;
 }
 
-function parsePayOsApiResult(raw: unknown): SubscriptionPaymentResult {
-  if (!raw || typeof raw !== 'object') throw new Error('Sai định dạng PayOS');
+function parseLocalPaymentApiResult(raw: unknown): SubscriptionPaymentResult {
+  if (!raw || typeof raw !== 'object') throw new Error('Sai định dạng phản hồi thanh toán');
   const root = raw as Record<string, unknown>;
-  if (!root.success) throw new Error(typeof root.message === 'string' ? root.message : 'PayOS thất bại');
+  if (!root.success) throw new Error(typeof root.message === 'string' ? root.message : 'Thanh toán thất bại');
 
   const data = root.data;
-  if (!data || typeof data !== 'object') throw new Error('PayOS không trả dữ liệu thanh toán');
+  if (!data || typeof data !== 'object') throw new Error('Không có dữ liệu thanh toán');
   const payment = data as Record<string, unknown>;
   const bank = payment.bankTransfer;
   const bankTransfer =
@@ -342,13 +342,13 @@ function parsePayOsApiResult(raw: unknown): SubscriptionPaymentResult {
   };
 }
 
-async function createLocalPayOsPayment(input: CreateSubscriptionPaymentInput): Promise<SubscriptionPaymentResult> {
+async function createLocalPay2sPayment(input: CreateSubscriptionPaymentInput): Promise<SubscriptionPaymentResult> {
   const amount = Number(String(input.amount ?? '').replace(/[^\d.-]/g, ''));
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new Error('Số tiền gói không hợp lệ');
   }
 
-  const res = await fetch('/api/payos/payment-requests', {
+  const res = await fetch('/api/pay2s/payment-requests', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -374,15 +374,15 @@ async function createLocalPayOsPayment(input: CreateSubscriptionPaymentInput): P
     throw new Error(message);
   }
 
-  return parsePayOsApiResult(raw);
+  return parseLocalPaymentApiResult(raw);
 }
 
 export async function createSubscriptionPayment(
   input: CreateSubscriptionPaymentInput,
 ): Promise<SubscriptionPaymentResult> {
-  const gateway = input.gateway || 'payos';
-  if (gateway === 'payos') {
-    return createLocalPayOsPayment(input);
+  const gateway = input.gateway || 'pay2s';
+  if (gateway === 'pay2s' || gateway === 'payos') {
+    return createLocalPay2sPayment(input);
   }
 
   const token = requireAuthBearerToken();
@@ -393,7 +393,7 @@ export async function createSubscriptionPayment(
     plan_id: input.planId.trim(),
     subscribe_type: input.subscribeType || 'MEMBER_PLAN_AI',
     type: input.type || 'ai_plan',
-    gateway: input.gateway || 'payos',
+    gateway: input.gateway || 'pay2s',
     ...gommoDeviceFields(),
   }).toString();
 

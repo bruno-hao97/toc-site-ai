@@ -60,7 +60,7 @@ export async function fetchCreditPackages(): Promise<CreditPackage[]> {
 }
 
 export async function createTopupRequest(username: string, packageId: string): Promise<TopupPaymentResult> {
-  const res = await fetch('/api/payos/topup-requests', {
+  const res = await fetch('/api/pay2s/topup-requests', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, packageId }),
@@ -82,7 +82,7 @@ export async function createTopupRequest(username: string, packageId: string): P
 }
 
 export async function fetchTopupOrder(orderCode: number): Promise<TopupOrder> {
-  const res = await fetch(`/api/payos/topup-orders/${orderCode}`);
+  const res = await fetch(`/api/pay2s/topup-orders/${orderCode}`);
   const text = await res.text();
   let raw: { success?: boolean; message?: string; data?: TopupOrder };
   try {

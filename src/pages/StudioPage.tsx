@@ -56,11 +56,11 @@ import {
   STUDIO_JOB_TYPES,
 } from '../constants/studioTypes';
 import {
-  getCreditsAi,
   loadAuth,
   notifyCreditsUpdated,
-  refreshSession,
 } from '../services/authStore';
+import { refreshDisplayCredits } from '../services/displayCredits';
+import { useDisplayCredits } from '../hooks/useDisplayCredits';
 import { getJobClient } from '../services/platformJobClient';
 
 import {
@@ -748,7 +748,7 @@ export default function StudioPage({
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [recentJobs, setRecentJobs] = useState<LocalJob[]>([]);
   const [sessionItems, setSessionItems] = useState<SessionItem[]>([]);
-  const [credits, setCredits] = useState(getCreditsAi());
+  const { credits, refresh: refreshDisplay } = useDisplayCredits();
   const [qty, setQty] = useState(1);
   const [composerMode, setComposerMode] = useState<ComposerMode>(() => {
     const saved = localStorage.getItem('studioComposerMode');
@@ -1609,8 +1609,7 @@ export default function StudioPage({
 
   async function refreshCreditsAfterJob() {
     try {
-      const refreshed = await refreshSession();
-      setCredits(refreshed.user?.credits ?? refreshed.upstream_me?.balancesInfo?.credits_ai ?? credits);
+      await refreshDisplay();
     } catch {
       /* ignore */
     }

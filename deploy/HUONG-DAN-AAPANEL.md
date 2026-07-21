@@ -23,7 +23,7 @@
    Kỳ vọng: JSON `Email hoặc mật khẩu không đúng` — **không** còn HTML 404.
 7. Thử đăng ký lại trên https://pro.agi.vn/register
 
-## Cách đầy đủ (Node + PayOS + Gommo proxy)
+## Cách đầy đủ (Node + Pay2S + Gommo proxy)
 
 Cần SSH vào VPS, rồi:
 
@@ -33,7 +33,7 @@ cd /www/wwwroot/pro.agi.vn   # hoặc thư mục project của bạn
 bash deploy/setup-vps.sh
 ```
 
-Sau đó bỏ comment các block `# location /api/payos/` trong snippet nginx.
+Sau đó bỏ comment các block `# location /api/pay2s/` (và alias `/api/payos/` nếu cần) trong snippet nginx.
 
 ## Nếu muốn mình cấu hình remote
 

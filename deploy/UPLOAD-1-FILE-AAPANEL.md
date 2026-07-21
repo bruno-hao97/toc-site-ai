@@ -33,36 +33,43 @@ Bạn **chưa tạo file trên VPS** nếu chưa làm một trong hai việc sau
 
 ### Bước 3 — Upload ghi đè
 
+Upload **cả hai file** (admin cần số dư VMedia + tạo job không bị chặn credit nội bộ):
+
+| File trên máy | Ghi chú |
+|---|---|
+| `server\php-bridge\job-create.php` | Admin bypass credit nội bộ |
+| `server\php-bridge\admin-vmedia-balance.php` | Số dư VMedia cho admin trên domain |
+
 1. Trong thư mục đó, bấm **Upload**
-2. Trên máy Windows chọn file:
-   ```
-   C:\Users\Admin\Documents\GitHub\toc-site-ai\server\php-bridge\job-create.php
-   ```
+2. Trên máy Windows chọn từng file ở bảng trên
 3. Nếu hỏi **Replace / Ghi đè** → chọn **Yes / Replace**
 
 ### Bước 4 — Kiểm tra
 
-Mở trình duyệt:
+Mở trình duyệt (đã đăng nhập admin):
 
+**job-create:**
 ```
 https://pro.agi.vn/api/platform/job-create.php?probe=1
 ```
 
-**Trước khi upload (file cũ):**
-```json
-{"success":false,"message":"Method not allowed"}
+**admin-vmedia-balance** (DevTools → Network, hoặc curl với Bearer JWT):
+```
+https://pro.agi.vn/api/platform/admin-vmedia-balance.php
 ```
 
-**Sau khi upload OK (file mới):**
+**Sau khi upload OK (job-create):**
 ```json
 {
   "success": true,
   "data": {
-    "bridgeBuild": "2026-07-20-hotfix2",
+    "bridgeBuild": "2026-07-21-admin-vmedia",
     "normalize_stored_job_status": true
   }
 }
 ```
+
+**admin-vmedia-balance** trả `credits_ai` > 0 → header/domain hiện **VMedia** thay vì số dư nội bộ.
 
 ### Bước 5 — Test tạo ảnh
 
