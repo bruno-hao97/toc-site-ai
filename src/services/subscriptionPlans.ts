@@ -106,6 +106,14 @@ export interface SubscriptionPaymentResult {
 const PLANS_URL = `${GOMMO_AUTH_PATH}/subscriptions/plans`;
 const CREATE_PAYMENT_URL = `${GOMMO_AUTH_PATH}/subscriptions/create_payment`;
 
+/** access_token (Gommo) hoặc platform_token (JWT) — khớp getGommoClient(). */
+function requireAuthBearerToken(): string {
+  const auth = loadAuth();
+  const token = auth?.access_token?.trim() || auth?.platform_token?.trim();
+  if (!token) throw new Error('Chưa đăng nhập');
+  return token;
+}
+
 function normalizePlan(raw: unknown): SubscriptionPlan | null {
   if (!raw || typeof raw !== 'object') return null;
   const row = raw as Record<string, unknown>;
@@ -130,8 +138,7 @@ function parsePlansPayload(input: unknown): PlansPayload {
 }
 
 export async function fetchSubscriptionPlans(type: SubscriptionPlanType): Promise<SubscriptionPlan[]> {
-  const auth = loadAuth();
-  if (!auth?.platform_token) throw new Error('Chưa đăng nhập');
+  const token = requireAuthBearerToken();
 
   const body = new URLSearchParams({
     action_type: 'plans',
@@ -143,7 +150,7 @@ export async function fetchSubscriptionPlans(type: SubscriptionPlanType): Promis
   const res = await fetch(PLANS_URL, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${auth.platform_token}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body,
@@ -378,8 +385,7 @@ export async function createSubscriptionPayment(
     return createLocalPayOsPayment(input);
   }
 
-  const auth = loadAuth();
-  if (!auth?.platform_token) throw new Error('Chưa đăng nhập');
+  const token = requireAuthBearerToken();
   if (!input.planId?.trim()) throw new Error('Thiếu plan_id');
 
   const body = new URLSearchParams({
@@ -394,7 +400,7 @@ export async function createSubscriptionPayment(
   const res = await fetch(CREATE_PAYMENT_URL, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${auth.platform_token}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body,
