@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, KeyRound, KeySquare, Lock, User, X } from 'lucide-react';
-import { loginWithGommoToken, loginWithPlatformSession } from '../services/authStore';
+import { loginWithGommoToken, loginWithPlatformSession, isTokenLoginAllowed } from '../services/authStore';
 import { gommoResetPassword, GommoAuthError } from '../services/gommoAuth';
 import { platformLogin, PlatformAuthError } from '../services/platformAuth';
 import { UpstreamMeError } from '../services/upstreamMe';
@@ -23,6 +23,7 @@ export default function LoginPage() {
 
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState('');
+  const showTokenLogin = isTokenLoginAllowed();
 
   function goStep(next: Step) {
     setError('');
@@ -109,16 +110,18 @@ export default function LoginPage() {
               <ChevronRight size={18} className="auth-method-arrow" />
             </button>
 
-            <button type="button" className="auth-method" onClick={() => goStep('token')}>
-              <span className="auth-method-icon purple">
-                <KeySquare size={18} />
-              </span>
-              <span className="auth-method-text">
-                <strong>Đăng nhập bằng Token</strong>
-                <small>Access Token nâng cao</small>
-              </span>
-              <ChevronRight size={18} className="auth-method-arrow" />
-            </button>
+            {showTokenLogin && (
+              <button type="button" className="auth-method" onClick={() => goStep('token')}>
+                <span className="auth-method-icon purple">
+                  <KeySquare size={18} />
+                </span>
+                <span className="auth-method-text">
+                  <strong>Đăng nhập bằng Token</strong>
+                  <small>Access Token nâng cao (dev)</small>
+                </span>
+                <ChevronRight size={18} className="auth-method-arrow" />
+              </button>
+            )}
           </div>
         )}
 
@@ -128,9 +131,11 @@ export default function LoginPage() {
               <button type="button" className="auth-back" onClick={() => goStep('menu')}>
                 <ArrowLeft size={14} /> Quay lại
               </button>
-              <button type="button" className="auth-switch-link" onClick={() => goStep('token')}>
-                ĐĂNG NHẬP BẰNG TOKEN
-              </button>
+              {showTokenLogin && (
+                <button type="button" className="auth-switch-link" onClick={() => goStep('token')}>
+                  ĐĂNG NHẬP BẰNG TOKEN
+                </button>
+              )}
             </div>
 
             <form onSubmit={handleLogin} className="form">
@@ -211,7 +216,7 @@ export default function LoginPage() {
           </>
         )}
 
-        {step === 'token' && (
+        {step === 'token' && showTokenLogin && (
           <>
             <div className="auth-switch">
               <button type="button" className="auth-back" onClick={() => goStep('menu')}>

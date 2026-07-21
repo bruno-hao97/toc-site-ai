@@ -106,10 +106,10 @@ export interface SubscriptionPaymentResult {
 const PLANS_URL = `${GOMMO_AUTH_PATH}/subscriptions/plans`;
 const CREATE_PAYMENT_URL = `${GOMMO_AUTH_PATH}/subscriptions/create_payment`;
 
-/** access_token (Gommo) hoặc platform_token (JWT) — khớp getGommoClient(). */
+/** platform_token (JWT) ưu tiên — khớp getGommoClient(). */
 function requireAuthBearerToken(): string {
   const auth = loadAuth();
-  const token = auth?.access_token?.trim() || auth?.platform_token?.trim();
+  const token = auth?.platform_token?.trim() || auth?.access_token?.trim();
   if (!token) throw new Error('Chưa đăng nhập');
   return token;
 }

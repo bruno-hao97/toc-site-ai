@@ -28,7 +28,8 @@ export type UploadTarget =
 const DEFAULT_IMAGE_BYTES = 10 * 1024 * 1024;
 const DEFAULT_VIDEO_BYTES = 50 * 1024 * 1024;
 const DEFAULT_VIDEO_DURATION_SEC = 30;
-const DEFAULT_MIN_IMAGE_PX = 300;
+/** Không chặn kích thước ảnh mặc định — đồng bộ Home quick create (chỉ model config / motion mới bắt min). */
+const DEFAULT_MIN_IMAGE_PX = 0;
 
 function positiveNum(...values: unknown[]): number | undefined {
   for (const v of values) {
@@ -127,14 +128,14 @@ export function getUploadRules(
     case 'frameImage':
       return rulesFromBlock(start, {
         maxImageBytes: DEFAULT_IMAGE_BYTES,
-        minImagePx: DEFAULT_MIN_IMAGE_PX,
-        hint: 'JPG / PNG, ≥ 300px',
+        minImagePx: 0,
+        hint: 'JPG / PNG',
       });
     case 'frameEnd':
       return rulesFromBlock(end, {
         maxImageBytes: DEFAULT_IMAGE_BYTES,
-        minImagePx: DEFAULT_MIN_IMAGE_PX,
-        hint: 'JPG / PNG, ≥ 300px',
+        minImagePx: 0,
+        hint: 'JPG / PNG',
       });
     case 'referenceVideo':
       return rulesFromBlock(ref, {
@@ -146,7 +147,7 @@ export function getUploadRules(
     default:
       return rulesFromBlock(ref, {
         maxImageBytes: DEFAULT_IMAGE_BYTES,
-        minImagePx: DEFAULT_MIN_IMAGE_PX,
+        minImagePx: 0,
         hint: 'JPG / PNG',
       });
   }

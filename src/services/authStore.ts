@@ -69,6 +69,12 @@ export function loadAuth(): AuthState | null {
       state.projectId = DEFAULT_PROJECT_ID;
       dirty = true;
     }
+    // Platform login — bỏ access_token Gommo cũ để luôn đi qua bridge server-side.
+    if (state.platform_token?.trim() && (state.access_token || state.upstream_me)) {
+      delete state.access_token;
+      delete state.upstream_me;
+      dirty = true;
+    }
     if (dirty) saveAuth(state);
     return state;
   } catch {
@@ -78,10 +84,13 @@ export function loadAuth(): AuthState | null {
 
 export function saveAuth(state: AuthState): void {
   const projectId = pickProjectId(state.projectId) || DEFAULT_PROJECT_ID;
+  const platformToken = state.platform_token?.trim() || undefined;
+  const accessToken = platformToken ? undefined : state.access_token?.trim() || undefined;
   const next: AuthState = {
     ...state,
-    platform_token: state.platform_token?.trim() || undefined,
-    access_token: state.access_token?.trim() || undefined,
+    platform_token: platformToken,
+    access_token: accessToken,
+    upstream_me: platformToken ? undefined : state.upstream_me,
     domain: normalizeDomain(state.domain),
     projectId,
   };
@@ -116,22 +125,22 @@ export function authUserKey(): string {
 
 /**
  * Client Gommo qua gw.php.
- * - access_token → passthrough token người dùng
- * - platform_token → gateway dùng token admin phía server
+ * - platform_token → gateway dùng token admin phía server (ưu tiên)
+ * - access_token → passthrough token người dùng (chỉ khi không có platform_token)
  */
 export function getGommoClient(): GommoClient {
   const auth = loadAuth();
-  if (auth?.access_token?.trim()) {
-    return new GommoClient({
-      accessToken: auth.access_token,
-      domain: auth.domain || loadSettings().domain,
-      projectId: resolveProjectId(auth.projectId),
-    });
-  }
   if (auth?.platform_token?.trim()) {
     return new GommoClient({
       platformToken: auth.platform_token,
       domain: auth.domain || 'vmedia.ai',
+      projectId: resolveProjectId(auth.projectId),
+    });
+  }
+  if (auth?.access_token?.trim()) {
+    return new GommoClient({
+      accessToken: auth.access_token,
+      domain: auth.domain || loadSettings().domain,
       projectId: resolveProjectId(auth.projectId),
     });
   }
@@ -197,6 +206,11 @@ export async function loginWithPlatformSession(
   };
   saveAuth(state);
   return state;
+}
+
+/** Token login Gommo — chỉ bật UI ở dev (production ẩn). */
+export function isTokenLoginAllowed(): boolean {
+  return import.meta.env.DEV;
 }
 
 export async function loginWithGommoToken(
