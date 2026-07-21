@@ -22,6 +22,13 @@ import {
 import { DEFAULT_DOMAIN } from '../services/settingsStore';
 import { extractPollSnapshot } from '../services/mediaGenerationStatus';
 import { createJobAndPoll, type PollProgress } from '../services/polling';
+import {
+  formatCreatingProgressMessage,
+  formatPollDoneMessage,
+  formatPollProgressDevMessage,
+  formatPollTimeoutMessage,
+  formatStartingProgressMessage,
+} from '../services/pollProgressCopy';
 import { isLoggedIn, loadAuth } from '../services/authStore';
 import { getJobClient } from '../services/platformJobClient';
 import UrlField from '../components/UrlField';
@@ -163,7 +170,7 @@ export default function ApiPlaygroundPage() {
 
     setSubmitting(true);
     setError('');
-    setProgress('Đang tạo job…');
+    setProgress(formatStartingProgressMessage());
     setCreateResponse(null);
     setPollResponse(null);
     setResultUrl(null);
@@ -187,11 +194,11 @@ export default function ApiPlaygroundPage() {
         payload,
         (p) => {
           if ('phase' in p && p.phase === 'creating') {
-            setProgress('Đang tạo job…');
+            setProgress(formatCreatingProgressMessage());
             return;
           }
           const prog = p as PollProgress;
-          setProgress(`Poll #${prog.attempt}: ${prog.phase} — ${prog.status || '…'}`);
+          setProgress(formatPollProgressDevMessage(prog));
           setPollResponse(prog.envelope);
         },
         abortRef.current.signal,
@@ -203,9 +210,9 @@ export default function ApiPlaygroundPage() {
       const url = result.resultUrl ?? snap.resultUrl;
       if (url) {
         setResultUrl(url);
-        setProgress('Hoàn tất — có result_url');
+        setProgress(formatPollDoneMessage());
       } else if (result.pollResult?.timeout) {
-        setError('Hết thời gian poll (~5 phút)');
+        setError(formatPollTimeoutMessage());
       } else if (result.pollResult && !result.pollResult.success) {
         setError(result.pollResult.error || 'Job thất bại');
       } else {

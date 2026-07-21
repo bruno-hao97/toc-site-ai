@@ -83,6 +83,12 @@ import {
 import { resolveModelPrice } from '../services/modelPricing';
 import { createJobAndPoll, type PollProgress } from '../services/polling';
 import {
+  formatCreatingProgressMessage,
+  formatPollDoneMessage,
+  formatPollProgressMessage,
+  formatStartingProgressMessage,
+} from '../services/pollProgressCopy';
+import {
   addHistoryEntry,
   isMediaUrl,
   listHistory,
@@ -1368,7 +1374,7 @@ export default function StudioPage({
       abortRef.current = new AbortController();
       setSubmitting(true);
       setError('');
-      setProgress('Đang tạo job…');
+      setProgress(formatStartingProgressMessage());
       setResultUrl(null);
       const slug = modelSlug(currentModel);
 
@@ -1406,7 +1412,7 @@ export default function StudioPage({
           }
         };
         await Promise.all(Array.from({ length: limit }, () => worker()));
-        setProgress('Hoàn tất!');
+        setProgress(formatPollDoneMessage());
         await refreshCreditsAfterJob();
       } finally {
         setSubmitting(false);
@@ -1430,7 +1436,7 @@ export default function StudioPage({
       abortRef.current = new AbortController();
       setSubmitting(true);
       setError('');
-      setProgress('Đang tạo job…');
+      setProgress(formatStartingProgressMessage());
       setResultUrl(null);
       const slug = modelSlug(currentModel);
       const pendingId = crypto.randomUUID();
@@ -1451,7 +1457,7 @@ export default function StudioPage({
             video_url: editVideoUrl,
           },
         });
-        setProgress('Hoàn tất!');
+        setProgress(formatPollDoneMessage());
         await refreshCreditsAfterJob();
       } finally {
         setSubmitting(false);
@@ -1565,7 +1571,7 @@ export default function StudioPage({
 
     setSubmitting(true);
     setError('');
-    setProgress('Đang tạo job…');
+    setProgress(formatStartingProgressMessage());
     setResultUrl(null);
 
     const newPending: PendingJob[] = tasks.map((t) => ({
@@ -1594,7 +1600,7 @@ export default function StudioPage({
         }
       };
       await Promise.all(Array.from({ length: limit }, () => worker()));
-      setProgress('Hoàn tất!');
+      setProgress(formatPollDoneMessage());
       await refreshCreditsAfterJob();
     } finally {
       setSubmitting(false);
@@ -1623,12 +1629,12 @@ export default function StudioPage({
       payload,
       (p) => {
         if ('phase' in p && p.phase === 'creating') {
-          setProgress('Đang gửi request tạo job…');
+          setProgress(formatCreatingProgressMessage());
           if (pendingId) bumpPendingProgress(pendingId, 10);
           return;
         }
         const prog = p as PollProgress;
-        setProgress(`Poll #${prog.attempt}: ${prog.status || prog.phase}`);
+        setProgress(formatPollProgressMessage(prog));
         if (pendingId) bumpPendingProgress(pendingId, 12 + prog.attempt * 3);
         if (prog.resultUrl) setResultUrl(prog.resultUrl);
       },

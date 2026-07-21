@@ -5,8 +5,9 @@ import {
   getDisplayUser,
 } from '../../services/authStore';
 import { loadTheme, saveTheme, type ThemeMode } from '../../services/themeStore';
-import { Check, ChevronDown, CircleHelp, ClipboardList, Clock, CreditCard, Gift, LayoutDashboard, LogOut, Moon, Pencil, Settings, Shield, Sun, Trash2, User, Users, Wallet } from 'lucide-react';
+import { Check, ChevronDown, CircleHelp, ClipboardList, Clock, CreditCard, Gift, LayoutDashboard, LogOut, Moon, Pencil, Phone, Settings, Shield, Sun, Trash2, User, Users, Wallet } from 'lucide-react';
 import { APP_SITE_URL } from '../../services/settingsStore';
+import { CONTACT_PHONE_TEL, contactPhoneLine } from '../../lib/brand';
 import {
   countByProject,
   createProject,
@@ -278,6 +279,9 @@ export default function UserMenuDropdown({ credits, isAdmin = false, onCreditsRe
             </a>
             <a href={EXTERNAL.support} target="_blank" rel="noreferrer" className="user-menu-item">
               <CircleHelp {...ICON} /> Trung tâm hỗ trợ
+            </a>
+            <a href={CONTACT_PHONE_TEL} className="user-menu-item">
+              <Phone {...ICON} /> {contactPhoneLine('Liên hệ')}
             </a>
             <a href={EXTERNAL.referral} target="_blank" rel="noreferrer" className="user-menu-item">
               <Gift {...ICON} /> Giới thiệu bạn bè

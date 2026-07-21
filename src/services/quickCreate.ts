@@ -8,7 +8,11 @@ import {
   type ModelSchema,
 } from './modelSchema';
 import { getJobClient } from './platformJobClient';
-import { createJobAndPoll } from './polling';
+import { createJobAndPoll, type PollProgress } from './polling';
+import {
+  formatCreatingProgressMessage,
+  formatPollProgressMessage,
+} from './pollProgressCopy';
 import type { GommoModel, JobType } from './api';
 
 /** Có thể tạo job khi đã đăng nhập (platform hoặc Gommo). */
@@ -79,11 +83,11 @@ export async function quickGenerate({
     payload,
     (p) => {
       if ('phase' in p && p.phase === 'creating') {
-        onProgress?.('Đang tạo job…');
+        onProgress?.(formatCreatingProgressMessage());
         return;
       }
-      const prog = p as { status?: string; phase?: string };
-      onProgress?.(`Đang xử lý… ${prog.status || prog.phase || ''}`.trim());
+      const prog = p as PollProgress;
+      onProgress?.(formatPollProgressMessage(prog));
     },
     signal,
   );

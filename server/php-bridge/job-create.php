@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const JOB_CREATE_BRIDGE_BUILD = '2026-07-20-hotfix2';
+const JOB_CREATE_BRIDGE_BUILD = '2026-07-21-admin-vmedia';
 
 require __DIR__ . '/bootstrap.php';
 require __DIR__ . '/gommo.php';
@@ -126,10 +126,14 @@ if ($cost < 1) {
 }
 
 $jobId = uuid_v4();
+$isAdmin = user_is_admin($user);
 
 try {
     $pdo->beginTransaction();
-    charge_user_credits($pdo, (string) $user['id'], $cost);
+    // Admin dùng token merchant VMedia — không trừ credit nội bộ platform.
+    if (!$isAdmin) {
+        charge_user_credits($pdo, (string) $user['id'], $cost);
+    }
 
     $path = '/ai/jobs/' . rawurlencode($type) . '/' . rawurlencode($modelId);
     $envelope = gommo_post_form($path, $fields);
@@ -155,7 +159,9 @@ try {
     // Create đã fail ngay → hoàn credit trong cùng transaction.
     $alreadyFailed = !$resultUrl && is_job_failed_status($status);
     if ($alreadyFailed) {
-        refund_user_credits($pdo, (string) $user['id'], $cost);
+        if (!$isAdmin) {
+            refund_user_credits($pdo, (string) $user['id'], $cost);
+        }
         $status = $status !== '' && $status !== 'processing' ? $status : 'FAILED';
     }
 

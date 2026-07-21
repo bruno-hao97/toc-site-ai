@@ -7,7 +7,12 @@ import { notifyCreditsUpdated } from './authStore';
 import { gommoDeviceFields } from './gommoDevice';
 import { isModelAvailable, normalizeOptions } from './modelSchema';
 import { getJobClient } from './platformJobClient';
-import { createJobAndPoll } from './polling';
+import { createJobAndPoll, type PollProgress } from './polling';
+import {
+  formatCreatingProgressMessage,
+  formatPollProgressMessage,
+  formatStartingProgressMessage,
+} from './pollProgressCopy';
 
 export const UPSCALE_JOB_TYPE = 'image-upscale' as JobType;
 export const UPSCALE_MODEL_ID = 'generative_upscale_v2';
@@ -60,15 +65,18 @@ export async function runImageUpscale(
   };
 
   const client = getJobClient();
-  onProgress?.('Đang tạo job upscale…');
+  onProgress?.(formatStartingProgressMessage());
   const { resultUrl, pollResult } = await createJobAndPoll(
     client,
     UPSCALE_JOB_TYPE,
     modelId,
     payload,
     (p) => {
-      if ('phase' in p && p.phase === 'creating') onProgress?.('Đang gửi yêu cầu…');
-      else if ('phase' in p) onProgress?.(`Đang xử lý… (${p.phase})`);
+      if ('phase' in p && p.phase === 'creating') {
+        onProgress?.(formatCreatingProgressMessage());
+        return;
+      }
+      onProgress?.(formatPollProgressMessage(p as PollProgress));
     },
   );
   notifyCreditsUpdated();

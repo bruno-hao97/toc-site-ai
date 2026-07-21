@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { TemplateGraph } from './workflowLibraryStore';
 
-/** Node theo định dạng file .wfl (79ai-workflow) export từ vmedia. */
+/** Node theo định dạng file .wfl export từ Gommo/vmedia. */
 interface WflNode {
   id: string;
   type: string;

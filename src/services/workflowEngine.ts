@@ -3,6 +3,11 @@ import { isLoggedIn, loadAuth } from './authStore';
 import { getJobClient } from './platformJobClient';
 import { createJobAndPoll, type PollProgress } from './polling';
 import {
+  formatCreatingProgressMessage,
+  formatPollProgressMessage,
+  formatStartingProgressMessage,
+} from './pollProgressCopy';
+import {
   analyzeModel,
   buildJobPayload,
   isModelAvailable,
@@ -56,7 +61,7 @@ export async function runNodeJob(input: RunNodeInput): Promise<string> {
     projectId: client.projectId,
   });
 
-  onStatus?.('Đang tạo job…');
+  onStatus?.(formatStartingProgressMessage());
   const { pollResult, resultUrl } = await createJobAndPoll(
     client,
     type,
@@ -64,11 +69,11 @@ export async function runNodeJob(input: RunNodeInput): Promise<string> {
     payload,
     (p) => {
       if ('phase' in p && p.phase === 'creating') {
-        onStatus?.('Đang gửi request…');
+        onStatus?.(formatCreatingProgressMessage());
         return;
       }
       const prog = p as PollProgress;
-      onStatus?.(`Poll #${prog.attempt}: ${prog.status || prog.phase}`);
+      onStatus?.(formatPollProgressMessage(prog));
     },
     signal,
   );

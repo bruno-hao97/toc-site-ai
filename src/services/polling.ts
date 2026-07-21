@@ -5,6 +5,7 @@ import {
   extractPollSnapshot,
   type StatusPhase,
 } from './mediaGenerationStatus';
+import { formatPollCancelledMessage, formatPollTimeoutMessage } from './pollProgressCopy';
 import { pollMediaForJobType } from './modelSchema';
 
 export interface PollProgress {
@@ -46,7 +47,7 @@ export async function startPolling(
 ): Promise<PollResult> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     if (signal?.aborted) {
-      return { success: false, error: 'Poll đã bị hủy' };
+      return { success: false, error: formatPollCancelledMessage() };
     }
 
     const envelope = await client.pollOnce(jobId, media);
@@ -72,7 +73,7 @@ export async function startPolling(
     await sleep(intervalMs);
   }
 
-  return { success: false, timeout: true, error: 'Hết thời gian poll (~5 phút)' };
+  return { success: false, timeout: true, error: formatPollTimeoutMessage() };
 }
 
 export async function createJobAndPoll(

@@ -1,4 +1,5 @@
 import type { GommoModel } from './api';
+import { readProgressLocale } from './pollProgressCopy';
 
 /** Giá credit theo mode + resolution (khớp StudioPage). */
 export function resolveWorkflowModelPrice(
@@ -32,14 +33,17 @@ export function formatGenTimer(ms: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-/** Map raw poll status → copy hiển thị trên node. */
+/** Map trạng thái tạo → copy hiển thị trên node workflow. */
 export function formatGenLoadingCopy(statusText?: string): { primary: string; secondary: string } {
   const raw = (statusText || '').trim();
-  if (!raw || /pending|processing|poll|active|bắt đầu|đang tạo|đang gửi/i.test(raw)) {
-    return { primary: 'CREATING...', secondary: 'Đang xử lý...' };
+  const locale = readProgressLocale();
+  const processing = locale === 'en' ? 'Processing…' : 'Đang xử lý…';
+  if (!raw || /poll #\d+|pending_active|media_generation|^(running|unknown)$/i.test(raw)) {
+    return { primary: 'CREATING...', secondary: processing };
   }
-  if (/^poll #\d+/i.test(raw)) {
-    return { primary: 'CREATING...', secondary: 'Đang xử lý...' };
+  if (/đang|creating|processing|queued|waiting|render|generat/i.test(raw)) {
+    return { primary: 'CREATING...', secondary: raw };
   }
   return { primary: 'CREATING...', secondary: raw };
 }
+

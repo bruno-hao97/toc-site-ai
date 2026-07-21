@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, Loader2, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, Loader2, Phone, Sparkles } from 'lucide-react';
 import SubscriptionConfirmModal from '../components/SubscriptionConfirmModal';
 import SubscriptionPaymentModal from '../components/SubscriptionPaymentModal';
 import CreditConfirmModal from '../components/CreditConfirmModal';
@@ -18,6 +18,7 @@ import {
   type SubscriptionPlan,
   type SubscriptionPlanType,
 } from '../services/subscriptionPlans';
+import { CONTACT_PHONE_TEL, contactPhoneLine } from '../lib/brand';
 
 type PlanFieldKey =
   | 'video_day'
@@ -567,6 +568,10 @@ export default function PricingPage() {
               <article className="panel">
                 <h3>Hỗ trợ 24/7</h3>
                 <p className="muted">Đội ngũ hỗ trợ liên tục, xử lý nhanh vấn đề gói và thanh toán.</p>
+                <a className="pricing-contact-phone" href={CONTACT_PHONE_TEL}>
+                  <Phone size={14} />
+                  {contactPhoneLine('Liên hệ')}
+                </a>
               </article>
               <article className="panel">
                 <h3>Hiệu năng cao</h3>

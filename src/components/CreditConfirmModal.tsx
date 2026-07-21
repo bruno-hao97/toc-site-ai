@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Coins, Loader2, X } from 'lucide-react';
+import { Coins, Loader2, Phone, X } from 'lucide-react';
 import type { CreditPackage } from '../services/topupApi';
+import { CONTACT_PHONE_TEL, contactPhoneLine } from '../lib/brand';
 
 interface Props {
   open: boolean;
@@ -77,6 +78,13 @@ export default function CreditConfirmModal({
 
         <p className="pricing-credit-expiry-note">
           Credit nạp sẽ hết hạn sau 3 tháng kể từ ngày nạp.
+        </p>
+
+        <p className="pricing-credit-support">
+          <a href={CONTACT_PHONE_TEL}>
+            <Phone size={13} />
+            {contactPhoneLine('Hỗ trợ')}
+          </a>
         </p>
 
         {error ? <p className="pricing-confirm-error">{error}</p> : null}

@@ -1,4 +1,5 @@
 import BrandLogo from '../BrandLogo';
+import { CONTACT_PHONE_TEL, contactPhoneLine } from '../../lib/brand';
 
 const footerLinks = {
   'Nền tảng': [
@@ -13,7 +14,7 @@ const footerLinks = {
   ],
   'Công ty': [
     { label: 'Về chúng tôi', href: '#' },
-    { label: 'Liên hệ', href: '#' },
+    { label: contactPhoneLine('Liên hệ'), href: CONTACT_PHONE_TEL },
   ],
 } as const;
 

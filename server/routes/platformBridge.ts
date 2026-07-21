@@ -88,7 +88,8 @@ router.post('/job-create.php', async (req, res) => {
       res.status(400).json({ success: false, message: 'Không xác định được giá model' });
       return;
     }
-    if (user.credits < cost) {
+    // Admin dùng token merchant VMedia — không kiểm tra/trừ credit nội bộ platform.
+    if (!user.isAdmin && user.credits < cost) {
       res.status(400).json({
         success: false,
         message: `Số dư credit không đủ (cần ${cost.toLocaleString('vi-VN')})`,
@@ -107,7 +108,7 @@ router.post('/job-create.php', async (req, res) => {
       data: {
         platformJobId: randomUUID(),
         costCredits: cost,
-        credits: Math.max(0, user.credits - cost),
+        credits: user.isAdmin ? user.credits : Math.max(0, user.credits - cost),
         envelope,
         bridgeVersion: PLATFORM_JOB_BRIDGE_BUILD,
         devNote:

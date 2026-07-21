@@ -153,7 +153,7 @@ code {
   max-width: none;
   margin: 0;
   padding: 0;
-  /* 79ai.net/image design tokens (scoped, không ảnh hưởng trang khác) */
+  /* Studio/image design tokens (scoped, không ảnh hưởng trang khác) */
   --surface: #111317;
   --border: #23262d;
   --text: #e7e8ea;
@@ -321,7 +321,7 @@ textarea { resize: vertical; min-height: 4rem; }
   max-width: 420px;
 }
 
-/* ===== Trang đăng nhập kiểu 79ai (chỉ áp dụng .auth-login) ===== */
+/* ===== Trang đăng nhập (.auth-login) ===== */
 .auth-login {
   min-height: 100vh;
   align-items: center;
@@ -1541,7 +1541,7 @@ a.user-pill:hover { color: var(--text); }
   padding: 0.2rem 0.45rem;
 }
 
-/* —— Header user menu (79ai) —— */
+/* —— Header user menu —— */
 .nav-compact { margin-left: 0.5rem; }
 
 .header-balance-label {
@@ -1884,7 +1884,7 @@ a.user-pill:hover { color: var(--text); }
   text-align: left;
 }
 
-/* —— Profile 79ai —— */
+/* —— Profile —— */
 .profile-79 { max-width: 1040px; padding: 0; margin: 0 auto; }
 
 .profile-cover {
@@ -2653,7 +2653,7 @@ a.user-pill:hover { color: var(--text); }
   line-height: 1.45;
 }
 
-/* —— Settings 79ai —— */
+/* —— Settings —— */
 .settings-79 { max-width: 820px; margin: 0 auto; }
 
 .settings-79-stack { display: flex; flex-direction: column; gap: 1rem; }
@@ -15301,6 +15301,39 @@ input.wf-gen-pill--select {
   font-size: 0.95rem;
 }
 
+.pricing-contact-phone {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  color: var(--ok);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.pricing-contact-phone:hover {
+  text-decoration: underline;
+}
+
+.pricing-credit-support {
+  margin: 0.75rem 0 0;
+  text-align: center;
+}
+
+.pricing-credit-support a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--ok);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.pricing-credit-support a:hover {
+  text-decoration: underline;
+}
+
 .pricing-faq-list {
   margin-top: 0.6rem;
   display: flex;
@@ -15648,6 +15681,16 @@ input.wf-gen-pill--select {
 
 .pricing-confirm-support p {
   margin: 0.2rem 0 0;
+}
+
+.pricing-confirm-support a {
+  color: var(--ok);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.pricing-confirm-support a:hover {
+  text-decoration: underline;
 }
 
 .pricing-confirm-promo {
