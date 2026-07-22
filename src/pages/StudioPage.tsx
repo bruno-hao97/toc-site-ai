@@ -3356,6 +3356,12 @@ export default function StudioPage({
                   items={currentPreviewItems}
                   index={Math.min(currentPreviewIndex, currentPreviewItems.length - 1)}
                   kind={historyComposerMediaKind(jobType)}
+                  layout={
+                    historyComposerMediaKind(jobType) === 'image'
+                    || historyComposerMediaKind(jobType) === 'video'
+                      ? 'home'
+                      : 'composer'
+                  }
                   onClose={() => setCurrentPreviewIndex(null)}
                   onNavigate={setCurrentPreviewIndex}
                   handlers={buildPreviewHandlers(

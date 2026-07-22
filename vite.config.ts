@@ -32,6 +32,10 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
+      '/api/platform/mine-media.php': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
       '/api/platform': {
         target: 'https://pro.agi.vn',
         changeOrigin: true,

@@ -24,9 +24,43 @@ export function feedResolutionLabel(item: FeedItem): string {
   return '';
 }
 
+/**
+ * Nhãn "Chất lượng" kiểu vmedia: tier (50 / Mini / HD), không phải pixel.
+ * Pixel đi vào Kích thước.
+ */
+export function feedQualityLabel(item: FeedItem): string {
+  const q = item.quality;
+  if (q != null && String(q).trim() !== '') return String(q).trim();
+
+  const mode = (item.mode || '').trim();
+  if (mode && !/^\d+x\d+$/i.test(mode) && mode !== 'unknow' && mode !== 'unknown') {
+    // mode kiểu standard/mini thường là chế độ, vẫn hữu ích làm chất lượng nếu không có quality
+    if (/^(mini|standard|high|low|quality|hd|fhd|uhd|4k)/i.test(mode) || /^\d{1,3}$/.test(mode)) {
+      return mode;
+    }
+  }
+  const res = feedResolutionLabel(item);
+  if (!res) return '';
+  // Pixel dimension → không dùng làm chất lượng
+  if (/^\d+\s*[x×]\s*\d+$/i.test(res) || /^\d{3,4}p$/i.test(res)) return '';
+  // Số ngắn kiểu quality tier (vd 50)
+  if (/^\d{1,3}$/.test(res)) return res;
+  if (/^(hd|fhd|uhd|4k|8k|mini|standard|high|low|quality)/i.test(res)) return res;
+  // Resolution kiểu "720" thuần thường là height — không hiện ở Chất lượng
+  if (/^\d{3,4}$/.test(res)) return '';
+  return res;
+}
+
 export function feedDimensionsLabel(item: FeedItem): string {
   const r0 = item.resolutions?.[0];
   if (r0?.width && r0?.height) return `${r0.width}×${r0.height}`;
+  const res = feedResolutionLabel(item);
+  const m = res.match(/^(\d+)\s*[x×]\s*(\d+)$/i);
+  if (m) return `${m[1]}×${m[2]}`;
+  // Một số API chỉ trả "720" / "960" → suy ra vuông
+  if (/^\d{3,4}$/.test(res) && !feedQualityLabel(item)) {
+    return `${res}×${res}`;
+  }
   return '';
 }
 
@@ -68,6 +102,31 @@ export function feedCreatedDateLabel(item: FeedItem): string {
   } catch {
     return '';
   }
+}
+
+/** Ngày ngắn kiểu vmedia: "22-07". */
+export function feedCreatedShortLabel(item: FeedItem): string {
+  if (item.created_time == null) return '';
+  let ts = typeof item.created_time === 'string' ? Number(item.created_time) : item.created_time;
+  if (!Number.isFinite(ts) || ts <= 0) return '';
+  if (ts < 1e12) ts *= 1000;
+  try {
+    const d = new Date(ts);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${day}-${month}`;
+  } catch {
+    return '';
+  }
+}
+
+/** Thumbnail ảnh/object tham chiếu (icon sản phẩm góc phải). */
+export function feedRefThumb(item: FeedItem): string | null {
+  const fromImages = item.images?.[0]?.url?.trim();
+  if (fromImages) return fromImages;
+  const fromObjects = item.objects?.[0]?.url?.trim();
+  if (fromObjects) return fromObjects;
+  return null;
 }
 
 /** Nhãn tuổi nhóm ngày kiểu vmedia: "4 ngày trước". */

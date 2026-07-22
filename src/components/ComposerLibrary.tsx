@@ -390,6 +390,7 @@ export default function ComposerLibrary({
           items={sortedItems}
           index={previewIndex}
           kind={kind}
+          layout={kind === 'image' || kind === 'video' ? 'home' : 'composer'}
           onClose={() => setPreviewIndex(null)}
           onNavigate={setPreviewIndex}
           handlers={

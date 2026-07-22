@@ -3302,6 +3302,11 @@ function Flow() {
           items={resultPreview.items}
           index={Math.min(resultPreview.index, resultPreview.items.length - 1)}
           kind={resultPreview.kind}
+          layout={
+            resultPreview.kind === 'image' || resultPreview.kind === 'video'
+              ? 'home'
+              : 'composer'
+          }
           onClose={() => setResultPreview(null)}
           onNavigate={(i) => setResultPreview((p) => (p ? { ...p, index: i } : p))}
           handlers={resultPreviewHandlers}

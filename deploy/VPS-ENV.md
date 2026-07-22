@@ -2,7 +2,16 @@
 
 ## 1. Copy file env
 
-Gửi file **`production.env`** (ở root repo) cho chủ VPS qua kênh riêng tư.
+**Từ máy Windows** (sau khi sửa `.env` local):
+
+```cmd
+deploy\sync-production-env.ps1
+deploy\push-env.cmd
+```
+
+(`push-env` cần `deploy\ftp.local.ps1` — copy từ `ftp.local.example.ps1`.)
+
+**Hoặc** gửi file **`production.env`** (ở root repo) cho chủ VPS qua kênh riêng tư.
 
 Trên VPS:
 

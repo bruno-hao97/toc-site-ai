@@ -116,6 +116,7 @@ export interface FeedItem {
   mode?: string;
   ratio?: string;
   resolution?: string;
+  quality?: string | number;
   duration?: string;
   title?: string;
   resolutions?: FeedResolution[];
@@ -124,6 +125,8 @@ export interface FeedItem {
   download_url?: string;
   thumbnail_url?: string;
   thumbnail_end_url?: string;
+  url_preview?: string;
+  url?: string;
   prompt?: string;
   credit_fee?: number;
   like_count?: number;
@@ -364,7 +367,7 @@ export async function fetchMyVideos(params: FetchMineParams = {}): Promise<MineP
     fields,
   );
 
-  const items = (parsed.data ?? []).map((it) => ({ ...it, type: 'video' as const }));
+  const items = (parsed.data ?? []).map((it) => mapVideoToFeedItem(it));
   const last = items.length ? items[items.length - 1] : undefined;
   return { items, nextAfterId: parsed.next_after_id ?? last?.id_base ?? '' };
 }
@@ -392,115 +395,77 @@ export async function fetchMyImages(params: FetchMineParams = {}): Promise<MineP
   return { items, nextAfterId: parsed.next_after_id ?? last?.id_base ?? '' };
 }
 
-interface PlatformJobListItem {
-  id: string;
-  providerJobId?: string | null;
-  jobType: string;
-  modelId: string;
-  status: string;
-  resultUrl: string;
-  prompt?: string | null;
-  ratio?: string | null;
-  resolution?: string | null;
-  createdTime?: number | null;
-}
-
-function platformJobToFeedItem(job: PlatformJobListItem): FeedItem {
-  const url = job.resultUrl;
-  const feedType = job.jobType === 'video' ? 'video' : 'image';
-  return {
-    id_base: job.id,
-    type: feedType,
-    status: 'FINISH',
-    prompt: job.prompt || undefined,
-    model: job.modelId,
-    ratio: job.ratio || undefined,
-    resolution: job.resolution || undefined,
-    thumbnail_url: url,
-    download_url: url,
-    created_time: job.createdTime ?? undefined,
-    resolutions: url
-      ? [{ type: feedType, status: 'FINISH', url, name: job.resolution || undefined }]
-      : undefined,
-  };
-}
-
 async function fetchPlatformMine(
   type: 'image' | 'video',
   params: FetchMineParams,
 ): Promise<MinePage> {
-  const auth = loadAuth();
-  const token = auth?.platform_token?.trim();
-  if (!token) throw new UpstreamMeError('Chưa đăng nhập tài khoản hệ thống', 401);
-
   const { limit = 30, afterId = '' } = params;
-  const qs = new URLSearchParams({ type, limit: String(limit) });
-  if (afterId) qs.set('afterId', afterId);
+  const q: Record<string, string> = { type, limit: String(limit) };
+  if (afterId) q.afterId = afterId;
 
-  const res = await fetch(`/api/platform/job-list.php?${qs}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-  });
-  if (res.status === 401 || res.status === 403) {
-    clearAuth();
-    if (typeof window !== 'undefined') window.location.href = '/login';
+  if (type === 'image') {
+    const parsed = await platformFeedGet<MineImagesResponse>(PLATFORM_BRIDGE.mineMedia, q);
+    const raw = parsed.data ?? [];
+    const items = raw.map(mapImageToFeedItem);
+    const last = raw.length ? raw[raw.length - 1] : undefined;
+    return { items, nextAfterId: parsed.next_after_id ?? last?.id_base ?? '' };
   }
-  const text = await res.text();
-  let parsed: {
-    success?: boolean;
-    message?: string;
-    data?: { items?: PlatformJobListItem[]; nextAfterId?: string };
-  };
-  try {
-    parsed = JSON.parse(text) as typeof parsed;
-  } catch {
-    throw new UpstreamMeError(text || `HTTP ${res.status}`, res.status);
-  }
-  if (!res.ok || !parsed.success || !parsed.data) {
-    throw new UpstreamMeError(parsed.message || 'Không tải được thư viện', res.status);
-  }
-  const items = (parsed.data.items ?? []).map(platformJobToFeedItem);
-  return { items, nextAfterId: parsed.data.nextAfterId ?? '' };
-}
 
-async function deletePlatformJob(jobId: string): Promise<void> {
-  const auth = loadAuth();
-  const token = auth?.platform_token?.trim();
-  if (!token) throw new UpstreamMeError('Chưa đăng nhập tài khoản hệ thống', 401);
-
-  const res = await fetch('/api/platform/job-delete.php', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({ platformJobId: jobId }),
-  });
-  if (res.status === 401 || res.status === 403) {
-    clearAuth();
-    if (typeof window !== 'undefined') window.location.href = '/login';
-  }
-  const text = await res.text();
-  let parsed: { success?: boolean; message?: string };
-  try {
-    parsed = JSON.parse(text) as typeof parsed;
-  } catch {
-    throw new UpstreamMeError(text || `HTTP ${res.status}`, res.status);
-  }
-  if (!res.ok || parsed.success === false) {
-    throw new UpstreamMeError(parsed.message || 'Xóa thất bại', res.status);
-  }
+  const parsed = await platformFeedGet<MineVideosResponse>(PLATFORM_BRIDGE.mineMedia, q);
+  const items = (parsed.data ?? []).map((it) => mapVideoToFeedItem(it));
+  const last = items.length ? items[items.length - 1] : undefined;
+  return { items, nextAfterId: parsed.next_after_id ?? last?.id_base ?? '' };
 }
 
 export function feedModelLabel(item: FeedItem): string {
   return item.modelInfo?.name?.trim() || item.model?.trim() || '';
 }
 
+function isVideoMediaUrl(url: string): boolean {
+  const base = url.split('?')[0].split('#')[0].toLowerCase();
+  return /\.(mp4|webm|mov|m4v|m3u8|avi)(\?|$)/i.test(base) || base.includes('/video/');
+}
+
+function mapVideoToFeedItem(raw: FeedItem): FeedItem {
+  const ext = raw as FeedItem & {
+    quality?: string | number;
+    fileSize?: number;
+    size?: number;
+  };
+  return {
+    ...raw,
+    type: 'video',
+    thumbnail_url: raw.thumbnail_url || raw.url_preview || undefined,
+    download_url: raw.download_url || raw.url || undefined,
+    quality: ext.quality ?? raw.quality,
+    file_size: raw.file_size || ext.fileSize || ext.size || undefined,
+  };
+}
+
 export function feedThumb(item: FeedItem): string | null {
-  if (item.thumbnail_url?.trim()) return item.thumbnail_url;
-  const finished = item.resolutions?.find((r) => r.url);
-  if (finished?.url) return finished.url;
-  if (item.download_url?.trim()) return item.download_url;
+  const candidates: string[] = [];
+  const push = (u?: string | null) => {
+    const t = u?.trim();
+    if (t) candidates.push(t);
+  };
+  push(item.thumbnail_url);
+  push(item.url_preview);
+  push(item.thumbnail_end_url);
+  for (const r of item.resolutions ?? []) {
+    push(r.url);
+  }
+  push(item.download_url);
+  push(item.url);
+
+  const poster = candidates.find((u) => !isVideoMediaUrl(u));
+  if (poster) return poster;
+  return candidates[0] ?? null;
+}
+
+/** URL poster ảnh cho video (không phải file .mp4). */
+export function feedPosterUrl(item: FeedItem): string | null {
+  const thumb = feedThumb(item);
+  if (thumb && !isVideoMediaUrl(thumb)) return thumb;
   return null;
 }
 
@@ -514,6 +479,42 @@ export function feedMediaUrl(item: FeedItem): string | null {
 
 export function feedSourceCount(item: FeedItem): number {
   return (item.images?.length || 0) + (item.objects?.length || 0);
+}
+
+/** Số lượng hiển thị trên card (ref assets hoặc batch resolutions). */
+export function feedDisplayQty(item: FeedItem): number {
+  const refs = feedSourceCount(item);
+  const resCount = item.resolutions?.filter((r) => r.url || r.status === 'FINISH').length ?? 0;
+  return Math.max(1, refs > 1 ? refs : resCount > 1 ? resCount : refs || 1);
+}
+
+export function feedIsFailed(item: FeedItem): boolean {
+  const media = feedMediaUrl(item);
+  const s = (item.status || '').toUpperCase();
+  if (media && (s.includes('SUCCESS') || s === 'FINISH' || s === 'FINISHED' || s === '')) {
+    return false;
+  }
+  if (!s) return false;
+  if (s.includes('SUCCESS') || s === 'FINISH' || s === 'FINISHED' || s.includes('PROCESSING')) {
+    return false;
+  }
+  return (
+    s.includes('FAIL')
+    || s.includes('ERROR')
+    || s.includes('REJECT')
+    || s.includes('CANCEL')
+    || s.includes('BLOCK')
+    || s.includes('NSFW')
+    || s.includes('DENIED')
+  );
+}
+
+/** Job đủ dữ liệu để hiển thị trên grid (kể cả failed). */
+export function feedIsDisplayable(item: FeedItem): boolean {
+  if (feedThumb(item) || feedMediaUrl(item)) return true;
+  if (feedIsFailed(item)) return true;
+  const s = (item.status || '').toUpperCase();
+  return s.includes('PROCESS') || s.includes('PENDING') || s.includes('QUEUE');
 }
 
 export function formatFeedTime(value: string | number | undefined): string {
@@ -531,15 +532,10 @@ export function formatFeedTime(value: string | number | undefined): string {
   }
 }
 
-/** Xóa ảnh/video — platform: MySQL; token: Gommo. */
+/** Xóa ảnh/video — Gommo post-delete (kể cả user platform). */
 export async function deleteFeedPost(idBase: string): Promise<void> {
   const id = idBase.trim();
   if (!id) throw new UpstreamMeError('Thiếu id_base', 400);
-
-  if (usesPlatformJobs()) {
-    await deletePlatformJob(id);
-    return;
-  }
 
   const fields = { id_base: id, ...gommoDeviceFields() };
   const parsed = await feedRequest<{ success?: boolean; message?: string }>(

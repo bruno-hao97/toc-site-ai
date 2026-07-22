@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Download, Eye, MoreVertical, Send, Trash2 } from 'lucide-react';
 import ComposerSelectCircle from './ComposerSelectCircle';
-import { feedMediaUrl, feedThumb, type FeedItem } from '../services/feedApi';
+import { feedMediaUrl, feedPosterUrl, feedThumb, type FeedItem } from '../services/feedApi';
 import {
   feedModelDisplay,
   feedResolutionLabel,
@@ -40,12 +40,14 @@ export default function ComposerLibraryItem({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const thumb = feedThumb(item);
+  const poster = feedPosterUrl(item);
   const fullUrl = feedMediaUrl(item) || thumb;
   const model = feedModelDisplay(item);
   const res = feedResolutionLabel(item);
   const ratio = ratioClass(item.ratio);
   const isVideo = kind === 'video';
   const prompt = (item.prompt || '').trim();
+  const previewSrc = poster || thumb;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -62,17 +64,26 @@ export default function ComposerLibraryItem({
     <div
       className={`clib-item ${ratio}${selected ? ' selected' : ''}`}
       title={prompt || model || item.id_base}
+      role="button"
+      tabIndex={0}
+      onClick={onPreview}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPreview();
+        }
+      }}
     >
       {onToggleSelect && (
         <ComposerSelectCircle selected={selected} onToggle={onToggleSelect} />
       )}
 
       <div className="clib-item-media">
-        {thumb ? (
-          isVideo ? (
-            <video src={thumb} muted preload="metadata" />
+        {previewSrc ? (
+          isVideo && !poster ? (
+            <video src={`${previewSrc}#t=0.001`} muted playsInline preload="metadata" />
           ) : (
-            <img src={thumb} alt="" loading="lazy" />
+            <img src={previewSrc} alt="" loading="lazy" />
           )
         ) : (
           <span className="clib-placeholder" />

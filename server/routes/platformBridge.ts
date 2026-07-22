@@ -294,4 +294,40 @@ router.get('/admin-vmedia-balance.php', async (req, res) => {
   }
 });
 
+/** Tab "Của tôi" — proxy Gommo /ai/videos + /ai/images (local dev). */
+router.get('/mine-media.php', async (req, res) => {
+  try {
+    const auth = authHeader(req);
+    await fetchBridgeUser(auth);
+
+    const type = String(req.query.type ?? 'video').trim();
+    const limit = Math.max(1, Math.min(50, Number(req.query.limit ?? 30) || 30));
+    const afterId = String(req.query.afterId ?? req.query.after_id ?? '').trim();
+
+    if (type !== 'video' && type !== 'image') {
+      res.status(400).json({ success: false, message: 'type phải là video hoặc image' });
+      return;
+    }
+
+    const authBase = (config.gommo.authBaseUrl || 'https://api.gommo.net').replace(/\/$/, '');
+    const authPath = (config.gommo.authPath || '/api/apps/go-mmo').replace(/\/$/, '');
+    const path = type === 'video' ? `${authPath}/ai/videos` : `${authPath}/ai/images`;
+    const fields: Record<string, unknown> = {
+      limit: String(limit),
+      order_by: 'index',
+      sort_by: 'desc',
+    };
+    if (afterId) fields.after_id = afterId;
+
+    const envelope = await gommoAdminPostForm(path, fields, authBase);
+    res.json(envelope);
+  } catch (err) {
+    console.error('[platformBridge/mine-media]', err);
+    res.status(500).json({
+      success: false,
+      message: `Không tải được thư viện: ${err instanceof Error ? err.message : 'Unknown error'}`,
+    });
+  }
+});
+
 export default router;

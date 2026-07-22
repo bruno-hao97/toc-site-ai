@@ -5,17 +5,23 @@ import {
   ChevronRight,
   Copy,
   Download,
+  ExternalLink,
+  Flag,
   Loader2,
   Maximize2,
   Pencil,
   RotateCcw,
+  Sparkles,
   Trash2,
   Upload,
   Video,
+  Wand2,
   X,
 } from 'lucide-react';
+import { getDisplayUser } from '../services/authStore';
 import {
   feedMediaUrl,
+  feedPosterUrl,
   feedThumb,
   type FeedItem,
 } from '../services/feedApi';
@@ -23,8 +29,9 @@ import {
   feedCreatedDateLabel,
   feedDimensionsLabel,
   feedModelDisplay,
+  feedQualityLabel,
   feedRatioLabel,
-  feedResolutionLabel,
+  feedRefThumb,
   feedTimeAgo,
   formatFileSize,
 } from '../services/feedLibraryMeta';
@@ -36,9 +43,11 @@ import {
 } from '../services/imageUpscale';
 import { isModelAvailable, normalizeOptions } from '../services/modelSchema';
 import { downloadMediaUrl } from '../utils/downloadMedia';
+import { probeFileSize } from '../utils/probeFileSize';
 
 export type ComposerPreviewHandlers = {
   onRegenerate?: () => void;
+  onReuse?: () => void;
   onPublish?: () => void;
   onCreateVideo?: () => void;
   onEdit?: () => void;
@@ -46,10 +55,13 @@ export type ComposerPreviewHandlers = {
   onUpscaleDone?: (resultUrl: string) => void;
 };
 
+const PROMPT_COLLAPSE_LEN = 180;
+
 export default function ComposerLibraryPreviewModal({
   items,
   index,
   kind,
+  layout = 'composer',
   onClose,
   onNavigate,
   handlers = {},
@@ -58,15 +70,19 @@ export default function ComposerLibraryPreviewModal({
   items: FeedItem[];
   index: number;
   kind: 'image' | 'video';
+  layout?: 'composer' | 'home';
   onClose: () => void;
   onNavigate: (index: number) => void;
   handlers?: ComposerPreviewHandlers;
   deleting?: boolean;
 }) {
   const item = items[index];
-  const mediaUrl = item ? feedMediaUrl(item) || feedThumb(item) : null;
+  const playUrl = item ? feedMediaUrl(item) || feedThumb(item) : null;
+  const poster = item ? feedPosterUrl(item) : null;
   const canPrev = index > 0;
   const canNext = index < items.length - 1;
+  const isHomeLayout = layout === 'home';
+  const isHomeVideo = isHomeLayout && kind === 'video';
 
   const [upscaleOpen, setUpscaleOpen] = useState(false);
   const [upscaleMode, setUpscaleMode] = useState('');
@@ -76,15 +92,29 @@ export default function ComposerLibraryPreviewModal({
   const [upscaleError, setUpscaleError] = useState('');
   const [upscaleStatus, setUpscaleStatus] = useState('');
   const [upscaleModel, setUpscaleModel] = useState<Awaited<ReturnType<typeof fetchUpscaleModels>>[0] | null>(null);
+  const [promptExpanded, setPromptExpanded] = useState(false);
+  const [reportMsg, setReportMsg] = useState('');
+  const [soonMsg, setSoonMsg] = useState('');
+  const [probedSize, setProbedSize] = useState<number | null>(null);
 
   const {
     onRegenerate,
+    onReuse,
     onPublish,
     onCreateVideo,
     onEdit,
     onDelete,
     onUpscaleDone,
   } = handlers;
+
+  const me = getDisplayUser();
+
+  useEffect(() => {
+    setPromptExpanded(false);
+    setReportMsg('');
+    setSoonMsg('');
+    setProbedSize(null);
+  }, [item?.id_base]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -100,6 +130,17 @@ export default function ComposerLibraryPreviewModal({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [index, canPrev, canNext, onClose, onNavigate, upscaleOpen]);
+
+  useEffect(() => {
+    if (!playUrl || (item?.file_size && item.file_size > 0)) return;
+    let cancelled = false;
+    void probeFileSize(playUrl).then((n) => {
+      if (!cancelled && n) setProbedSize(n);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [playUrl, item?.file_size]);
 
   const loadUpscaleModel = useCallback(async () => {
     setUpscaleLoading(true);
@@ -143,16 +184,34 @@ export default function ComposerLibraryPreviewModal({
     [upscaleModel],
   );
 
-  if (!item || !mediaUrl) return null;
+  if (!item || !playUrl) return null;
 
   const model = feedModelDisplay(item);
-  const quality = feedResolutionLabel(item);
+  const quality = feedQualityLabel(item);
   const dimensions = feedDimensionsLabel(item);
   const ratio = feedRatioLabel(item);
   const createdDate = feedCreatedDateLabel(item);
-  const size = formatFileSize(item.file_size);
-  const prompt = (item.prompt || '').trim();
+  const size = formatFileSize(item.file_size || probedSize || undefined);
+  const prompt = (item.prompt || item.title || '').trim();
   const isImage = kind === 'image';
+  const kindTag = isImage ? 'v-image' : 'v-video';
+  const authorName =
+    item.author?.name?.trim()
+    || item.author?.username?.trim()
+    || me.name
+    || me.username
+    || 'Bạn';
+  const authorAvatar = item.author?.avatar || me.avatar;
+  const refImages = [
+    ...(item.images ?? []),
+    ...(item.objects ?? []),
+  ].filter((r) => r.url?.trim());
+  const primaryRef = feedRefThumb(item);
+  const promptLong = prompt.length > PROMPT_COLLAPSE_LEN;
+  const promptShown =
+    promptExpanded || !promptLong
+      ? prompt
+      : `${prompt.slice(0, PROMPT_COLLAPSE_LEN).trim()}…`;
 
   async function copyPrompt() {
     if (!prompt) return;
@@ -163,13 +222,23 @@ export default function ComposerLibraryPreviewModal({
     }
   }
 
+  function showSoon(label: string) {
+    setSoonMsg(`${label} — sắp hỗ trợ trên AGI Center.`);
+    window.setTimeout(() => setSoonMsg(''), 2800);
+  }
+
+  function reportIssue() {
+    setReportMsg('Đã ghi nhận báo lỗi. Cảm ơn bạn!');
+    window.setTimeout(() => setReportMsg(''), 2800);
+  }
+
   async function handleUpscaleSubmit() {
-    if (!mediaUrl || !upscaleMode || !upscaleRes || upscaleBusy) return;
+    if (!playUrl || !upscaleMode || !upscaleRes || upscaleBusy) return;
     setUpscaleBusy(true);
     setUpscaleError('');
     setUpscaleStatus('Đang bắt đầu…');
     try {
-      const resultUrl = await runImageUpscale(mediaUrl, {
+      const resultUrl = await runImageUpscale(playUrl, {
         mode: upscaleMode,
         resolution: upscaleRes,
         modelId: upscaleModel?.model || upscaleModel?.slug,
@@ -187,11 +256,10 @@ export default function ComposerLibraryPreviewModal({
 
   return createPortal(
     <div className="clib-preview-backdrop" onClick={onClose}>
-      <div className="clib-preview" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="clib-preview-close" aria-label="Đóng" onClick={onClose}>
-          <X size={20} />
-        </button>
-
+      <div
+        className={`clib-preview${isHomeLayout ? ' clib-preview--home' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="clib-preview-main">
           {canPrev && (
             <button
@@ -206,9 +274,16 @@ export default function ComposerLibraryPreviewModal({
 
           <div className="clib-preview-stage">
             {kind === 'video' ? (
-              <video src={mediaUrl} controls autoPlay className="clib-preview-media" />
+              <video
+                key={item.id_base}
+                src={playUrl}
+                poster={poster || undefined}
+                controls
+                playsInline
+                className="clib-preview-media"
+              />
             ) : (
-              <img src={mediaUrl} alt="" className="clib-preview-media" />
+              <img src={playUrl} alt="" className="clib-preview-media" />
             )}
           </div>
 
@@ -226,21 +301,62 @@ export default function ComposerLibraryPreviewModal({
 
         <aside className="clib-preview-side">
           <header className="clib-preview-side-head">
-            <span className="clib-preview-user">Bạn</span>
-            <span className="clib-preview-time">{feedTimeAgo(item.created_time)}</span>
+            <div className="clib-preview-user-row">
+              {authorAvatar ? (
+                <img className="clib-preview-avatar" src={authorAvatar} alt="" />
+              ) : (
+                <span className="clib-preview-avatar clib-preview-avatar-empty" />
+              )}
+              <div className="clib-preview-user-meta">
+                <span className="clib-preview-user">
+                  {authorName}
+                  <span className="clib-preview-online" title="Online" />
+                </span>
+                <span className="clib-preview-time">{feedTimeAgo(item.created_time)}</span>
+              </div>
+            </div>
+            <button type="button" className="clib-preview-close" aria-label="Đóng" onClick={onClose}>
+              <X size={18} />
+            </button>
           </header>
 
           {prompt && (
             <div className="clib-preview-prompt">
-              <p>&ldquo;{prompt}&rdquo;</p>
-              <button type="button" className="clib-preview-copy" onClick={() => void copyPrompt()}>
-                <Copy size={14} />
-              </button>
+              <div className="clib-preview-prompt-head">
+                <span className="clib-preview-kind-tag">{kindTag}</span>
+                <button
+                  type="button"
+                  className="clib-preview-copy-text"
+                  onClick={() => void copyPrompt()}
+                >
+                  <Copy size={13} /> Sao chép
+                </button>
+              </div>
+              <p>{promptShown}</p>
+              <div className="clib-preview-prompt-foot">
+                {promptLong && (
+                  <button
+                    type="button"
+                    className="clib-preview-link-btn"
+                    onClick={() => setPromptExpanded((v) => !v)}
+                  >
+                    {promptExpanded ? 'Thu gọn' : 'Xem thêm'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="clib-preview-link-btn"
+                  onClick={reportIssue}
+                >
+                  <Flag size={12} /> Báo lỗi
+                </button>
+              </div>
+              {reportMsg && <p className="clib-preview-toast">{reportMsg}</p>}
             </div>
           )}
 
           <section className="clib-preview-info">
-            <h4>Thông tin</h4>
+            <h4>{isHomeVideo ? 'v-video info' : isHomeLayout ? 'v-image info' : 'Thông tin'}</h4>
             <dl>
               {model && (
                 <>
@@ -266,6 +382,12 @@ export default function ComposerLibraryPreviewModal({
                   <dd className="accent-green">{size}</dd>
                 </>
               )}
+              {item.duration && Number(item.duration) > 0 && kind === 'video' && (
+                <>
+                  <dt>Thời lượng</dt>
+                  <dd className="accent-cyan">{item.duration}s</dd>
+                </>
+              )}
               {ratio && (
                 <>
                   <dt>Tỷ lệ</dt>
@@ -279,7 +401,43 @@ export default function ComposerLibraryPreviewModal({
                 </>
               )}
             </dl>
+            {playUrl && (
+              <a
+                className="clib-preview-media-link"
+                href={playUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLink size={13} />
+                {kind === 'video' ? 'Xem video' : 'Xem ảnh'}
+              </a>
+            )}
           </section>
+
+          <section className="clib-preview-refs">
+            <h4>Ảnh tham chiếu</h4>
+            <div className="clib-preview-refs-grid">
+              {(refImages.length ? refImages : primaryRef ? [{ url: primaryRef }] : []).length > 0 ? (
+                (refImages.length ? refImages : primaryRef ? [{ url: primaryRef }] : []).map(
+                  (ref, i) => (
+                    <a
+                      key={`${ref.url}-${i}`}
+                      className="clib-preview-ref-thumb"
+                      href={ref.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <img src={ref.url} alt="" loading="lazy" />
+                    </a>
+                  ),
+                )
+              ) : (
+                <span className="clib-preview-ref-empty">Không có ảnh tham chiếu</span>
+              )}
+            </div>
+          </section>
+
+          {soonMsg && <p className="clib-preview-toast">{soonMsg}</p>}
 
           {upscaleOpen && isImage ? (
             <div className="clib-upscale-panel">
@@ -355,6 +513,99 @@ export default function ComposerLibraryPreviewModal({
                 </>
               )}
             </div>
+          ) : isHomeLayout ? (
+            <div className="clib-preview-actions-vmedia">
+              <button
+                type="button"
+                className="clib-preview-regenerate clib-preview-regenerate--gold"
+                disabled={!onRegenerate}
+                onClick={onRegenerate}
+              >
+                <RotateCcw size={16} />
+                Tạo lại
+              </button>
+              {isHomeVideo ? (
+                <>
+                  <button
+                    type="button"
+                    className="clib-preview-action-row"
+                    onClick={() => showSoon('Upscale Video')}
+                  >
+                    <Maximize2 size={16} />
+                    Upscale Video
+                  </button>
+                  <button
+                    type="button"
+                    className="clib-preview-action-row"
+                    onClick={() => showSoon('Cải thiện thiết kế')}
+                  >
+                    <Sparkles size={16} />
+                    Cải thiện thiết kế
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="clib-preview-action-row"
+                    onClick={() => {
+                      setUpscaleOpen(true);
+                      setUpscaleError('');
+                    }}
+                  >
+                    <Maximize2 size={16} />
+                    Upscale ảnh
+                  </button>
+                  <button
+                    type="button"
+                    className="clib-preview-action-row"
+                    onClick={() => showSoon('Cải thiện thiết kế')}
+                  >
+                    <Sparkles size={16} />
+                    Cải thiện thiết kế
+                  </button>
+                </>
+              )}
+              <div className="clib-preview-actions-grid">
+                <button
+                  type="button"
+                  className="clib-preview-action-tile"
+                  disabled={!onReuse && !onRegenerate}
+                  onClick={onReuse || onRegenerate}
+                >
+                  <Copy size={18} />
+                  <span>Dùng lại</span>
+                </button>
+                <button
+                  type="button"
+                  className="clib-preview-action-tile"
+                  onClick={() => void downloadMediaUrl(playUrl)}
+                >
+                  <Download size={18} />
+                  <span>Tải xuống</span>
+                </button>
+              </div>
+              <div className="clib-preview-actions-grid">
+                <button
+                  type="button"
+                  className="clib-preview-action-tile"
+                  disabled={!onEdit}
+                  onClick={onEdit}
+                >
+                  <Wand2 size={18} />
+                  <span>{isHomeVideo ? 'Edit Video' : 'Chỉnh sửa'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="clib-preview-action-tile danger"
+                  disabled={deleting || !onDelete}
+                  onClick={onDelete}
+                >
+                  <Trash2 size={18} />
+                  <span>{deleting ? 'Đang xóa…' : 'Xóa'}</span>
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="clib-preview-actions-v2">
               <button
@@ -389,7 +640,7 @@ export default function ComposerLibraryPreviewModal({
                 <button
                   type="button"
                   className="clib-preview-action-tile"
-                  onClick={() => void downloadMediaUrl(mediaUrl)}
+                  onClick={() => void downloadMediaUrl(playUrl)}
                 >
                   <Download size={18} />
                   <span>Tải xuống</span>
@@ -431,7 +682,7 @@ export default function ComposerLibraryPreviewModal({
 
         <div className="clib-preview-thumbs">
           {items.map((it, i) => {
-            const thumb = feedThumb(it);
+            const thumb = feedPosterUrl(it) || feedThumb(it);
             if (!thumb) return null;
             return (
               <button
@@ -440,10 +691,11 @@ export default function ComposerLibraryPreviewModal({
                 className={`clib-preview-thumb${i === index ? ' active' : ''}`}
                 onClick={() => onNavigate(i)}
               >
-                {kind === 'video' ? (
-                  <video src={thumb} muted preload="metadata" />
-                ) : (
-                  <img src={thumb} alt="" loading="lazy" />
+                <img src={thumb} alt="" loading="lazy" />
+                {it.type !== 'image' && (
+                  <span className="clib-preview-thumb-play" aria-hidden>
+                    ▶
+                  </span>
                 )}
               </button>
             );
