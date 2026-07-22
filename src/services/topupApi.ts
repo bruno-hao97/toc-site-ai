@@ -1,3 +1,5 @@
+import { apiUnavailableMessage, readJsonResponse } from './apiResponse';
+
 export interface TopupBankTransfer {
   accountName: string;
   bankName: string;
@@ -46,15 +48,9 @@ export interface CreditPackage {
 
 export async function fetchCreditPackages(): Promise<CreditPackage[]> {
   const res = await fetch('/api/platform/credit-packages.php');
-  const text = await res.text();
-  let raw: { success?: boolean; message?: string; data?: CreditPackage[] };
-  try {
-    raw = JSON.parse(text) as typeof raw;
-  } catch {
-    throw new Error(text || `HTTP ${res.status}`);
-  }
+  const raw = await readJsonResponse<{ success?: boolean; message?: string; data?: CreditPackage[] }>(res);
   if (!res.ok || !raw.success || !Array.isArray(raw.data)) {
-    throw new Error(raw.message || `HTTP ${res.status}`);
+    throw new Error(raw.message || apiUnavailableMessage(res.status));
   }
   return raw.data;
 }
@@ -66,16 +62,9 @@ export async function createTopupRequest(username: string, packageId: string): P
     body: JSON.stringify({ username, packageId }),
   });
 
-  const text = await res.text();
-  let raw: { success?: boolean; message?: string; data?: TopupPaymentResult };
-  try {
-    raw = JSON.parse(text) as typeof raw;
-  } catch {
-    throw new Error(text || `HTTP ${res.status}`);
-  }
-
+  const raw = await readJsonResponse<{ success?: boolean; message?: string; data?: TopupPaymentResult }>(res);
   if (!res.ok || !raw.success || !raw.data) {
-    throw new Error(raw.message || `HTTP ${res.status}`);
+    throw new Error(raw.message || apiUnavailableMessage(res.status));
   }
 
   return raw.data;
@@ -83,15 +72,9 @@ export async function createTopupRequest(username: string, packageId: string): P
 
 export async function fetchTopupOrder(orderCode: number): Promise<TopupOrder> {
   const res = await fetch(`/api/pay2s/topup-orders/${orderCode}`);
-  const text = await res.text();
-  let raw: { success?: boolean; message?: string; data?: TopupOrder };
-  try {
-    raw = JSON.parse(text) as typeof raw;
-  } catch {
-    throw new Error(text || `HTTP ${res.status}`);
-  }
+  const raw = await readJsonResponse<{ success?: boolean; message?: string; data?: TopupOrder }>(res);
   if (!res.ok || !raw.success || !raw.data) {
-    throw new Error(raw.message || `HTTP ${res.status}`);
+    throw new Error(raw.message || apiUnavailableMessage(res.status));
   }
   return raw.data;
 }

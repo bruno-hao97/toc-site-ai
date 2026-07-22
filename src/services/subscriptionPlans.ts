@@ -1,4 +1,5 @@
 import { loadAuth } from './authStore';
+import { apiUnavailableMessage, readJsonResponse } from './apiResponse';
 import { gommoDeviceFields } from './gommoDevice';
 import { PRICING_DOMAIN } from './settingsStore';
 import { GOMMO_AUTH_PATH } from './upstreamMe';
@@ -358,19 +359,13 @@ async function createLocalPay2sPayment(input: CreateSubscriptionPaymentInput): P
     }),
   });
 
-  const text = await res.text();
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    throw new Error(text || `HTTP ${res.status}`);
-  }
+  const raw = await readJsonResponse<unknown>(res);
 
   if (!res.ok) {
     const message =
       raw && typeof raw === 'object' && typeof (raw as Record<string, unknown>).message === 'string'
         ? String((raw as Record<string, unknown>).message)
-        : `HTTP ${res.status}`;
+        : apiUnavailableMessage(res.status);
     throw new Error(message);
   }
 
