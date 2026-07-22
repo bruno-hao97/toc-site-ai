@@ -3,6 +3,7 @@ import { ChevronDown, Loader2 } from 'lucide-react';
 import { isLoggedIn } from '../services/authStore';
 import { getJobClient } from '../services/platformJobClient';
 import type { GommoModel, JobType } from '../services/api';
+import { formatPriceVariant } from '../services/modelPricing';
 import type { CreditPackage } from '../services/topupApi';
 
 interface Props {
@@ -59,7 +60,7 @@ function priceRows(models: GommoModel[]): PriceRow[] {
       const original = Number(
         price.price_default || price.original_price || price.price_original || price.list_price || 0,
       );
-      const variant = [price.mode, price.resolution].filter(Boolean).join(' · ') || 'Mặc định';
+      const variant = formatPriceVariant(price);
       return [{
         key: `${name}-${modelIndex}-${priceIndex}`,
         modelName: name,

@@ -385,14 +385,59 @@ function gommo_fetch_models(string $type): array
 }
 
 /**
- * Giá theo mode + resolution — cùng logic Studio resolveModelPrice.
+ * Giá theo mode + resolution + duration — cùng logic Studio resolveModelPrice.
  *
  * @param array<string, mixed> $model
  */
-function resolve_model_price(array $model, string $mode, string $resolution): int
+function resolve_model_price(array $model, string $mode, string $resolution, string $duration = ''): int
 {
     $eq = static function (?string $a, ?string $b): bool {
         return strtolower((string) ($a ?? '')) === strtolower((string) ($b ?? ''));
+    };
+
+    $rowDim = static function (array $row, string $key): ?string {
+        if (!array_key_exists($key, $row)) {
+            return null;
+        }
+        $v = $row[$key];
+        if ($v === null || $v === '') {
+            return null;
+        }
+        return (string) $v;
+    };
+
+    $dimMatches = static function (array $row, string $key, string $value) use ($rowDim, $eq): bool {
+        $rowVal = $rowDim($row, $key);
+        if ($rowVal === null) {
+            return true;
+        }
+        if (trim($value) === '') {
+            return false;
+        }
+        return $eq($rowVal, $value);
+    };
+
+    $durationOk = static function (array $row, string $duration) use ($rowDim, $eq): bool {
+        $rowDuration = $rowDim($row, 'duration');
+        if ($rowDuration === null) {
+            return true;
+        }
+        if (trim($duration) === '') {
+            return false;
+        }
+        return $eq($rowDuration, $duration);
+    };
+
+    $findHit = static function (array $prices, callable $predicate) {
+        foreach ($prices as $p) {
+            if (!is_array($p)) {
+                continue;
+            }
+            if ($predicate($p)) {
+                return $p;
+            }
+        }
+        return null;
     };
 
     $base = isset($model['price']) ? (int) $model['price'] : 0;
@@ -401,66 +446,43 @@ function resolve_model_price(array $model, string $mode, string $resolution): in
         return max(0, $base);
     }
 
+    $predicates = [
+        static fn (array $p): bool => $durationOk($p, $duration)
+            && $dimMatches($p, 'mode', $mode)
+            && $dimMatches($p, 'resolution', $resolution)
+            && $dimMatches($p, 'duration', $duration),
+        static fn (array $p): bool => $durationOk($p, $duration)
+            && $dimMatches($p, 'mode', $mode)
+            && $rowDim($p, 'resolution') === null
+            && $dimMatches($p, 'duration', $duration),
+        static fn (array $p): bool => $durationOk($p, $duration)
+            && $rowDim($p, 'mode') === null
+            && $dimMatches($p, 'resolution', $resolution)
+            && $dimMatches($p, 'duration', $duration),
+        static fn (array $p): bool => $durationOk($p, $duration)
+            && $rowDim($p, 'mode') === null
+            && $rowDim($p, 'resolution') === null
+            && $dimMatches($p, 'duration', $duration),
+        static fn (array $p): bool => $durationOk($p, $duration)
+            && $eq($rowDim($p, 'mode'), $mode)
+            && $eq($rowDim($p, 'resolution'), $resolution),
+        static fn (array $p): bool => $durationOk($p, $duration)
+            && $rowDim($p, 'mode') === null
+            && $eq($rowDim($p, 'resolution'), $resolution),
+        static fn (array $p): bool => $durationOk($p, $duration)
+            && $rowDim($p, 'resolution') === null
+            && $eq($rowDim($p, 'mode'), $mode),
+        static fn (array $p): bool => $durationOk($p, $duration)
+            && $eq($rowDim($p, 'resolution'), $resolution),
+        static fn (array $p): bool => $durationOk($p, $duration)
+            && $eq($rowDim($p, 'mode'), $mode),
+    ];
+
     $hit = null;
-    foreach ($prices as $p) {
-        if (!is_array($p)) {
-            continue;
-        }
-        $pMode = isset($p['mode']) ? (string) $p['mode'] : null;
-        $pRes = isset($p['resolution']) ? (string) $p['resolution'] : null;
-        if ($eq($pMode, $mode) && $eq($pRes, $resolution)) {
-            $hit = $p;
+    foreach ($predicates as $predicate) {
+        $hit = $findHit($prices, $predicate);
+        if ($hit !== null) {
             break;
-        }
-    }
-    if ($hit === null) {
-        foreach ($prices as $p) {
-            if (!is_array($p)) {
-                continue;
-            }
-            $pMode = $p['mode'] ?? null;
-            $pRes = isset($p['resolution']) ? (string) $p['resolution'] : null;
-            if ($pMode === null && $eq($pRes, $resolution)) {
-                $hit = $p;
-                break;
-            }
-        }
-    }
-    if ($hit === null) {
-        foreach ($prices as $p) {
-            if (!is_array($p)) {
-                continue;
-            }
-            $pMode = isset($p['mode']) ? (string) $p['mode'] : null;
-            $pRes = $p['resolution'] ?? null;
-            if ($pRes === null && $eq($pMode, $mode)) {
-                $hit = $p;
-                break;
-            }
-        }
-    }
-    if ($hit === null) {
-        foreach ($prices as $p) {
-            if (!is_array($p)) {
-                continue;
-            }
-            $pRes = isset($p['resolution']) ? (string) $p['resolution'] : null;
-            if ($eq($pRes, $resolution)) {
-                $hit = $p;
-                break;
-            }
-        }
-    }
-    if ($hit === null) {
-        foreach ($prices as $p) {
-            if (!is_array($p)) {
-                continue;
-            }
-            $pMode = isset($p['mode']) ? (string) $p['mode'] : null;
-            if ($eq($pMode, $mode)) {
-                $hit = $p;
-                break;
-            }
         }
     }
 
@@ -486,6 +508,7 @@ function resolve_job_cost(string $type, string $modelId, array $fields): int
 {
     $mode = trim((string) ($fields['mode'] ?? ''));
     $resolution = trim((string) ($fields['resolution'] ?? ''));
+    $duration = trim((string) ($fields['duration'] ?? ''));
 
     try {
         $models = gommo_fetch_models($type);
@@ -498,7 +521,7 @@ function resolve_job_cost(string $type, string $modelId, array $fields): int
             if ($id === '' || $id !== $needle) {
                 continue;
             }
-            $price = resolve_model_price($model, $mode, $resolution);
+            $price = resolve_model_price($model, $mode, $resolution, $duration);
             if ($price > 0) {
                 return $price;
             }

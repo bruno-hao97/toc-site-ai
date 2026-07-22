@@ -119,7 +119,7 @@ if ($modelId === '') {
     json_out(400, ['success' => false, 'message' => 'Thiếu modelId']);
 }
 
-// Giá từ catalog Gommo (mode/resolution) — không tin costCredits từ client.
+// Giá từ catalog Gommo (mode/resolution/duration) — không tin costCredits từ client.
 $cost = resolve_job_cost($type, $modelId, $fields);
 if ($cost < 1) {
     json_out(400, ['success' => false, 'message' => 'Không xác định được giá model']);
@@ -150,6 +150,7 @@ try {
         'ratio' => isset($fields['ratio']) ? (string) $fields['ratio'] : null,
         'resolution' => isset($fields['resolution']) ? (string) $fields['resolution'] : null,
         'mode' => isset($fields['mode']) ? (string) $fields['mode'] : null,
+        'duration' => isset($fields['duration']) ? (string) $fields['duration'] : null,
     ];
     $meta = array_filter($meta, static function ($v) {
         return $v !== null && $v !== '';

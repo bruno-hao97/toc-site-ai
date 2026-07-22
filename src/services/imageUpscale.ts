@@ -5,6 +5,7 @@ import {
 } from './api';
 import { notifyCreditsUpdated } from './authStore';
 import { gommoDeviceFields } from './gommoDevice';
+import { resolveModelPrice } from './modelPricing';
 import { isModelAvailable, normalizeOptions } from './modelSchema';
 import { getJobClient } from './platformJobClient';
 import { createJobAndPoll, type PollProgress } from './polling';
@@ -35,8 +36,8 @@ export function resolveUpscalePrice(
   mode: string,
   resolution: string,
 ): number | undefined {
-  const row = model.prices?.find((p) => p.mode === mode && p.resolution === resolution);
-  if (row?.price != null) return row.price;
+  const fromTable = resolveModelPrice(model, mode, resolution);
+  if (fromTable > 0) return fromTable;
   const modeOpt = normalizeOptions(model.mode || model.modes).find((o) => o.value === mode);
   if (modeOpt?.price != null) return modeOpt.price;
   return model.price;

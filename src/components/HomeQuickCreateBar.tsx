@@ -34,7 +34,7 @@ import {
   uploadQuickMedia,
 } from '../services/quickCreate';
 import { notifyCreditsUpdated } from '../services/authStore';
-import { resolveModelPrice } from '../services/modelPricing';
+import { modelPriceRangeLabel, resolveModelPrice } from '../services/modelPricing';
 
 type QuickMenuId = 'chat' | 'script' | 'video' | 'image' | 'tts' | 'music' | 'audio' | 'apps';
 
@@ -182,10 +182,14 @@ export default function HomeQuickCreateBar() {
   const unitCost = useMemo(() => {
     if (!currentModel) return 0;
     return (
-      resolveModelPrice(currentModel, selections.mode || '', selections.resolution || '') ||
-      (currentModel.price ?? 0)
+      resolveModelPrice(
+        currentModel,
+        selections.mode || '',
+        selections.resolution || '',
+        selections.duration || '',
+      ) || (currentModel.price ?? 0)
     );
-  }, [currentModel, selections.mode, selections.resolution]);
+  }, [currentModel, selections.mode, selections.resolution, selections.duration]);
   const cost = unitCost * qty;
 
   useEffect(() => {
@@ -326,6 +330,7 @@ export default function HomeQuickCreateBar() {
     value: modelSlug(m),
     label: m.name || modelSlug(m),
     price: m.price,
+    description: modelPriceRangeLabel(m) || undefined,
   }));
 
   const showStoryboard = expanded && (type === 'video' || type === 'image');
@@ -502,7 +507,9 @@ export default function HomeQuickCreateBar() {
                   }}
                 >
                   <span>{o.label}</span>
-                  {o.price != null && <small>{o.price}</small>}
+                  {(o.description || o.price != null) && (
+                    <small>{o.description || o.price}</small>
+                  )}
                 </button>
               ))}
             </div>

@@ -264,8 +264,14 @@ export function AiGenNodeCard({
   }, [schema?.slug]);
 
   const creditCost = useMemo(
-    () => resolveWorkflowModelPrice(currentModel, data.mode || '', data.resolution || ''),
-    [currentModel, data.mode, data.resolution],
+    () =>
+      resolveWorkflowModelPrice(
+        currentModel,
+        data.mode || '',
+        data.resolution || '',
+        data.duration || '',
+      ),
+    [currentModel, data.mode, data.resolution, data.duration],
   );
   const creditBadge = formatCreditBadge(creditCost);
 

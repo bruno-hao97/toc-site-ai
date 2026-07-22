@@ -81,21 +81,92 @@ export function gommoModelId(model: JsonRecord): string {
   return '';
 }
 
-export function resolveModelPrice(model: JsonRecord, mode: string, resolution: string): number {
+type PriceRow = JsonRecord;
+
+function eqPrice(a?: string, b?: string): boolean {
+  return (a ?? '').toLowerCase() === (b ?? '').toLowerCase();
+}
+
+function rowDim(row: PriceRow, key: 'mode' | 'resolution' | 'duration'): string | null {
+  const v = row[key];
+  if (v == null || v === '') return null;
+  return String(v);
+}
+
+function dimMatches(row: PriceRow, key: 'mode' | 'resolution' | 'duration', value: string): boolean {
+  const rowVal = rowDim(row, key);
+  if (rowVal == null) return true;
+  if (!value.trim()) return false;
+  return eqPrice(rowVal, value);
+}
+
+function durationOk(row: PriceRow, duration: string): boolean {
+  const rowDuration = rowDim(row, 'duration');
+  if (rowDuration == null) return true;
+  if (!duration.trim()) return false;
+  return eqPrice(rowDuration, duration);
+}
+
+function findPriceRow(
+  prices: PriceRow[],
+  mode: string,
+  resolution: string,
+  duration: string,
+): PriceRow | null {
+  const predicates: Array<(p: PriceRow) => boolean> = [
+    (p) =>
+      durationOk(p, duration) &&
+      dimMatches(p, 'mode', mode) &&
+      dimMatches(p, 'resolution', resolution) &&
+      dimMatches(p, 'duration', duration),
+    (p) =>
+      durationOk(p, duration) &&
+      dimMatches(p, 'mode', mode) &&
+      rowDim(p, 'resolution') == null &&
+      dimMatches(p, 'duration', duration),
+    (p) =>
+      durationOk(p, duration) &&
+      rowDim(p, 'mode') == null &&
+      dimMatches(p, 'resolution', resolution) &&
+      dimMatches(p, 'duration', duration),
+    (p) =>
+      durationOk(p, duration) &&
+      rowDim(p, 'mode') == null &&
+      rowDim(p, 'resolution') == null &&
+      dimMatches(p, 'duration', duration),
+    (p) =>
+      durationOk(p, duration) &&
+      eqPrice(rowDim(p, 'mode') ?? undefined, mode) &&
+      eqPrice(rowDim(p, 'resolution') ?? undefined, resolution),
+    (p) =>
+      durationOk(p, duration) &&
+      rowDim(p, 'mode') == null &&
+      eqPrice(rowDim(p, 'resolution') ?? undefined, resolution),
+    (p) =>
+      durationOk(p, duration) &&
+      rowDim(p, 'resolution') == null &&
+      eqPrice(rowDim(p, 'mode') ?? undefined, mode),
+    (p) => durationOk(p, duration) && eqPrice(rowDim(p, 'resolution') ?? undefined, resolution),
+    (p) => durationOk(p, duration) && eqPrice(rowDim(p, 'mode') ?? undefined, mode),
+  ];
+
+  for (const pred of predicates) {
+    const hit = prices.find((p) => p && typeof p === 'object' && pred(p as PriceRow));
+    if (hit) return hit as PriceRow;
+  }
+  return null;
+}
+
+export function resolveModelPrice(
+  model: JsonRecord,
+  mode: string,
+  resolution: string,
+  duration = '',
+): number {
   const prices = model.prices;
   if (!Array.isArray(prices)) return 0;
   const base = Number(model.base_price ?? model.price ?? 0) || 0;
-  let hit: JsonRecord | null = null;
-  for (const row of prices) {
-    if (!row || typeof row !== 'object') continue;
-    const p = row as JsonRecord;
-    const pMode = String(p.mode ?? '').trim();
-    const pRes = String(p.resolution ?? '').trim();
-    if (mode && pMode && pMode !== mode) continue;
-    if (resolution && pRes && pRes !== resolution) continue;
-    hit = p;
-    if (mode && resolution) break;
-  }
+  const hit = findPriceRow(prices as PriceRow[], mode, resolution, duration);
   if (hit?.price != null) return Math.max(0, Number(hit.price) || 0);
   if (base > 0) return base;
   const first = prices[0];
@@ -114,6 +185,7 @@ export async function resolveJobCost(
 ): Promise<number> {
   const mode = String(fields.mode ?? '').trim();
   const resolution = String(fields.resolution ?? '').trim();
+  const duration = String(fields.duration ?? '').trim();
   try {
     const res = await fetch(`${bridgeBase}/job-models.php?type=${encodeURIComponent(type)}`, {
       headers: { Authorization: authHeader, Accept: 'application/json' },
@@ -129,7 +201,7 @@ export async function resolveJobCost(
       if (!model || typeof model !== 'object') continue;
       const row = model as JsonRecord;
       if (gommoModelId(row).toLowerCase() !== needle) continue;
-      const price = resolveModelPrice(row, mode, resolution);
+      const price = resolveModelPrice(row, mode, resolution, duration);
       if (price > 0) return price;
       break;
     }

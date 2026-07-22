@@ -343,6 +343,7 @@ export interface GommoModel {
   prices?: Array<{
     mode?: string;
     resolution?: string;
+    duration?: string | number;
     /** Giá sale / đơn vị (vd. credit/s sau giảm). */
     price?: number;
     /** Giá niêm yết / đơn vị trước giảm. */

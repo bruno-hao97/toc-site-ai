@@ -79,7 +79,7 @@ import {
   type ModelOption,
   type ModelSchema,
 } from '../services/modelSchema';
-import { resolveModelPrice } from '../services/modelPricing';
+import { modelPriceRangeLabel, resolveModelPrice } from '../services/modelPricing';
 import { createJobAndPoll, type PollProgress } from '../services/polling';
 import {
   formatCreatingProgressMessage,
@@ -231,26 +231,6 @@ function modelProvider(m: GommoModel): string {
 
 function providerSubtitle(provider: string): string {
   return SERVER_SUBTITLES[provider] ?? 'Professional AI generation';
-}
-
-function formatPrice(price: number): string {
-  return price.toLocaleString('vi-VN');
-}
-
-// Khoảng giá min–max của model: ưu tiên mảng prices[] (theo mode/resolution),
-// fallback về price gốc. Trả về chuỗi "min-max" hoặc "x" nếu chỉ 1 mức.
-function modelPriceLabel(m: GommoModel): string {
-  const values: number[] = [];
-  if (Array.isArray(m.prices)) {
-    for (const p of m.prices) {
-      if (typeof p?.price === 'number' && p.price > 0) values.push(p.price);
-    }
-  }
-  if (values.length === 0 && typeof m.price === 'number') values.push(m.price);
-  if (values.length === 0) return '';
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  return min === max ? formatPrice(min) : `${formatPrice(min)}-${formatPrice(max)}`;
 }
 
 function isModelMaintenance(m: GommoModel): boolean {
@@ -484,7 +464,7 @@ function ModelPicker({
   const renderItem = (m: GommoModel) => {
     const slug = modelSlug(m);
     const active = multi ? multiValues.includes(slug) : slug === value;
-    const priceLabel = motionPricing ? motionModelPriceLabel(m) : modelPriceLabel(m);
+    const priceLabel = motionPricing ? motionModelPriceLabel(m) : modelPriceRangeLabel(m);
     const maint = isModelMaintenance(m);
     return (
       <button
@@ -564,7 +544,7 @@ function ModelPicker({
     ? motionPricing
       ? motionRateLabel(current, selectionMode, selectionResolution) ||
         motionModelPriceLabel(current)
-      : modelPriceLabel(current)
+      : modelPriceRangeLabel(current)
     : '';
   const multiLabel = useMemo(() => {
     if (!multi || multiValues.length === 0) return '';
@@ -847,8 +827,17 @@ export default function StudioPage({
     [selections.shots],
   );
   const scriptCount = multiShotEnabled && schema?.fields.multiShots ? activeShots.length : 1;
-  const modelPrice = currentModel?.price ?? 0;
-  const unitCost = modelPrice;
+  // Giá đơn vị theo config hiện tại (mode/resolution/duration) — không dùng model.price thô.
+  const unitCost = useMemo(
+    () =>
+      resolveModelPrice(
+        currentModel,
+        selections.mode || '',
+        selections.resolution || '',
+        selections.duration || '',
+      ) || (currentModel?.price ?? 0),
+    [currentModel, selections.mode, selections.resolution, selections.duration],
+  );
   const motionRatePerSec = useMemo(
     () =>
       isMotionView && currentModel
@@ -902,12 +891,11 @@ export default function StudioPage({
   );
   const motionGrossTotal = motionQuote.grossTotal;
   const motionTotalCost = motionQuote.finalTotal;
-  // Composer hiển thị giá động theo mode + resolution đang chọn (khớp 79AI);
-  // fallback về unitCost nếu model chưa có bảng giá.
+  // Composer: Motion = rate/s; còn lại = giá theo config (đã gồm duration).
   const composerCost = useMemo(() => {
     if (isMotionView) return motionRatePerSec;
-    return resolveModelPrice(currentModel, selections.mode || '', selections.resolution || '') || unitCost;
-  }, [isMotionView, motionRatePerSec, currentModel, selections.mode, selections.resolution, unitCost]);
+    return unitCost;
+  }, [isMotionView, motionRatePerSec, unitCost]);
   const submitQty = composerMode === 'multi' ? 1 : qty;
   const submitTotalCost = useMemo(() => {
     if (isMotionView) {
@@ -917,9 +905,18 @@ export default function StudioPage({
       return selectedSlugs.reduce((sum, slug) => {
         const m = pickerModels.find((x) => modelSlug(x) === slug);
         if (!m) return sum;
-        return sum + (resolveModelPrice(m, selections.mode || '', selections.resolution || '') || unitCost);
+        return (
+          sum +
+          (resolveModelPrice(
+            m,
+            selections.mode || '',
+            selections.resolution || '',
+            selections.duration || '',
+          ) || (m.price ?? 0))
+        );
       }, 0);
     }
+    // Multi-shot video: catalog tính theo tổng duration (không nhân số cảnh).
     return (composerCost || 0) * submitQty;
   }, [
     isMotionView,
@@ -931,7 +928,7 @@ export default function StudioPage({
     composerCost,
     selections.mode,
     selections.resolution,
-    unitCost,
+    selections.duration,
   ]);
 
   function switchComposerMode(mode: ComposerMode) {
@@ -3427,7 +3424,13 @@ export default function StudioPage({
         <p className="lead">
           Gọi thẳng <strong>v2.api.gommo.net</strong> — credit upstream:{' '}
           <strong>{credits.toLocaleString('vi-VN')}</strong>
-          {unitCost > 0 && <> · Chi phí ~{unitCost} credit</>}
+          {isMotionView
+            ? motionRatePerSec > 0 && (
+                <> · Chi phí ~{motionRatePerSec.toLocaleString('vi-VN')}/s</>
+              )
+            : submitTotalCost > 0 && (
+                <> · Chi phí ~{submitTotalCost.toLocaleString('vi-VN')} credit</>
+              )}
         </p>
       </div>
 
