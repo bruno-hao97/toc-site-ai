@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Download, Eye, MoreVertical, Send, Trash2 } from 'lucide-react';
+import { Download, Eye, MoreVertical, Play, Send, Trash2 } from 'lucide-react';
 import ComposerSelectCircle from './ComposerSelectCircle';
 import { feedMediaUrl, feedPosterUrl, feedThumb, type FeedItem } from '../services/feedApi';
 import {
@@ -87,6 +87,11 @@ export default function ComposerLibraryItem({
           )
         ) : (
           <span className="clib-placeholder" />
+        )}
+        {isVideo && (
+          <span className="clib-item-play" aria-hidden>
+            <Play size={18} fill="currentColor" strokeWidth={0} />
+          </span>
         )}
       </div>
 

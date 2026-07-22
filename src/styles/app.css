@@ -6774,6 +6774,30 @@ body.qc-dock-active .quick-chat-fab {
   display: block;
 }
 
+/* Nút play giữa thumbnail — giống vmedia thư viện video */
+.clib-item-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.92);
+  background: rgba(0, 0, 0, 0.18);
+  color: #fff;
+  pointer-events: none;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+}
+
+.clib-item-play svg {
+  margin-left: 2px; /* căn tam giác play nhìn cân hơn trong vòng tròn */
+}
+
 .clib-placeholder {
   display: block;
   width: 100%;
