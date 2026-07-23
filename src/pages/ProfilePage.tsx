@@ -253,7 +253,7 @@ export default function ProfilePage() {
               accent="#4ADE80"
               icon={Zap}
               value={credits.toLocaleString('vi-VN')}
-              label={isAdminVmedia ? 'Credits VMedia khả dụng' : 'Credits khả dụng'}
+              label={isAdminVmedia ? 'Credits Pro.agi.vn khả dụng' : 'Credits khả dụng'}
               badge="Live"
             />
             <StatCard

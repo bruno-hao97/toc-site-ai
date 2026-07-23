@@ -61,7 +61,7 @@ export default function WalletPage() {
         <h1>Ví credit</h1>
         <p className="lead">
           Số dư: <strong>{balance.toLocaleString('vi-VN')} credit</strong>
-          {isAdminVmedia && <> (VMedia)</>}
+          {isAdminVmedia && <> (Pro.agi.vn)</>}
           <> · Đã tiêu: <strong>{consumed.toLocaleString('vi-VN')} credit</strong></>
         </p>
       </div>

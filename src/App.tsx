@@ -142,7 +142,7 @@ function AppHeader() {
               </Link>
               <div className="header-balance">
                 <span className="header-balance-label">
-                  {isAdmin && isAdminVmedia ? 'VMedia' : t('header.balance')}
+                  {isAdmin && isAdminVmedia ? 'Pro.agi.vn' : t('header.balance')}
                 </span>
                 <span className="header-credit-pill">
                   {displayCredits.toLocaleString('vi-VN')}

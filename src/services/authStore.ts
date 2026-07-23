@@ -36,6 +36,22 @@ export interface DisplayUser {
   username: string | null;
 }
 
+function safeTrim(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function safeString(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+  if (value == null || typeof value === 'object') return null;
+  const trimmed = String(value).trim();
+  return trimmed || null;
+}
+
 function pickProjectId(id?: string | null): string | null {
   const trimmed = id?.trim();
   if (!trimmed || trimmed === DEFAULT_PROJECT_ID) return null;
@@ -152,20 +168,21 @@ export function getGommoClient(): GommoClient {
 export function getDisplayUser(): DisplayUser {
   const auth = loadAuth();
   if (auth?.user) {
+    const email = safeTrim(auth.user.email) || '';
     return {
-      name: auth.user.name?.trim() || null,
-      email: auth.user.email?.trim() || '',
+      name: safeTrim(auth.user.name),
+      email,
       avatar: null,
-      username: auth.user.email?.split('@')[0] || null,
+      username: email.split('@')[0] || null,
     };
   }
   const u = auth?.upstream_me?.userInfo;
   if (u) {
     return {
-      name: u.name?.trim() || u.username?.trim() || null,
-      email: u.email?.trim() || '',
-      avatar: u.avatar || null,
-      username: u.username || null,
+      name: safeTrim(u.name) || safeTrim(u.username),
+      email: safeTrim(u.email) || '',
+      avatar: safeString(u.avatar),
+      username: safeTrim(u.username),
     };
   }
   return { name: null, email: '', avatar: null, username: null };

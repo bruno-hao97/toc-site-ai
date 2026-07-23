@@ -667,7 +667,7 @@ function MusicNode({ id, data }: NodeProps<WFNode>) {
         <textarea
           className="wf-gen-prompt nodrag"
           value={data.prompt || ''}
-          placeholder="Mô tả bản nhạc (hoặc nối từ node text)"
+          placeholder="Phong cách nhạc (VD: upbeat electronic dance)"
           onChange={(e) => update({ prompt: e.target.value })}
         />
         <NodeLoadingResult
@@ -3028,6 +3028,25 @@ function Flow() {
 
           if (type === 'tts') {
             selections.text = node.data.text || promptWire || upText || node.data.prompt || '';
+          } else if (type === 'music') {
+            // VMedia: styles = phong cách; không có lyrics → instrumental (omit prompt).
+            const styleText = String(
+              node.data.style || promptText || 'instrumental pop',
+            ).trim();
+            selections.style = styleText;
+            selections.name = String(node.data.name || styleText.slice(0, 60) || 'Workflow track');
+            const lyrics = node.data.lyrics
+              ? String(node.data.lyrics)
+              : node.data.prompt && node.data.style
+                ? promptText
+                : '';
+            if (lyrics.trim()) {
+              selections.prompt = lyrics.trim();
+              selections.instrumental = false;
+            } else {
+              selections.instrumental = true;
+              delete selections.prompt;
+            }
           } else {
             selections.prompt = promptText;
           }

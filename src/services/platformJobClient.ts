@@ -36,7 +36,13 @@ export class PlatformJobClient {
     try {
       parsed = JSON.parse(text) as T & { success?: boolean; message?: string };
     } catch {
-      throw new Error(text || `HTTP ${res.status}`);
+      const trimmed = text.trimStart();
+      if (trimmed.startsWith('<!') || trimmed.startsWith('<html')) {
+        throw new Error(
+          `Máy chủ trả HTML thay vì JSON (HTTP ${res.status}${res.status === 403 ? ' Forbidden' : ''}). Kiểm tra đăng nhập / bridge / WAF.`,
+        );
+      }
+      throw new Error(text.slice(0, 200) || `HTTP ${res.status}`);
     }
     if (!res.ok || parsed.success === false) {
       const errMsg = (parsed as { message?: string }).message || `HTTP ${res.status}`;
@@ -73,7 +79,13 @@ export class PlatformJobClient {
     try {
       parsed = JSON.parse(text) as typeof parsed;
     } catch {
-      throw new Error(text || `HTTP ${res.status}`);
+      const trimmed = text.trimStart();
+      if (trimmed.startsWith('<!') || trimmed.startsWith('<html')) {
+        throw new Error(
+          `Máy chủ trả HTML thay vì JSON (HTTP ${res.status}${res.status === 403 ? ' Forbidden' : ''}). Kiểm tra đăng nhập / bridge / WAF.`,
+        );
+      }
+      throw new Error(text.slice(0, 200) || `HTTP ${res.status}`);
     }
     if (!res.ok || !parsed.success) {
       throw new Error(parsed.message || 'Upload thất bại');

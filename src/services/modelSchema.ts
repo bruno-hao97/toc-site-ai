@@ -3,6 +3,7 @@ import { DEFAULT_DOMAIN } from './settingsStore';
 import { POLL_MEDIA } from './api';
 import type { ComposerShot } from './composerShots';
 import { buildMultiShotPayload, getMultiShotConfig } from './composerShots';
+import { gommoDeviceFields } from './gommoDevice';
 
 export interface ModelOption {
   value: string;
@@ -34,6 +35,7 @@ export interface ModelSchema {
     prompt: boolean;
     text: boolean;
     musicName: boolean;
+    musicStyle: boolean;
     ratio: boolean;
     mode: boolean;
     resolution: boolean;
@@ -61,6 +63,10 @@ export interface JobSelections {
   prompt?: string;
   text?: string;
   name?: string;
+  /** Suno/VMedia: phong cách nhạc → gửi lên API dưới key `styles` (≥ 3 ký tự). */
+  style?: string;
+  /** Không lời — omit `prompt` như VMedia khi bật. */
+  instrumental?: boolean;
   gender?: string;
   ratio?: string;
   mode?: string;
@@ -204,9 +210,11 @@ export function analyzeModel(model: GommoModel, jobType: JobType): ModelSchema {
       withReference: Boolean(model.withReference) || refLimit > 0,
     },
     fields: {
+      // Music: prompt = lời bài hát; style = phong cách (riêng field).
       prompt: !['tts'].includes(jobType),
       text: jobType === 'tts',
       musicName: jobType === 'music',
+      musicStyle: jobType === 'music',
       ratio: ratios.length > 0,
       mode: modes.length > 0,
       resolution: resolutions.length > 0,
@@ -241,6 +249,8 @@ export function buildJobPayload(
   const payload: Record<string, unknown> = {
     domain: domain || DEFAULT_DOMAIN,
     project_id: projectId || 'default',
+    language: 'VI',
+    ...gommoDeviceFields(),
   };
 
   if (!schema.available) {
@@ -252,7 +262,24 @@ export function buildJobPayload(
 
   if (jobType === 'music') {
     if (selections.name) payload.name = selections.name;
-    if (selections.prompt) payload.prompt = selections.prompt;
+    // VMedia form: `styles` = phong cách; `prompt` = lời (omit khi Không lời).
+    const style = (selections.style || '').trim();
+    const lyrics = (selections.prompt || '').trim();
+    const styleValue = style || (!selections.instrumental ? lyrics : '');
+    if (styleValue) {
+      payload.styles = styleValue;
+      // Alias phòng upstream cũ / bridge đọc key khác.
+      payload.style = styleValue;
+      payload.tags = styleValue;
+    }
+    if (selections.instrumental) {
+      delete payload.prompt;
+    } else if (style && lyrics) {
+      payload.prompt = lyrics;
+    } else if (!style && lyrics) {
+      // Legacy: chỉ có prompt → đã map sang styles, không gửi lại làm lời.
+      delete payload.prompt;
+    }
     if (selections.gender != null) payload.gender = selections.gender;
   }
 

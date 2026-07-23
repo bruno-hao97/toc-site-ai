@@ -106,7 +106,7 @@ function MineCard({ item, onOpen }: { item: FeedItem; onOpen: () => void }) {
     if (!url) return;
     if (navigator.share) {
       try {
-        await navigator.share({ url, title: model || 'VMedia' });
+        await navigator.share({ url, title: model || 'Pro.agi.vn' });
         return;
       } catch {
         // fall through

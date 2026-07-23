@@ -147,7 +147,7 @@ export default function UserMenuDropdown({ credits, isAdmin = false, onCreditsRe
           >
             <span className="user-menu-balance-left">
               <Wallet {...ICON} />
-              {isAdmin ? 'Số dư VMedia' : 'Số dư'}
+              {isAdmin ? 'Số dư Pro.agi.vn' : 'Số dư'}
             </span>
             <strong>{credits.toLocaleString('vi-VN')}</strong>
           </button>

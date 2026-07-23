@@ -296,9 +296,11 @@ export default function HomeQuickCreateBar() {
 
     const sel = normalizeComponentSelections({
       ...selections,
-      prompt: type === 'tts' ? selections.prompt : text,
+      prompt: type === 'tts' ? selections.prompt : type === 'music' ? '' : text,
       text: type === 'tts' ? text : selections.text,
       name: type === 'music' ? text.slice(0, 60) || 'Quick track' : selections.name,
+      style: type === 'music' ? text || 'instrumental pop' : selections.style,
+      instrumental: type === 'music' ? true : selections.instrumental,
       ...(refs.length ? { subjects: refs } : {}),
     });
 

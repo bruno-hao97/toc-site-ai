@@ -23,6 +23,7 @@ import {
   Image as ImageIcon,
   Maximize2,
   Monitor,
+  Music2,
   PersonStanding,
   Plus,
   Proportions,
@@ -47,6 +48,7 @@ import ComposerLibraryPreviewModal, {
   type ComposerPreviewHandlers,
 } from '../components/ComposerLibraryPreviewModal';
 import ComposerSelectCircle from '../components/ComposerSelectCircle';
+import MusicTrackList, { type MusicTrackItem } from '../components/MusicTrackList';
 import UrlField from '../components/UrlField';
 import {
   defaultSelectionsForType,
@@ -975,6 +977,12 @@ export default function StudioPage({
   }, [isMotionView, isEditView, isImageComposer, isMusicComposer, composerMode]);
 
   useEffect(() => {
+    if (isMusicComposer && mainTab === 'history') {
+      setMainTab('folder');
+    }
+  }, [isMusicComposer, mainTab]);
+
+  useEffect(() => {
     if (!isMotionView || !motionVideoUrl) {
       setMotionVideoDuration(0);
       setMotionDurationLoading(false);
@@ -1167,6 +1175,7 @@ export default function StudioPage({
           prompt: prev.prompt || defaults.prompt,
           text: prev.text || defaults.text,
           name: prev.name || defaults.name,
+          style: prev.style || defaults.style,
           ...(prev.images?.length ? { images: prev.images } : {}),
         }),
       );
@@ -1332,6 +1341,14 @@ export default function StudioPage({
       }
       if (vidC > limits.video) {
         setError(`Quá nhiều video tham chiếu (tối đa ${limits.video}).`);
+        return;
+      }
+    }
+
+    if (isMusicComposer) {
+      const style = (selections.style || '').trim();
+      if (style.length < 3) {
+        setError(t('composer.musicStyleTooShort'));
         return;
       }
     }
@@ -1677,11 +1694,13 @@ export default function StudioPage({
   }, [mainTab, composerResults]);
 
   const toolbarCount =
-    mainTab === 'folder'
-      ? libraryCount
-      : mainTab === 'history'
-        ? historyCount
-        : displayedResults.length;
+    isMusicComposer && mainTab === 'folder'
+      ? composerResults.length
+      : mainTab === 'folder'
+        ? libraryCount
+        : mainTab === 'history'
+          ? historyCount
+          : displayedResults.length;
 
   const groupedResults = useMemo(() => {
     const map = new Map<string, HistoryEntry[]>();
@@ -2124,7 +2143,7 @@ export default function StudioPage({
   if (layout === 'composer') {
     return (
       <div
-        className="studio-composer"
+        className={`studio-composer${isMusicComposer ? ' studio-composer--music' : ''}`}
         ref={composerRef}
         style={{ gridTemplateColumns: `${sideWidth}px 6px 1fr` }}
       >
@@ -2163,7 +2182,16 @@ export default function StudioPage({
               <ChevronLeft size={16} />
             </button>
             <span className="composer-title">
-              {t('composer.create', { type: typeLabel() })}
+              {isMusicComposer ? (
+                <>
+                  <span className="composer-title-icon" aria-hidden>
+                    <Music2 size={15} />
+                  </span>
+                  {t('composer.music.create')}
+                </>
+              ) : (
+                t('composer.create', { type: typeLabel() })
+              )}
             </span>
           </div>
 
@@ -2607,6 +2635,63 @@ export default function StudioPage({
             </div>
           )}
 
+          {schema?.fields.musicStyle && (
+            <div className="composer-field">
+              <div className="composer-label-row">
+                <span className="composer-label">{t('composer.musicStyle')}</span>
+                <div className="composer-desc-tools">
+                  <button
+                    type="button"
+                    aria-label={t('composer.clearPrompt')}
+                    onClick={() => updateSelection('style', '')}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={t('composer.paste')}
+                    onClick={async () => {
+                      try {
+                        const text = await navigator.clipboard.readText();
+                        if (text) updateSelection('style', text);
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                  >
+                    <Clipboard size={14} />
+                  </button>
+                </div>
+              </div>
+              <textarea
+                className="composer-textarea"
+                rows={3}
+                placeholder={t('composer.musicStylePlaceholder')}
+                value={selections.style || ''}
+                onChange={(e) => updateSelection('style', e.target.value)}
+              />
+            </div>
+          )}
+
+          {isMusicComposer && (
+            <label className="composer-switch-row">
+              <span className="composer-switch-text">
+                <span>
+                  <strong>{t('composer.musicInstrumental')}</strong>
+                  <small>{t('composer.musicInstrumentalHint')}</small>
+                </span>
+              </span>
+              <span className={`composer-switch ${selections.instrumental ? 'on' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(selections.instrumental)}
+                  onChange={(e) => updateSelection('instrumental', e.target.checked)}
+                />
+                <span className="composer-switch-knob" />
+              </span>
+            </label>
+          )}
+
           {composerMode === 'ai' && schema?.fields.prompt && (
             <div className="composer-ai-panel">
               <div className="composer-label-row">
@@ -2875,7 +2960,9 @@ export default function StudioPage({
             </div>
           )}
 
-          {schema?.fields.prompt && !(multiShotEnabled && schema.fields.multiShots) && (
+          {schema?.fields.prompt &&
+            !(multiShotEnabled && schema.fields.multiShots) &&
+            !(isMusicComposer && selections.instrumental) && (
             <div className="composer-field">
               <div className="composer-label-row">
                 <span className="composer-label composer-prompt-label">
@@ -2888,7 +2975,7 @@ export default function StudioPage({
                       </span>
                     </>
                   ) : schema.fields.musicName ? (
-                    t('composer.musicStyle')
+                    t('composer.musicLyrics')
                   ) : (
                     t('composer.prompt')
                   )}
@@ -2940,7 +3027,7 @@ export default function StudioPage({
                   multiPrompt && composerMode === 'auto'
                     ? 'Prompt 1\n=====\nPrompt 2\n=====\nPrompt 3'
                     : schema.fields.musicName
-                      ? 'Mô tả phong cách nhạc…'
+                      ? t('composer.musicLyricsPlaceholder')
                       : 'Mô tả nội dung của bạn…'
                 }
                 value={selections.prompt || ''}
@@ -3052,10 +3139,12 @@ export default function StudioPage({
             disabled={submitting || !schema}
             onClick={(e) => void handleSubmit(e as unknown as FormEvent)}
           >
-            <Wand2 size={16} />
+            {isMusicComposer ? <Music2 size={16} /> : <Wand2 size={16} />}
             {submitting
               ? t('composer.submitting')
-              : t('composer.submit', { type: typeLabel() })}
+              : isMusicComposer
+                ? t('composer.music.create')
+                : t('composer.submit', { type: typeLabel() })}
           </button>
         </aside>
 
@@ -3070,11 +3159,17 @@ export default function StudioPage({
         <section className="composer-main">
           <div className="composer-toolbar">
             <div className="composer-toolbar-tabs">
-              {([
-                ['current', t('composer.gallery.current')],
-                ['history', t('composer.gallery.history')],
-                ['folder', t('composer.gallery.folder')],
-              ] as const).map(([key, label]) => (
+              {(isMusicComposer
+                ? ([
+                    ['current', t('composer.gallery.current')],
+                    ['folder', t('composer.gallery.folder')],
+                  ] as const)
+                : ([
+                    ['current', t('composer.gallery.current')],
+                    ['history', t('composer.gallery.history')],
+                    ['folder', t('composer.gallery.folder')],
+                  ] as const)
+              ).map(([key, label]) => (
                 <button
                   key={key}
                   type="button"
@@ -3153,7 +3248,52 @@ export default function StudioPage({
             </div>
           </div>
 
-          {mainTab === 'history' ? (
+          {isMusicComposer ? (
+            (() => {
+              const pendingItems: MusicTrackItem[] =
+                mainTab === 'current'
+                  ? pendingJobs.map((p) => ({
+                      id: p.id,
+                      title: p.prompt || selections.name || 'Đang tạo…',
+                      status: p.status === 'failed' ? 'failed' : 'processing',
+                      progress: p.progress,
+                    }))
+                  : [];
+              const source =
+                mainTab === 'folder' ? composerResults : displayedResults;
+              const doneItems: MusicTrackItem[] = source.map((e) => ({
+                id: e.id,
+                title: e.prompt || e.modelName || 'Bản nhạc',
+                modelLabel: e.modelName || e.modelSlug,
+                createdAt: e.createdAt,
+                resultUrl: e.resultUrl,
+                status: 'success',
+              }));
+              const items = [...pendingItems, ...doneItems];
+              return (
+                <MusicTrackList
+                  items={items}
+                  emptyText={
+                    mainTab === 'folder'
+                      ? 'Chưa có bài nào trong thư viện nhạc.'
+                      : t('composer.gallery.empty', { type: typeLabel() })
+                  }
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelect}
+                  onReuse={(id) => {
+                    const entry = composerResults.find((e) => e.id === id);
+                    if (entry) applyReuse(entry);
+                  }}
+                  onDelete={(id) => {
+                    removeHistoryEntry(id);
+                    setHistoryTick((n) => n + 1);
+                    clearSelection();
+                  }}
+                  onOpen={(url) => window.open(url, '_blank', 'noopener,noreferrer')}
+                />
+              );
+            })()
+          ) : mainTab === 'history' ? (
             <ComposerHistory
               jobType={jobType}
               zoom={zoom}
@@ -3494,7 +3634,7 @@ export default function StudioPage({
             <p className="muted">Chọn model.</p>
           ) : (
             <form onSubmit={handleSubmit} className="form">
-              {schema.fields.prompt && (
+              {schema.fields.prompt && !schema.fields.musicName && (
                 <label className="field">
                   <span className="label">Prompt</span>
                   <textarea
@@ -3520,6 +3660,37 @@ export default function StudioPage({
                   <input
                     value={selections.name || ''}
                     onChange={(e) => updateSelection('name', e.target.value)}
+                  />
+                </label>
+              )}
+              {schema.fields.musicStyle && (
+                <label className="field">
+                  <span className="label">Phong cách (styles)</span>
+                  <textarea
+                    rows={2}
+                    value={selections.style || ''}
+                    onChange={(e) => updateSelection('style', e.target.value)}
+                    placeholder="VD: upbeat electronic dance"
+                  />
+                </label>
+              )}
+              {schema.fields.musicName && (
+                <label className="field" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(selections.instrumental)}
+                    onChange={(e) => updateSelection('instrumental', e.target.checked)}
+                  />
+                  <span className="label" style={{ margin: 0 }}>Không lời (instrumental)</span>
+                </label>
+              )}
+              {schema.fields.musicName && !selections.instrumental && (
+                <label className="field">
+                  <span className="label">Lời bài hát (prompt)</span>
+                  <textarea
+                    rows={3}
+                    value={selections.prompt || ''}
+                    onChange={(e) => updateSelection('prompt', e.target.value)}
                   />
                 </label>
               )}

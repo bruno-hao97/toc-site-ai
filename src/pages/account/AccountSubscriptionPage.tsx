@@ -18,7 +18,7 @@ export default function AccountSubscriptionPage() {
           </span>
         </div>
         <div className="account-detail-row-inline">
-          <span>{isAdminVmedia ? 'Credits VMedia hiện tại' : 'Credits hiện tại'}</span>
+          <span>{isAdminVmedia ? 'Credits Pro.agi.vn hiện tại' : 'Credits hiện tại'}</span>
           <strong>{credits.toLocaleString('vi-VN')}</strong>
         </div>
         <Link

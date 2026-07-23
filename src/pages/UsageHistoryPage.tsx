@@ -321,7 +321,7 @@ export default function UsageHistoryPage() {
           <span className="uh-card-sub">bản ghi</span>
         </div>
         <div className="uh-card">
-          <span className="uh-card-label">{isAdminVmedia ? 'Số dư VMedia' : 'Số dư credit'}</span>
+          <span className="uh-card-label">{isAdminVmedia ? 'Số dư Pro.agi.vn' : 'Số dư credit'}</span>
           <span className="uh-card-value accent">{displayCredits.toLocaleString('vi-VN')}</span>
           <span className="uh-card-sub">khả dụng</span>
         </div>

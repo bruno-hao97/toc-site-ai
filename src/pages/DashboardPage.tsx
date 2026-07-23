@@ -228,7 +228,7 @@ export default function DashboardPage() {
           <div className="kpi-grid">
             <div className="kpi-card panel">
               <span className="kpi-label">
-                {isAdminVmedia ? 'Số dư VMedia' : t('dashboard.kpi.balance')}
+                {isAdminVmedia ? 'Số dư Pro.agi.vn' : t('dashboard.kpi.balance')}
               </span>
               <span className="kpi-value">{displayBalance.toLocaleString(numberLocale)}</span>
             </div>
