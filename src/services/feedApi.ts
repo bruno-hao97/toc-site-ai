@@ -1,5 +1,5 @@
 import { GOMMO_AUTH_BASE, GOMMO_AUTH_PATH, UpstreamMeError } from './upstreamMe';
-import { clearAuth, loadAuth, resolveProjectId } from './authStore';
+import { clearAuth, isAdminUser, loadAuth, resolveProjectId } from './authStore';
 import { GOMMO_CHAT_CONFIG } from './gommoChatConfig';
 import { buildDeviceInfo } from './audioVoices';
 import { usesPlatformJobs } from './platformJobClient';
@@ -395,6 +395,48 @@ export async function fetchMyImages(params: FetchMineParams = {}): Promise<MineP
   return { items, nextAfterId: parsed.next_after_id ?? last?.id_base ?? '' };
 }
 
+interface PlatformJobListItem {
+  id: string;
+  providerJobId?: string | null;
+  jobType: string;
+  modelId: string;
+  status: string;
+  resultUrl?: string | null;
+  prompt?: string | null;
+  ratio?: string | null;
+  resolution?: string | null;
+  mode?: string | null;
+  costCredits?: number;
+  createdTime?: number | null;
+}
+
+function platformJobToFeedItem(job: PlatformJobListItem): FeedItem {
+  const url = (job.resultUrl || '').trim();
+  const feedType = job.jobType === 'video' ? 'video' : 'image';
+  const status = (job.status || '').trim() || (url ? 'FINISH' : 'processing');
+  return {
+    id_base: job.id,
+    type: feedType,
+    status,
+    prompt: job.prompt || undefined,
+    model: job.modelId,
+    ratio: job.ratio || undefined,
+    resolution: job.resolution || undefined,
+    mode: job.mode || undefined,
+    thumbnail_url: url || undefined,
+    download_url: url || undefined,
+    created_time: job.createdTime ?? undefined,
+    credit_fee: typeof job.costCredits === 'number' ? job.costCredits : undefined,
+    resolutions: url
+      ? [{ type: feedType, status: 'FINISH', url, name: job.resolution || undefined }]
+      : undefined,
+  };
+}
+
+/**
+ * User thường → chỉ job trong DB theo user_id (job-list).
+ * Admin → toàn bộ thư viện merchant Gommo (mine-media).
+ */
 async function fetchPlatformMine(
   type: 'image' | 'video',
   params: FetchMineParams,
@@ -402,6 +444,16 @@ async function fetchPlatformMine(
   const { limit = 30, afterId = '' } = params;
   const q: Record<string, string> = { type, limit: String(limit) };
   if (afterId) q.afterId = afterId;
+
+  if (!isAdminUser()) {
+    const parsed = await platformFeedGet<{
+      success?: boolean;
+      message?: string;
+      data?: { items?: PlatformJobListItem[]; nextAfterId?: string };
+    }>(PLATFORM_BRIDGE.jobList, q);
+    const items = (parsed.data?.items ?? []).map(platformJobToFeedItem);
+    return { items, nextAfterId: parsed.data?.nextAfterId ?? '' };
+  }
 
   if (type === 'image') {
     const parsed = await platformFeedGet<MineImagesResponse>(PLATFORM_BRIDGE.mineMedia, q);
@@ -415,6 +467,36 @@ async function fetchPlatformMine(
   const items = (parsed.data ?? []).map((it) => mapVideoToFeedItem(it));
   const last = items.length ? items[items.length - 1] : undefined;
   return { items, nextAfterId: parsed.next_after_id ?? last?.id_base ?? '' };
+}
+
+async function deletePlatformJob(jobId: string): Promise<void> {
+  const auth = loadAuth();
+  const token = auth?.platform_token?.trim();
+  if (!token) throw new UpstreamMeError('Chưa đăng nhập tài khoản hệ thống', 401);
+
+  const res = await fetch(PLATFORM_BRIDGE.jobDelete, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ platformJobId: jobId }),
+  });
+  if (res.status === 401 || res.status === 403) {
+    clearAuth();
+    if (typeof window !== 'undefined') window.location.href = '/login';
+  }
+  const text = await res.text();
+  let parsed: { success?: boolean; message?: string };
+  try {
+    parsed = JSON.parse(text) as typeof parsed;
+  } catch {
+    throw new UpstreamMeError(text || `HTTP ${res.status}`, res.status);
+  }
+  if (!res.ok || parsed.success === false) {
+    throw new UpstreamMeError(parsed.message || 'Xóa thất bại', res.status);
+  }
 }
 
 export function feedModelLabel(item: FeedItem): string {
@@ -532,10 +614,15 @@ export function formatFeedTime(value: string | number | undefined): string {
   }
 }
 
-/** Xóa ảnh/video — Gommo post-delete (kể cả user platform). */
+/** Xóa ảnh/video — user thường xóa platform_jobs; admin xóa trên Gommo. */
 export async function deleteFeedPost(idBase: string): Promise<void> {
   const id = idBase.trim();
   if (!id) throw new UpstreamMeError('Thiếu id_base', 400);
+
+  if (usesPlatformJobs() && !isAdminUser()) {
+    await deletePlatformJob(id);
+    return;
+  }
 
   const fields = { id_base: id, ...gommoDeviceFields() };
   const parsed = await feedRequest<{ success?: boolean; message?: string }>(

@@ -5,15 +5,21 @@ require __DIR__ . '/bootstrap.php';
 require __DIR__ . '/gommo.php';
 
 /**
- * Tab "Của tôi" — danh sách video/ảnh của merchant VMedia.
- * Dùng chung access_token admin phía server (cùng pool với vmedia.ai merchant).
+ * Thư viện merchant VMedia (toàn bộ job Gommo) — chỉ admin.
+ * User thường dùng job-list.php (platform_jobs theo user_id).
  */
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_out(405, ['success' => false, 'message' => 'Method not allowed']);
 }
 
-require_bearer_user();
+[$pdo, $user] = require_bearer_user();
+if (!user_is_admin($user)) {
+    json_out(403, [
+        'success' => false,
+        'message' => 'Chỉ admin được xem thư viện merchant. User dùng job-list theo tài khoản.',
+    ]);
+}
 
 $type = trim((string) ($_GET['type'] ?? 'video'));
 $limit = max(1, min(50, (int) ($_GET['limit'] ?? 30)));

@@ -17,12 +17,12 @@ if ($type === '') {
     json_out(400, ['success' => false, 'message' => 'Thiếu type']);
 }
 
+// Chỉ job của chính user đăng nhập (admin xem merchant qua mine-media.php).
 $params = [(string) $user['id'], $type];
 $sql = 'SELECT id, user_id, job_type, model_id, provider_job_id, status, result_url, prompt, meta_json,
                cost_credits, created_at, updated_at
         FROM platform_jobs
-        WHERE user_id = ? AND job_type = ?
-          AND result_url IS NOT NULL AND result_url <> \'\'';
+        WHERE user_id = ? AND job_type = ?';
 
 if ($afterId !== '') {
     $cur = $pdo->prepare(

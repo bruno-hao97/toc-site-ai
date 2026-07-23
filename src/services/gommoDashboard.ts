@@ -63,8 +63,10 @@ function periodCutoffSeconds(period: DashboardPeriod): number {
 }
 
 /**
- * Dựng thống kê dashboard từ dữ liệu Gommo thật (ảnh/video của user + số dư credit),
- * trả về cùng shape DashboardStats để tái dùng UI dashboard hiện có.
+ * Dashboard stats từ fetchMyImages/Videos:
+ * - User thường → chỉ platform_jobs của chính họ
+ * - Admin → thư viện merchant Gommo
+ * + số dư credit hiển thị (platform / Vmedia admin).
  */
 export async function fetchGommoDashboardStats(
   period: DashboardPeriod = '7d',

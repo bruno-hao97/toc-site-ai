@@ -294,11 +294,18 @@ router.get('/admin-vmedia-balance.php', async (req, res) => {
   }
 });
 
-/** Tab "Của tôi" — proxy Gommo /ai/videos + /ai/images (local dev). */
+/** Thư viện merchant Gommo — chỉ admin (local Node proxy). */
 router.get('/mine-media.php', async (req, res) => {
   try {
     const auth = authHeader(req);
-    await fetchBridgeUser(auth);
+    const user = await fetchBridgeUser(auth);
+    if (!user.isAdmin) {
+      res.status(403).json({
+        success: false,
+        message: 'Chỉ admin được xem thư viện merchant. User dùng job-list theo tài khoản.',
+      });
+      return;
+    }
 
     const type = String(req.query.type ?? 'video').trim();
     const limit = Math.max(1, Math.min(50, Number(req.query.limit ?? 30) || 30));
