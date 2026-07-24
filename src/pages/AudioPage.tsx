@@ -667,7 +667,7 @@ export default function AudioPage() {
     setProgress(t('audio.generating'));
     let charged = 0;
     try {
-      const hold = Math.max(1, Math.floor(Number(selectedVoice.price) || estimatedCost || 1));
+      const hold = Math.max(1, Math.floor(Number(selectedVoice?.price) || estimatedCost || 1));
       await chargePlatformCredits(hold, 'TTS hold');
       charged = hold;
 
