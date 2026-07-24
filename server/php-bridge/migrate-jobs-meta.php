@@ -35,6 +35,21 @@ try {
         $done[] = 'platform_jobs.meta_json exists';
     }
 
+    // Seedance / video trả MEDIA_GENERATION_STATUS_* (>32 ký tự) — widen cột status
+    $statusCol = $pdo->query(
+        "SELECT CHARACTER_MAXIMUM_LENGTH AS len FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'platform_jobs' AND COLUMN_NAME = 'status'"
+    )->fetch();
+    $statusLen = (int) ($statusCol['len'] ?? 0);
+    if ($statusLen > 0 && $statusLen < 64) {
+        $pdo->exec("ALTER TABLE platform_jobs MODIFY status VARCHAR(64) NOT NULL DEFAULT 'pending'");
+        $done[] = "widened platform_jobs.status VARCHAR({$statusLen})→VARCHAR(64)";
+    } else {
+        $done[] = $statusLen > 0
+            ? "platform_jobs.status already VARCHAR({$statusLen})"
+            : 'platform_jobs.status column missing';
+    }
+
     json_out(200, ['success' => true, 'data' => ['done' => $done]]);
 } catch (Throwable $e) {
     json_out(500, ['success' => false, 'message' => $e->getMessage()]);

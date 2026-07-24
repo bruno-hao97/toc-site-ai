@@ -8,10 +8,13 @@ import {
   resolveJobCost,
 } from '../services/gommoEnvelope.js';
 import { gommoAdminPostForm, getGommoAdminToken } from '../services/gommoAdminClient.js';
-import { normalizeStoredJobStatus } from '../services/jobStatusHelpers.js';
+import {
+  isJobFailedStatus,
+  normalizeStoredJobStatus,
+} from '../services/jobStatusHelpers.js';
 
 const router = Router();
-export const PLATFORM_JOB_BRIDGE_BUILD = '2026-07-20-node-dev-bridge';
+export const PLATFORM_JOB_BRIDGE_BUILD = '2026-07-24-gommo-poll-sync';
 
 function bridgeBase(): string {
   const base = config.auth.bridgeUrl.replace(/\/$/, '');
@@ -88,8 +91,7 @@ router.post('/job-create.php', async (req, res) => {
       res.status(400).json({ success: false, message: 'Không xác định được giá model' });
       return;
     }
-    // Admin dùng token merchant VMedia — không kiểm tra/trừ credit nội bộ platform.
-    if (!user.isAdmin && user.credits < cost) {
+    if (user.credits < cost) {
       res.status(400).json({
         success: false,
         message: `Số dư credit không đủ (cần ${cost.toLocaleString('vi-VN')})`,
@@ -108,11 +110,12 @@ router.post('/job-create.php', async (req, res) => {
       data: {
         platformJobId: randomUUID(),
         costCredits: cost,
-        credits: user.isAdmin ? user.credits : Math.max(0, user.credits - cost),
+        // Local Node không trừ DB — upload job-create.php lên VPS để trừ thật.
+        credits: Math.max(0, user.credits - cost),
         envelope,
         bridgeVersion: PLATFORM_JOB_BRIDGE_BUILD,
         devNote:
-          'Local dev bridge: tạo job trực tiếp qua API merchant + token admin. Upload job-create.php lên VPS để trừ credit + lưu lịch sử DB.',
+          'Local dev bridge: tạo job qua merchant token. Upload job-create.php lên VPS để trừ credit nội bộ + lưu lịch sử DB.',
       },
     });
   } catch (err) {
@@ -127,23 +130,106 @@ router.post('/job-create.php', async (req, res) => {
 
 router.post('/job-poll.php', async (req, res) => {
   try {
-    const auth = authHeader(req);
-    await fetchBridgeUser(auth);
+    // Bắt buộc đăng nhập (không tin client mù).
+    authHeader(req);
+
+    const platformJobId = String(req.body?.platformJobId ?? req.body?.jobId ?? '').trim();
     const providerJobId = String(req.body?.providerJobId ?? '').trim();
     const media = String(req.body?.media ?? 'image').trim() || 'image';
-    if (!providerJobId) {
+
+    if (!providerJobId && !platformJobId) {
       res.status(400).json({ success: false, message: 'Thiếu job id' });
       return;
     }
 
-    const path = `/ai/jobs/${encodeURIComponent(providerJobId)}?media=${encodeURIComponent(media)}`;
+    // Nguồn sự thật = Gommo/VMedia. Local create không ghi DB VPS → không phụ thuộc PHP row.
+    let pollId = providerJobId;
+    if (!pollId && platformJobId && config.auth.bridgeUrl) {
+      // Chỉ khi thiếu provider id mới hỏi PHP lấy provider_job_id.
+      try {
+        const base = config.auth.bridgeUrl.replace(/\/$/, '');
+        const lookup = await fetch(`${base}/job-poll.php`, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            ...(req.headers.authorization
+              ? { Authorization: String(req.headers.authorization) }
+              : {}),
+          },
+          body: JSON.stringify(req.body ?? {}),
+        });
+        const text = await lookup.text();
+        res.status(lookup.status);
+        res.setHeader('Content-Type', 'application/json');
+        res.send(text);
+        return;
+      } catch (err) {
+        res.status(500).json({
+          success: false,
+          message: `Poll job thất bại: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        });
+        return;
+      }
+    }
+
+    if (!pollId) {
+      res.status(400).json({ success: false, message: 'Thiếu providerJobId để poll VMedia' });
+      return;
+    }
+
+    const path = `/ai/jobs/${encodeURIComponent(pollId)}?media=${encodeURIComponent(media)}`;
     const envelope = await gommoAdminPostForm(path, {});
+    const resultUrl = extractResultUrl(envelope);
+    const rawStatus = extractStatus(envelope);
+    const status = normalizeStoredJobStatus(rawStatus, resultUrl);
+    const failed = !resultUrl && (status === 'failed' || isJobFailedStatus(status));
+
+    let refunded = false;
+    let credits: number | undefined;
+
+    // Best-effort: đồng bộ DB + hoàn credit nội bộ trên VPS khi có platformJobId.
+    if (failed && config.auth.bridgeUrl && (platformJobId || providerJobId)) {
+      try {
+        const base = config.auth.bridgeUrl.replace(/\/$/, '');
+        const upstream = await fetch(`${base}/job-poll.php`, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            ...(req.headers.authorization
+              ? { Authorization: String(req.headers.authorization) }
+              : {}),
+          },
+          body: JSON.stringify({
+            platformJobId: platformJobId || undefined,
+            providerJobId: pollId,
+            media,
+          }),
+        });
+        const parsed = (await upstream.json()) as {
+          success?: boolean;
+          data?: { refunded?: boolean; credits?: number };
+        };
+        if (parsed.success && parsed.data) {
+          refunded = Boolean(parsed.data.refunded);
+          if (typeof parsed.data.credits === 'number') credits = parsed.data.credits;
+        }
+      } catch {
+        // Không chặn poll VMedia nếu PHP refund lỗi (job local thường chưa có row).
+      }
+    }
 
     res.json({
       success: true,
       data: {
+        platformJobId: platformJobId || null,
         envelope,
+        status: failed ? 'failed' : status,
+        refunded,
+        ...(credits != null ? { credits } : {}),
         bridgeVersion: PLATFORM_JOB_BRIDGE_BUILD,
+        polledVia: 'gommo-direct',
       },
     });
   } catch (err) {
@@ -151,6 +237,7 @@ router.post('/job-poll.php', async (req, res) => {
     res.status(500).json({
       success: false,
       message: `Poll job thất bại: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      bridgeBuild: PLATFORM_JOB_BRIDGE_BUILD,
     });
   }
 });

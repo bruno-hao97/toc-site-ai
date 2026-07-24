@@ -137,7 +137,7 @@ function StatCard({
 
 export default function ProfilePage() {
   const [me, setMe] = useState(getUpstreamMe());
-  const { credits, isAdminVmedia, refresh: refreshCredits } = useDisplayCredits();
+  const { credits, platformCredits, isAdminVmedia, refresh: refreshCredits } = useDisplayCredits();
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [chartDays, setChartDays] = useState(14);
@@ -249,13 +249,32 @@ export default function ProfilePage() {
           </div>
 
           <div className="profile-stats-grid">
-            <StatCard
-              accent="#4ADE80"
-              icon={Zap}
-              value={credits.toLocaleString('vi-VN')}
-              label={isAdminVmedia ? 'Credits Pro.agi.vn khả dụng' : 'Credits khả dụng'}
-              badge="Live"
-            />
+            {isAdminVmedia ? (
+              <>
+                <StatCard
+                  accent="#38BDF8"
+                  icon={Zap}
+                  value={platformCredits.toLocaleString('vi-VN')}
+                  label="Ví nội bộ"
+                  badge="Live"
+                />
+                <StatCard
+                  accent="#4ADE80"
+                  icon={Zap}
+                  value={credits.toLocaleString('vi-VN')}
+                  label="Credits Pro.agi.vn"
+                  badge="Live"
+                />
+              </>
+            ) : (
+              <StatCard
+                accent="#4ADE80"
+                icon={Zap}
+                value={credits.toLocaleString('vi-VN')}
+                label="Credits khả dụng"
+                badge="Live"
+              />
+            )}
             <StatCard
               accent="#60A5FA"
               icon={Video}

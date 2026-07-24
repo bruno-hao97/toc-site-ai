@@ -35,6 +35,7 @@ import {
 } from '../services/quickCreate';
 import { notifyCreditsUpdated } from '../services/authStore';
 import { modelPriceRangeLabel, resolveModelPrice } from '../services/modelPricing';
+import { isJobAcceptedPendingError } from '../services/jobInfraErrors';
 
 type QuickMenuId = 'chat' | 'script' | 'video' | 'image' | 'tts' | 'music' | 'audio' | 'apps';
 
@@ -164,8 +165,11 @@ export default function HomeQuickCreateBar() {
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [result, setResult] = useState<{ url: string; type: JobType } | null>(null);
   const [selections, setSelections] = useState<JobSelections>({});
+  /** Khóa submit sau khi VMedia đã nhận job (tránh spam tạo lại). */
+  const [providerBusy, setProviderBusy] = useState(false);
 
   const typeRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<HTMLDivElement>(null);
@@ -276,7 +280,7 @@ export default function HomeQuickCreateBar() {
   };
 
   const submit = async () => {
-    if (submitting) return;
+    if (submitting || providerBusy) return;
     if (!canQuickCreate()) {
       setError('Bạn cần đăng nhập để tạo nội dung.');
       return;
@@ -306,6 +310,7 @@ export default function HomeQuickCreateBar() {
 
     setSubmitting(true);
     setError('');
+    setInfo('');
     setResult(null);
     setProgress('Đang tạo job…');
 
@@ -319,10 +324,20 @@ export default function HomeQuickCreateBar() {
       });
       setResult({ url, type });
       setProgress('');
+      setProviderBusy(false);
       notifyCreditsUpdated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setProgress('');
+      if (isJobAcceptedPendingError(err)) {
+        setError('');
+        setInfo(err.message);
+        setProgress('');
+        setProviderBusy(true);
+        // Mở khóa sau 45s — đủ để giảm spam; user vẫn xem được info.
+        window.setTimeout(() => setProviderBusy(false), 45_000);
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+        setProgress('');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -445,6 +460,7 @@ export default function HomeQuickCreateBar() {
       </div>
 
       {error && <div className="qc-error">{error}</div>}
+      {info && !error && <div className="qc-info">{info}</div>}
 
       <div className="qc-toolbar">
         <div className="qc-type" ref={typeRef}>
@@ -569,10 +585,10 @@ export default function HomeQuickCreateBar() {
             type="button"
             className="qc-send"
             onClick={() => void submit()}
-            disabled={submitting || loadingModels}
+            disabled={submitting || providerBusy || loadingModels}
             title="Tạo"
           >
-            {submitting ? <Loader2 size={16} className="qc-spin" /> : <SendHorizontal size={16} />}
+            {submitting || providerBusy ? <Loader2 size={16} className="qc-spin" /> : <SendHorizontal size={16} />}
           </button>
         </div>
       </div>

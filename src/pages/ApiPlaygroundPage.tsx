@@ -21,6 +21,10 @@ import {
 import { extractPollSnapshot } from '../services/mediaGenerationStatus';
 import { createJobAndPoll, type PollProgress } from '../services/polling';
 import {
+  formatAcceptedPendingMessage,
+  isJobAcceptedPendingError,
+} from '../services/jobInfraErrors';
+import {
   formatCreatingProgressMessage,
   formatPollDoneMessage,
   formatPollProgressDevMessage,
@@ -212,6 +216,17 @@ export default function ApiPlaygroundPage() {
       if (url) {
         setResultUrl(url);
         setProgress(formatPollDoneMessage());
+      } else if (
+        result.acceptedOnProvider &&
+        (result.pollResult?.acceptedPending ||
+          result.pollResult?.infraError ||
+          result.pollResult?.timeout)
+      ) {
+        setError('');
+        setProgress(
+          result.pollResult?.error ||
+            formatAcceptedPendingMessage(result.providerJobId || snap.idBase),
+        );
       } else if (result.pollResult?.timeout) {
         setError(formatPollTimeoutMessage());
       } else if (result.pollResult && !result.pollResult.success) {
@@ -224,9 +239,14 @@ export default function ApiPlaygroundPage() {
         clearModelsCache();
         await loadModels(jobType, true);
       }
-      setError(err instanceof GommoApiError ? err.message : String(err));
-      if (err instanceof GommoApiError && err.envelope) {
-        setCreateResponse(err.envelope);
+      if (isJobAcceptedPendingError(err)) {
+        setError('');
+        setProgress(err.message);
+      } else {
+        setError(err instanceof GommoApiError ? err.message : String(err));
+        if (err instanceof GommoApiError && err.envelope) {
+          setCreateResponse(err.envelope);
+        }
       }
     } finally {
       setSubmitting(false);

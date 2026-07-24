@@ -84,6 +84,10 @@ import {
 import { modelPriceRangeLabel, resolveModelPrice } from '../services/modelPricing';
 import { createJobAndPoll, type PollProgress } from '../services/polling';
 import {
+  formatAcceptedPendingMessage,
+  isJobAcceptedPendingError,
+} from '../services/jobInfraErrors';
+import {
   formatCreatingProgressMessage,
   formatPollDoneMessage,
   formatPollProgressMessage,
@@ -1291,7 +1295,8 @@ export default function StudioPage({
     loadRecentJobs();
 
     try {
-      const { resultUrl: finalUrl, coverUrl } = await generateViaGommo(slug, payload, pendingId);
+      const { resultUrl: finalUrl, coverUrl, acceptedPending, providerJobId } =
+        await generateViaGommo(slug, payload, pendingId);
 
       if (finalUrl) {
         setResultUrl(finalUrl);
@@ -1301,6 +1306,31 @@ export default function StudioPage({
         loadRecentJobs();
         return true;
       }
+
+      // VMedia đã nhận job — giữ processing ngắn, không báo fail đỏ / không khuyến khích tạo lại.
+      if (acceptedPending) {
+        const info = formatAcceptedPendingMessage(providerJobId);
+        setError('');
+        setProgress(info);
+        updateLocalJob(localId, { status: 'processing' });
+        setPendingJobs((prev) =>
+          prev.map((p) =>
+            p.id === pendingId ? { ...p, status: 'processing', progress: 40 } : p,
+          ),
+        );
+        loadRecentJobs();
+        // Tránh khóa Submit mãi: sau 45s bỏ card pending (job vẫn chạy trên VMedia).
+        window.setTimeout(() => {
+          setPendingJobs((prev) => prev.filter((p) => p.id !== pendingId));
+          setProgress((cur) =>
+            cur.includes('Đã gửi lên VMedia')
+              ? 'Job đang chạy trên VMedia — kiểm tra thư viện trước khi tạo thêm.'
+              : cur,
+          );
+        }, 45_000);
+        return true;
+      }
+
       const errMsg = 'Job thất bại';
       setError(errMsg);
       updateLocalJob(localId, { status: 'failed', error: errMsg });
@@ -1310,6 +1340,22 @@ export default function StudioPage({
       loadRecentJobs();
       return false;
     } catch (err) {
+      if (isJobAcceptedPendingError(err)) {
+        const info = err.message;
+        setError('');
+        setProgress(info);
+        updateLocalJob(localId, { status: 'processing' });
+        setPendingJobs((prev) =>
+          prev.map((p) =>
+            p.id === pendingId ? { ...p, status: 'processing', progress: 40 } : p,
+          ),
+        );
+        loadRecentJobs();
+        window.setTimeout(() => {
+          setPendingJobs((prev) => prev.filter((p) => p.id !== pendingId));
+        }, 45_000);
+        return true;
+      }
       const msg = err instanceof GommoApiError || err instanceof Error ? err.message : String(err);
       setError(msg);
       updateLocalJob(localId, { status: 'failed', error: msg });
@@ -1323,6 +1369,10 @@ export default function StudioPage({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (submitting || pendingJobs.some((p) => p.status === 'processing')) {
+      setError('Đang có job xử lý — đợi xong hoặc kiểm tra thư viện / VMedia trước khi tạo thêm.');
+      return;
+    }
     if (!client || !currentModel || !schema) {
       setError('Chọn model trước.');
       return;
@@ -1636,8 +1686,20 @@ export default function StudioPage({
     slug: string,
     payload: Record<string, unknown>,
     pendingId?: string,
-  ): Promise<{ resultUrl: string | null; coverUrl?: string | null }> {
-    const { pollResult, resultUrl: url, coverUrl, createEnvelope } = await createJobAndPoll(
+  ): Promise<{
+    resultUrl: string | null;
+    coverUrl?: string | null;
+    acceptedPending?: boolean;
+    providerJobId?: string;
+  }> {
+    const {
+      pollResult,
+      resultUrl: url,
+      coverUrl,
+      createEnvelope,
+      acceptedOnProvider,
+      providerJobId,
+    } = await createJobAndPoll(
       client!,
       jobType,
       slug,
@@ -1659,7 +1721,27 @@ export default function StudioPage({
     const snap = extractPollSnapshot(createEnvelope as Parameters<typeof extractPollSnapshot>[0]);
     const finalUrl = url ?? snap.resultUrl;
     if (finalUrl) {
-      return { resultUrl: finalUrl, coverUrl: coverUrl ?? snap.coverUrl };
+      return {
+        resultUrl: finalUrl,
+        coverUrl: coverUrl ?? snap.coverUrl,
+        providerJobId: providerJobId || snap.idBase,
+      };
+    }
+
+    if (
+      acceptedOnProvider &&
+      (pollResult?.acceptedPending || pollResult?.infraError || pollResult?.timeout)
+    ) {
+      return {
+        resultUrl: null,
+        coverUrl: coverUrl ?? snap.coverUrl,
+        acceptedPending: true,
+        providerJobId: providerJobId || snap.idBase,
+      };
+    }
+
+    if (pollResult?.success === false && pollResult.error) {
+      throw new Error(pollResult.error);
     }
     throw new Error(pollResult?.error || 'Job thất bại');
   }
@@ -3141,11 +3223,11 @@ export default function StudioPage({
           <button
             type="button"
             className="composer-submit"
-            disabled={submitting || !schema}
+            disabled={submitting || !schema || pendingJobs.some((p) => p.status === 'processing')}
             onClick={(e) => void handleSubmit(e as unknown as FormEvent)}
           >
             {isMusicComposer ? <Music2 size={16} /> : <Wand2 size={16} />}
-            {submitting
+            {submitting || pendingJobs.some((p) => p.status === 'processing')
               ? t('composer.submitting')
               : isMusicComposer
                 ? t('composer.music.create')
@@ -3786,8 +3868,12 @@ export default function StudioPage({
                 />
               )}
               <div className="actions">
-                <button type="submit" className="btn primary btn-job" disabled={submitting}>
-                  {submitting
+                <button
+                  type="submit"
+                  className="btn primary btn-job"
+                  disabled={submitting || pendingJobs.some((p) => p.status === 'processing')}
+                >
+                  {submitting || pendingJobs.some((p) => p.status === 'processing')
                     ? t('composer.submitting')
                     : t('composer.submit', { type: typeLabel() })}
                 </button>

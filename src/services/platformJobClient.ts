@@ -46,6 +46,15 @@ export class PlatformJobClient {
     }
     if (!res.ok || parsed.success === false) {
       const errMsg = (parsed as { message?: string }).message || `HTTP ${res.status}`;
+      // HTML / trang 404 webserver — không phải status fail của VMedia.
+      if (
+        typeof errMsg === 'string' &&
+        (/<\s*html/i.test(errMsg) || /404 Not Found/i.test(errMsg))
+      ) {
+        throw new Error(
+          `Máy chủ trả HTML thay vì JSON (HTTP ${res.status}). Kiểm tra bridge / proxy — job có thể đã chạy trên VMedia.`,
+        );
+      }
       throw new Error(errMsg);
     }
     return parsed;

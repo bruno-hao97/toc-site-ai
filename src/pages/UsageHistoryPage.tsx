@@ -165,7 +165,7 @@ function UsageAreaChart({ items, days }: { items: UsageHistoryItem[]; days: numb
 
 export default function UsageHistoryPage() {
   const { type: typeParam } = useParams<{ type?: string }>();
-  const { credits: displayCredits, isAdminVmedia } = useDisplayCredits();
+  const { credits: displayCredits, platformCredits, isAdminVmedia } = useDisplayCredits();
 
   const [items, setItems] = useState<UsageHistoryItem[]>([]);
   const [source, setSource] = useState<'upstream' | 'local' | 'empty'>('empty');
@@ -321,10 +321,19 @@ export default function UsageHistoryPage() {
           <span className="uh-card-sub">bản ghi</span>
         </div>
         <div className="uh-card">
-          <span className="uh-card-label">{isAdminVmedia ? 'Số dư Pro.agi.vn' : 'Số dư credit'}</span>
-          <span className="uh-card-value accent">{displayCredits.toLocaleString('vi-VN')}</span>
-          <span className="uh-card-sub">khả dụng</span>
+          <span className="uh-card-label">{isAdminVmedia ? 'Ví nội bộ' : 'Số dư credit'}</span>
+          <span className="uh-card-value accent">
+            {(isAdminVmedia ? platformCredits : displayCredits).toLocaleString('vi-VN')}
+          </span>
+          <span className="uh-card-sub">{isAdminVmedia ? 'quỹ phân phối' : 'khả dụng'}</span>
         </div>
+        {isAdminVmedia && (
+          <div className="uh-card">
+            <span className="uh-card-label">Pro.agi.vn</span>
+            <span className="uh-card-value accent">{displayCredits.toLocaleString('vi-VN')}</span>
+            <span className="uh-card-sub">merchant</span>
+          </div>
+        )}
         <div className="uh-card">
           <span className="uh-card-label">Credits đã dùng</span>
           <span className="uh-card-value">{summary.creditsUsed.toLocaleString('vi-VN')}</span>

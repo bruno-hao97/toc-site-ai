@@ -29,12 +29,19 @@ const EXTERNAL = {
 
 interface Props {
   credits: number;
-  /** Admin đang xem số dư VMedia thật (không phải credit nội bộ). */
+  /** Ví nội bộ platform — hiện cạnh VMedia khi admin. */
+  platformCredits?: number;
+  /** Admin đang xem 2 ví (nội bộ + VMedia). */
   isAdmin?: boolean;
   onCreditsRefresh?: () => void;
 }
 
-export default function UserMenuDropdown({ credits, isAdmin = false, onCreditsRefresh }: Props) {
+export default function UserMenuDropdown({
+  credits,
+  platformCredits,
+  isAdmin = false,
+  onCreditsRefresh,
+}: Props) {
   const navigate = useNavigate();
   const user = getDisplayUser();
   const [open, setOpen] = useState(false);
@@ -140,17 +147,46 @@ export default function UserMenuDropdown({ credits, isAdmin = false, onCreditsRe
             </div>
           </div>
 
-          <button
-            type="button"
-            className="user-menu-balance"
-            onClick={() => { onCreditsRefresh?.(); setOpen(false); }}
-          >
-            <span className="user-menu-balance-left">
-              <Wallet {...ICON} />
-              {isAdmin ? 'Số dư Pro.agi.vn' : 'Số dư'}
-            </span>
-            <strong>{credits.toLocaleString('vi-VN')}</strong>
-          </button>
+          {isAdmin ? (
+            <div className="user-menu-balances">
+              <button
+                type="button"
+                className="user-menu-balance"
+                onClick={() => { onCreditsRefresh?.(); setOpen(false); navigate('/wallet'); }}
+              >
+                <span className="user-menu-balance-left">
+                  <Wallet {...ICON} />
+                  Ví nội bộ
+                </span>
+                <strong className="user-menu-balance-platform">
+                  {(platformCredits ?? 0).toLocaleString('vi-VN')}
+                </strong>
+              </button>
+              <button
+                type="button"
+                className="user-menu-balance"
+                onClick={() => { onCreditsRefresh?.(); setOpen(false); navigate('/wallet'); }}
+              >
+                <span className="user-menu-balance-left">
+                  <Wallet {...ICON} />
+                  Pro.agi.vn
+                </span>
+                <strong>{credits.toLocaleString('vi-VN')}</strong>
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="user-menu-balance"
+              onClick={() => { onCreditsRefresh?.(); setOpen(false); }}
+            >
+              <span className="user-menu-balance-left">
+                <Wallet {...ICON} />
+                Số dư
+              </span>
+              <strong>{credits.toLocaleString('vi-VN')}</strong>
+            </button>
+          )}
 
           <div className="user-menu-section">
             <div className="user-menu-section-head">

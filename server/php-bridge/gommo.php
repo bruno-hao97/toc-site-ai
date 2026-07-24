@@ -314,10 +314,11 @@ function is_job_success_claim(string $status): bool
         || $s === 'COMPLETED'
         || $s === 'FINISH'
         || $s === 'FINISHED'
-        || strpos($s, 'SUCCESS') === 0;
+        || $s === 'MEDIA_GENERATION_STATUS_SUCCESSFUL'
+        || strpos($s, 'SUCCESS') !== false;
 }
 
-/** Status fail từ Gommo gateway / imageInfo. */
+/** Status fail từ Gommo gateway / imageInfo / videoInfo. */
 function is_job_failed_status(string $status): bool
 {
     $s = strtoupper(trim($status));
@@ -344,10 +345,11 @@ function is_job_failed_status(string $status): bool
     if (in_array($s, $failed, true)) {
         return true;
     }
+    // Running / success-claim — không coi là fail (kể cả MEDIA_GENERATION_STATUS_*)
     if (
-        strpos($s, 'PENDING') === 0
-        || strpos($s, 'SUCCESS') === 0
-        || strpos($s, 'PROCESS') === 0
+        strpos($s, 'PENDING') !== false
+        || strpos($s, 'SUCCESS') !== false
+        || strpos($s, 'PROCESS') !== false
         || strpos($s, 'ACTIVE') !== false
         || strpos($s, 'QUEUE') !== false
         || $s === 'RUNNING'
@@ -373,7 +375,8 @@ function is_job_failed_status(string $status): bool
 }
 
 /**
- * Chuẩn hóa status lưu DB: không bao giờ ghi success nếu thiếu result_url.
+ * Chuẩn hóa status lưu DB (VARCHAR ngắn): success | failed | processing.
+ * Không bao giờ ghi success nếu thiếu result_url; không lưu raw MEDIA_GENERATION_STATUS_*.
  */
 function normalize_stored_job_status(string $status, ?string $resultUrl): string
 {
@@ -381,13 +384,10 @@ function normalize_stored_job_status(string $status, ?string $resultUrl): string
         return 'success';
     }
     if (is_job_failed_status($status)) {
-        return strtoupper(trim($status)) !== '' ? strtoupper(trim($status)) : 'FAILED';
+        return 'failed';
     }
-    // Gommo báo SUCCESS/FINISH nhưng chưa có URL → vẫn đang xử lý
-    if (is_job_success_claim($status) || $status === '') {
-        return 'processing';
-    }
-    return $status;
+    // Mọi trạng thái in-flight / success-claim chưa có URL → processing
+    return 'processing';
 }
 
 function image_job_cost(): int
@@ -603,4 +603,90 @@ function charge_user_credits(PDO $pdo, string $userId, int $amount): void
         throw new RuntimeException('Số dư credit không đủ (cần ' . number_format($amount) . ')');
     }
     $pdo->prepare('UPDATE users SET credits = credits - ? WHERE id = ?')->execute([$amount, $userId]);
+}
+
+/** Đảm bảo cột refunded_at tồn tại (idempotent). */
+function ensure_platform_jobs_refunded_at(PDO $pdo): void
+{
+    static $ready = false;
+    if ($ready) {
+        return;
+    }
+    try {
+        $col = $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'platform_jobs'
+               AND COLUMN_NAME = 'refunded_at'"
+        );
+        if ($col && (int) $col->fetchColumn() === 0) {
+            $pdo->exec('ALTER TABLE platform_jobs ADD COLUMN refunded_at TIMESTAMP NULL DEFAULT NULL AFTER cost_credits');
+        }
+        $ready = true;
+    } catch (Throwable $ignored) {
+        // DB cũ / thiếu quyền — caller sẽ bắt khi UPDATE.
+    }
+}
+
+/**
+ * Hoàn credit job fail (idempotent qua refunded_at).
+ * @return bool true nếu vừa hoàn trong lần gọi này
+ */
+function try_refund_failed_platform_job(PDO $pdo, string $jobId, ?string $forceStatus = 'failed'): bool
+{
+    ensure_platform_jobs_refunded_at($pdo);
+
+    $ownTx = !$pdo->inTransaction();
+    if ($ownTx) {
+        $pdo->beginTransaction();
+    }
+
+    try {
+        $stmt = $pdo->prepare(
+            'SELECT id, user_id, cost_credits, refunded_at, status FROM platform_jobs WHERE id = ? FOR UPDATE'
+        );
+        $stmt->execute([$jobId]);
+        $job = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$job) {
+            if ($ownTx) {
+                $pdo->rollBack();
+            }
+            return false;
+        }
+        if (!empty($job['refunded_at'])) {
+            if ($ownTx) {
+                $pdo->commit();
+            }
+            return false;
+        }
+
+        $cost = (int) ($job['cost_credits'] ?? 0);
+        if ($cost > 0) {
+            refund_user_credits($pdo, (string) $job['user_id'], $cost);
+        }
+
+        if ($forceStatus !== null && $forceStatus !== '') {
+            $pdo->prepare(
+                'UPDATE platform_jobs
+                 SET status = ?, refunded_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ? AND refunded_at IS NULL'
+            )->execute([$forceStatus, $jobId]);
+        } else {
+            $pdo->prepare(
+                'UPDATE platform_jobs
+                 SET refunded_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ? AND refunded_at IS NULL'
+            )->execute([$jobId]);
+        }
+
+        if ($ownTx) {
+            $pdo->commit();
+        }
+        return true;
+    } catch (Throwable $e) {
+        if ($ownTx && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
+    }
 }

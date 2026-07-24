@@ -3,6 +3,7 @@ import { clearAuth, loadAuth, resolveProjectId } from './authStore';
 import { GOMMO_CHAT_CONFIG } from './gommoChatConfig';
 import type { AppLocale } from '../i18n/types';
 import { normalizeElevenLabsCheapModel } from './audioCatalog';
+import { JobAcceptedPendingError } from './jobInfraErrors';
 
 export type VoiceProvider = 'elevenlabs_cheap' | 'minimaxai_cheap' | 'omnivoice_local';
 
@@ -403,6 +404,15 @@ export async function createAudio(opts: {
   const fileUrl = extractAudioFileUrl(audioInfo);
 
   if (!fileUrl) {
+    const providerId =
+      (typeof audioInfo.id_base === 'string' && audioInfo.id_base.trim()) ||
+      (typeof (parsed as { id_base?: string }).id_base === 'string'
+        ? String((parsed as { id_base?: string }).id_base).trim()
+        : '');
+    if (providerId) {
+      // Provider đã nhận job — không hoàn credit / không coi là fail cứng.
+      throw new JobAcceptedPendingError(providerId);
+    }
     throw new UpstreamMeError(
       (parsed.message as string) || 'Không nhận được file audio từ server',
     );

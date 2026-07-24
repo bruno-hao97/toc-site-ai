@@ -9,6 +9,7 @@ import { resolveModelPrice } from './modelPricing';
 import { isModelAvailable, normalizeOptions } from './modelSchema';
 import { getJobClient } from './platformJobClient';
 import { createJobAndPoll, type PollProgress } from './polling';
+import { JobAcceptedPendingError, requireJobResultUrl } from './jobInfraErrors';
 import {
   formatCreatingProgressMessage,
   formatPollProgressMessage,
@@ -67,7 +68,7 @@ export async function runImageUpscale(
 
   const client = getJobClient();
   onProgress?.(formatStartingProgressMessage());
-  const { resultUrl, pollResult } = await createJobAndPoll(
+  const { resultUrl, pollResult, acceptedOnProvider, providerJobId } = await createJobAndPoll(
     client,
     UPSCALE_JOB_TYPE,
     modelId,
@@ -81,10 +82,18 @@ export async function runImageUpscale(
     },
   );
   notifyCreditsUpdated();
-  if (!resultUrl) {
-    throw new GommoApiError(pollResult?.error || 'Upscale thất bại');
+  try {
+    return requireJobResultUrl({
+      resultUrl,
+      acceptedOnProvider,
+      providerJobId,
+      pollResult,
+      failMessage: 'Upscale thất bại',
+    });
+  } catch (err) {
+    if (err instanceof JobAcceptedPendingError) throw err;
+    throw new GommoApiError(err instanceof Error ? err.message : 'Upscale thất bại');
   }
-  return resultUrl;
 }
 
 export function modelsRequestFields(type: string): Record<string, string> {

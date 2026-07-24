@@ -40,6 +40,8 @@ export const config = {
     maxVnd: Number(process.env.TOPUP_MAX_VND) || 20_000_000,
     creditsPerVnd: Number(process.env.TOPUP_CREDITS_PER_VND) || 1,
     ordersFile: process.env.TOPUP_ORDERS_FILE || path.join(process.cwd(), 'data', 'topup-orders.json'),
+    /** Khớp migrate_key / service_key trên PHP bridge — trừ ví admin khi user nạp. */
+    bridgeServiceKey: (process.env.BRIDGE_SERVICE_KEY || process.env.MIGRATE_KEY || '').trim(),
   },
   payos: {
     clientId: (process.env.PAYOS_CLIENT_ID || '').trim().replace(/\r/g, ''),

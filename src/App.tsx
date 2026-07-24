@@ -64,11 +64,17 @@ function StudioHistoryRedirect() {
 
 function AppHeader() {
   const { t, locale, toggleLocale } = useLocale();
-  const { credits: displayCredits, isAdminVmedia, refresh } = useDisplayCredits();
+  const {
+    credits: displayCredits,
+    platformCredits,
+    isAdminVmedia,
+    refresh,
+  } = useDisplayCredits();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const loggedIn = isLoggedIn();
   const isAdmin = isAdminUser();
   const location = useLocation();
+  const showDualWallets = isAdmin && isAdminVmedia;
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -140,17 +146,33 @@ function AppHeader() {
               <Link to="/pricing" className="price-pill">
                 <Coins size={15} /> {t('header.pricing')}
               </Link>
-              <div className="header-balance">
-                <span className="header-balance-label">
-                  {isAdmin && isAdminVmedia ? 'Pro.agi.vn' : t('header.balance')}
-                </span>
-                <span className="header-credit-pill">
-                  {displayCredits.toLocaleString('vi-VN')}
-                </span>
-              </div>
+              {showDualWallets ? (
+                <div className="header-balance header-balance--dual">
+                  <div className="header-balance-row">
+                    <span className="header-balance-label">Nội bộ</span>
+                    <span className="header-credit-pill header-credit-pill--platform">
+                      {platformCredits.toLocaleString('vi-VN')}
+                    </span>
+                  </div>
+                  <div className="header-balance-row">
+                    <span className="header-balance-label">Pro.agi.vn</span>
+                    <span className="header-credit-pill">
+                      {displayCredits.toLocaleString('vi-VN')}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="header-balance">
+                  <span className="header-balance-label">{t('header.balance')}</span>
+                  <span className="header-credit-pill">
+                    {displayCredits.toLocaleString('vi-VN')}
+                  </span>
+                </div>
+              )}
               <UserMenuDropdown
                 credits={displayCredits}
-                isAdmin={isAdmin && isAdminVmedia}
+                platformCredits={platformCredits}
+                isAdmin={showDualWallets}
                 onCreditsRefresh={refreshCredits}
               />
             </div>

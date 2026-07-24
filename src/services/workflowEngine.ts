@@ -2,6 +2,7 @@ import type { GommoModel, JobType } from './api';
 import { isLoggedIn, loadAuth } from './authStore';
 import { getJobClient } from './platformJobClient';
 import { createJobAndPoll, type PollProgress } from './polling';
+import { requireJobResultUrl } from './jobInfraErrors';
 import {
   formatCreatingProgressMessage,
   formatPollProgressMessage,
@@ -62,7 +63,7 @@ export async function runNodeJob(input: RunNodeInput): Promise<string> {
   });
 
   onStatus?.(formatStartingProgressMessage());
-  const { pollResult, resultUrl } = await createJobAndPoll(
+  const { pollResult, resultUrl, acceptedOnProvider, providerJobId } = await createJobAndPoll(
     client,
     type,
     modelId,
@@ -77,6 +78,11 @@ export async function runNodeJob(input: RunNodeInput): Promise<string> {
     },
     signal,
   );
-  if (resultUrl) return resultUrl;
-  throw new Error(pollResult?.error || 'Job thất bại');
+  return requireJobResultUrl({
+    resultUrl,
+    acceptedOnProvider,
+    providerJobId,
+    pollResult,
+    failMessage: 'Job thất bại',
+  });
 }

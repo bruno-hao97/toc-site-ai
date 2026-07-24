@@ -14,6 +14,7 @@ import {
   formatPollProgressMessage,
 } from './pollProgressCopy';
 import type { GommoModel, JobType } from './api';
+import { requireJobResultUrl } from './jobInfraErrors';
 
 /** Có thể tạo job khi đã đăng nhập (platform hoặc Gommo). */
 export function canQuickCreate(): boolean {
@@ -76,7 +77,7 @@ export async function quickGenerate({
     projectId: client.projectId,
   });
 
-  const { pollResult, resultUrl } = await createJobAndPoll(
+  const { pollResult, resultUrl, acceptedOnProvider, providerJobId } = await createJobAndPoll(
     client,
     type,
     slug,
@@ -91,6 +92,11 @@ export async function quickGenerate({
     },
     signal,
   );
-  if (resultUrl) return resultUrl;
-  throw new Error(pollResult?.error || 'Job thất bại');
+  return requireJobResultUrl({
+    resultUrl,
+    acceptedOnProvider,
+    providerJobId,
+    pollResult,
+    failMessage: 'Job thất bại',
+  });
 }

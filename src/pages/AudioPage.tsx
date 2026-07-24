@@ -56,6 +56,11 @@ import {
   recordPlatformJob,
   type FeedItem,
 } from '../services/feedApi';
+import {
+  chargePlatformCredits,
+  refundPlatformCredits,
+} from '../services/platformCreditsAdjust';
+import { isJobAcceptedPendingError } from '../services/jobInfraErrors';
 import { defaultSelectionsForType } from '../constants/studioTypes';
 import AudioTtsSettingsPanel, {
   STABILITY_MODE_VALUES,
@@ -660,7 +665,12 @@ export default function AudioPage() {
     setSubmitting(true);
     setError('');
     setProgress(t('audio.generating'));
+    let charged = 0;
     try {
+      const hold = Math.max(1, Math.floor(Number(selectedVoice.price) || estimatedCost || 1));
+      await chargePlatformCredits(hold, 'TTS hold');
+      charged = hold;
+
       const result = await createAudio({
         text,
         voiceId: item.voice_id,
@@ -671,6 +681,16 @@ export default function AudioPage() {
       const url = result.fileUrl;
 
       if (!url) throw new Error(t('audio.generateFailed'));
+
+      const actual = Math.max(1, Math.floor(Number(result.audioInfo.price) || hold));
+      if (actual > charged) {
+        await chargePlatformCredits(actual - charged, 'TTS price adjust');
+        charged = actual;
+      } else if (actual < charged) {
+        await refundPlatformCredits(charged - actual, 'TTS price adjust');
+        charged = actual;
+      }
+
       setResultUrl(url);
       setScript(text);
       addHistoryEntry({
@@ -687,7 +707,7 @@ export default function AudioPage() {
           modelId: model,
           voiceId: item.voice_id,
           server,
-          costCredits: result.audioInfo.price,
+          costCredits: charged,
           providerJobId: result.audioInfo.id_base,
           duration: result.audioInfo.duration,
           fileSize: undefined,
@@ -695,12 +715,27 @@ export default function AudioPage() {
       } catch {
         /* local history vẫn giữ */
       }
+      charged = 0;
       void loadAudioLists();
       notifyCreditsUpdated();
       setProgress('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setProgress('');
+      if (isJobAcceptedPendingError(err)) {
+        // TTS đã nhận trên provider — giữ credit, không hoàn.
+        charged = 0;
+        setError('');
+        setProgress(err.message);
+      } else {
+        if (charged > 0) {
+          try {
+            await refundPlatformCredits(charged, 'TTS failed refund');
+          } catch {
+            /* best-effort */
+          }
+        }
+        setError(err instanceof Error ? err.message : String(err));
+        setProgress('');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -751,8 +786,13 @@ export default function AudioPage() {
     setResultUrl(null);
 
     const slug = activeModel ? modelSlug(activeModel) : apiModelId;
+    let charged = 0;
 
     try {
+      const hold = Math.max(1, Math.floor(estimatedCost || Number(selectedVoice.price) || 1));
+      await chargePlatformCredits(hold, 'TTS hold');
+      charged = hold;
+
       const result = await createAudio({
         text,
         ...buildCreateAudioParams(apiModelId),
@@ -760,6 +800,18 @@ export default function AudioPage() {
       const url = result.fileUrl;
 
       if (!url) throw new Error(t('audio.generateFailed'));
+
+      const actual = Math.max(
+        1,
+        Math.floor(Number(result.audioInfo.price) || estimatedCost || hold),
+      );
+      if (actual > charged) {
+        await chargePlatformCredits(actual - charged, 'TTS price adjust');
+        charged = actual;
+      } else if (actual < charged) {
+        await refundPlatformCredits(charged - actual, 'TTS price adjust');
+        charged = actual;
+      }
 
       setResultUrl(url);
       addHistoryEntry({
@@ -782,13 +834,14 @@ export default function AudioPage() {
           modelId: slug || apiModelId,
           voiceId: selectedVoice.voice_id,
           server: provider,
-          costCredits: estimatedCost || result.audioInfo.price,
+          costCredits: charged,
           providerJobId: result.audioInfo.id_base,
           duration: result.audioInfo.duration,
         });
       } catch {
         /* local history vẫn giữ */
       }
+      charged = 0;
       void loadAudioLists();
 
       if (auth) {
@@ -801,8 +854,21 @@ export default function AudioPage() {
       notifyCreditsUpdated();
       setProgress('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setProgress('');
+      if (isJobAcceptedPendingError(err)) {
+        charged = 0;
+        setError('');
+        setProgress(err.message);
+      } else {
+        if (charged > 0) {
+          try {
+            await refundPlatformCredits(charged, 'TTS failed refund');
+          } catch {
+            /* best-effort */
+          }
+        }
+        setError(err instanceof Error ? err.message : String(err));
+        setProgress('');
+      }
     } finally {
       setSubmitting(false);
     }

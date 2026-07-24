@@ -38,15 +38,34 @@ $to = find_user_by_email_or_phone($pdo, $toQuery);
 if (!$to) {
     json_out(404, ['success' => false, 'message' => 'Không tìm thấy người nhận trên hệ thống']);
 }
+if ($to['id'] === $admin['id']) {
+    json_out(400, ['success' => false, 'message' => 'Không thể cấp credit cho chính mình']);
+}
 
 try {
     $pdo->beginTransaction();
+
+    $lockFrom = $pdo->prepare('SELECT id, credits FROM users WHERE id = ? FOR UPDATE');
+    $lockFrom->execute([$admin['id']]);
+    $fromRow = $lockFrom->fetch();
+    if (!$fromRow) {
+        throw new RuntimeException('Tài khoản admin không tồn tại');
+    }
+    if ((int) $fromRow['credits'] < $amount) {
+        $pdo->rollBack();
+        json_out(400, [
+            'success' => false,
+            'message' => 'Số dư ví nội bộ không đủ (cần ' . number_format($amount) . ')',
+        ]);
+    }
+
     $lockTo = $pdo->prepare('SELECT id FROM users WHERE id = ? FOR UPDATE');
     $lockTo->execute([$to['id']]);
     if (!$lockTo->fetch()) {
         throw new RuntimeException('Người nhận không tồn tại');
     }
 
+    $pdo->prepare('UPDATE users SET credits = credits - ? WHERE id = ?')->execute([$amount, $admin['id']]);
     $pdo->prepare('UPDATE users SET credits = credits + ? WHERE id = ?')->execute([$amount, $to['id']]);
 
     $transferId = uuid_v4();
@@ -55,6 +74,7 @@ try {
     )->execute([$transferId, $admin['id'], $to['id'], $amount, 'admin_grant', $message]);
 
     $pdo->commit();
+    $freshAdmin = find_user_by_id($pdo, $admin['id']);
     $freshTo = find_user_by_id($pdo, $to['id']);
 
     json_out(200, [
@@ -62,7 +82,8 @@ try {
         'data' => [
             'transferId' => $transferId,
             'amount' => $amount,
-            'message' => 'Cấp credit thành công',
+            'message' => 'Cấp credit thành công (đã trừ ví nội bộ)',
+            'from' => user_public($freshAdmin ?: $admin),
             'to' => [
                 'id' => $to['id'],
                 'email' => $to['email'],

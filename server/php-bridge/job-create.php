@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const JOB_CREATE_BRIDGE_BUILD = '2026-07-21-admin-vmedia';
+const JOB_CREATE_BRIDGE_BUILD = '2026-07-24-status-varchar64';
 
 require __DIR__ . '/bootstrap.php';
 require __DIR__ . '/gommo.php';
@@ -20,7 +20,8 @@ if (!function_exists('is_job_success_claim')) {
             || $s === 'COMPLETED'
             || $s === 'FINISH'
             || $s === 'FINISHED'
-            || strpos($s, 'SUCCESS') === 0;
+            || $s === 'MEDIA_GENERATION_STATUS_SUCCESSFUL'
+            || strpos($s, 'SUCCESS') !== false;
     }
 }
 if (!function_exists('is_job_failed_status')) {
@@ -40,9 +41,9 @@ if (!function_exists('is_job_failed_status')) {
             return true;
         }
         if (
-            strpos($s, 'PENDING') === 0
-            || strpos($s, 'SUCCESS') === 0
-            || strpos($s, 'PROCESS') === 0
+            strpos($s, 'PENDING') !== false
+            || strpos($s, 'SUCCESS') !== false
+            || strpos($s, 'PROCESS') !== false
             || strpos($s, 'ACTIVE') !== false
             || strpos($s, 'QUEUE') !== false
             || $s === 'RUNNING'
@@ -74,12 +75,9 @@ if (!function_exists('normalize_stored_job_status')) {
             return 'success';
         }
         if (is_job_failed_status($status)) {
-            return strtoupper(trim($status)) !== '' ? strtoupper(trim($status)) : 'FAILED';
+            return 'failed';
         }
-        if (is_job_success_claim($status) || $status === '') {
-            return 'processing';
-        }
-        return $status;
+        return 'processing';
     }
 }
 
@@ -126,14 +124,14 @@ if ($cost < 1) {
 }
 
 $jobId = uuid_v4();
-$isAdmin = user_is_admin($user);
+
+ensure_platform_jobs_refunded_at($pdo);
 
 try {
     $pdo->beginTransaction();
-    // Admin dùng token merchant VMedia — không trừ credit nội bộ platform.
-    if (!$isAdmin) {
-        charge_user_credits($pdo, (string) $user['id'], $cost);
-    }
+    // Trừ ví nội bộ cho mọi user (kể cả admin) để theo dõi quỹ phân phối + tự dùng.
+    // Job admin vẫn chạy bằng token merchant → VMedia cũng giảm tương ứng.
+    charge_user_credits($pdo, (string) $user['id'], $cost);
 
     $path = '/ai/jobs/' . rawurlencode($type) . '/' . rawurlencode($modelId);
     $envelope = gommo_post_form($path, $fields);
@@ -162,13 +160,10 @@ try {
     });
     $metaJson = $meta === [] ? null : json_encode($meta, JSON_UNESCAPED_UNICODE);
 
-    // Create đã fail ngay → hoàn credit trong cùng transaction.
+    // Create đã fail ngay → đánh dấu failed; hoàn credit sau INSERT (idempotent).
     $alreadyFailed = !$resultUrl && is_job_failed_status($status);
     if ($alreadyFailed) {
-        if (!$isAdmin) {
-            refund_user_credits($pdo, (string) $user['id'], $cost);
-        }
-        $status = $status !== '' && $status !== 'processing' ? $status : 'FAILED';
+        $status = $status !== '' && $status !== 'processing' ? $status : 'failed';
     }
 
     $pdo->prepare(
@@ -188,14 +183,9 @@ try {
         $cost,
     ]);
 
+    $refunded = false;
     if ($alreadyFailed) {
-        try {
-            $pdo->prepare(
-                'UPDATE platform_jobs SET refunded_at = CURRENT_TIMESTAMP WHERE id = ? AND refunded_at IS NULL'
-            )->execute([$jobId]);
-        } catch (Throwable $ignored) {
-            // Cột refunded_at có thể chưa migrate — bỏ qua.
-        }
+        $refunded = try_refund_failed_platform_job($pdo, $jobId, 'failed');
     }
 
     $pdo->commit();
@@ -207,6 +197,7 @@ try {
             'platformJobId' => $jobId,
             'costCredits' => $cost,
             'credits' => (int) (($freshUser ?: $user)['credits']),
+            'refunded' => $refunded,
             'envelope' => $envelope,
             'bridgeVersion' => JOB_CREATE_BRIDGE_BUILD,
         ],

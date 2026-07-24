@@ -24,7 +24,7 @@ const QUICK_LINKS = [
   { label: 'Nhóm Zalo', href: GO_URL, icon: Users, external: true },
   { label: 'Zalo hỗ trợ', href: GO_URL, icon: Phone, external: true },
   { label: 'Fanpage', href: GO_URL, icon: Share2, external: true },
-  { label: 'Nạp tiền & bảng giá', href: GO_URL, icon: Coins, external: true },
+  { label: 'Nạp tiền & bảng giá', href: '/pricing', icon: Coins, external: false },
   { label: 'Kết nối API', href: GO_URL, icon: Link2, external: true },
   { label: 'Chat hỗ trợ', href: GO_URL, icon: MessageCircle, external: true },
 ] as const;

@@ -14,7 +14,7 @@ return [
     'db_password' => 'a442379c2cda68',
     'jwt_secret' => 'ln-ai-dev-secret-2026-change-in-prod',
     'jwt_expires_seconds' => 604800,
-    'signup_bonus_credits' => 1000,
+    'signup_bonus_credits' => 0,
     'transfer_min' => 1000,
     'transfer_max' => 20000000,
     'admin_emails' => [

@@ -69,7 +69,7 @@ router.post('/transfer', async (req, res) => {
   }
 });
 
-/** Admin → user (cấp từ quỹ, không trừ ví admin) */
+/** Admin → user (cấp từ quỹ nội bộ — trừ ví admin) */
 router.post('/grant', async (req, res) => {
   try {
     await forwardToBridge(req, res, 'grant.php');

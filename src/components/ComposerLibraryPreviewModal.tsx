@@ -44,6 +44,7 @@ import {
 import { isModelAvailable, normalizeOptions } from '../services/modelSchema';
 import { downloadMediaUrl } from '../utils/downloadMedia';
 import { probeFileSize } from '../utils/probeFileSize';
+import { isJobAcceptedPendingError } from '../services/jobInfraErrors';
 
 export type ComposerPreviewHandlers = {
   onRegenerate?: () => void;
@@ -246,11 +247,18 @@ export default function ComposerLibraryPreviewModal({
       onUpscaleDone?.(resultUrl);
       setUpscaleOpen(false);
       void downloadMediaUrl(resultUrl);
-    } catch (e) {
-      setUpscaleError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setUpscaleBusy(false);
       setUpscaleStatus('');
+      setUpscaleBusy(false);
+    } catch (e) {
+      if (isJobAcceptedPendingError(e)) {
+        setUpscaleError('');
+        setUpscaleStatus(e.message);
+        window.setTimeout(() => setUpscaleBusy(false), 45_000);
+        return;
+      }
+      setUpscaleError(e instanceof Error ? e.message : String(e));
+      setUpscaleStatus('');
+      setUpscaleBusy(false);
     }
   }
 

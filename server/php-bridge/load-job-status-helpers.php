@@ -27,7 +27,8 @@ if (!function_exists('is_job_success_claim')) {
             || $s === 'COMPLETED'
             || $s === 'FINISH'
             || $s === 'FINISHED'
-            || strpos($s, 'SUCCESS') === 0;
+            || $s === 'MEDIA_GENERATION_STATUS_SUCCESSFUL'
+            || strpos($s, 'SUCCESS') !== false;
     }
 }
 
@@ -48,9 +49,9 @@ if (!function_exists('is_job_failed_status')) {
             return true;
         }
         if (
-            strpos($s, 'PENDING') === 0
-            || strpos($s, 'SUCCESS') === 0
-            || strpos($s, 'PROCESS') === 0
+            strpos($s, 'PENDING') !== false
+            || strpos($s, 'SUCCESS') !== false
+            || strpos($s, 'PROCESS') !== false
             || strpos($s, 'ACTIVE') !== false
             || strpos($s, 'QUEUE') !== false
             || $s === 'RUNNING'
@@ -83,11 +84,8 @@ if (!function_exists('normalize_stored_job_status')) {
             return 'success';
         }
         if (is_job_failed_status($status)) {
-            return strtoupper(trim($status)) !== '' ? strtoupper(trim($status)) : 'FAILED';
+            return 'failed';
         }
-        if (is_job_success_claim($status) || $status === '') {
-            return 'processing';
-        }
-        return $status;
+        return 'processing';
     }
 }

@@ -17,9 +17,11 @@ function isVideoItem(item: FeedItem): boolean {
 
 export default function FeedMasonryCard({
   item,
+  onOpen,
   onFavoriteChange,
 }: {
   item: FeedItem;
+  onOpen?: () => void;
   onFavoriteChange?: () => void;
 }) {
   const [fav, setFav] = useState(() => isFavorite(item.id_base));
@@ -29,7 +31,7 @@ export default function FeedMasonryCard({
   const author = item.author?.name || 'Ẩn danh';
   const likes = item.likes_count ?? item.like_count ?? 0;
   const comments = item.comments_count ?? 0;
-  const href = media || thumb || '#';
+  const openable = Boolean(onOpen && (media || thumb));
 
   useEffect(() => {
     const sync = () => setFav(isFavorite(item.id_base));
@@ -47,7 +49,20 @@ export default function FeedMasonryCard({
 
   return (
     <article className="feed-masonry-card">
-      <a className="feed-masonry-media" href={href} target="_blank" rel="noreferrer">
+      <div
+        className={`feed-masonry-media${openable ? ' feed-masonry-media-openable' : ''}`}
+        role={openable ? 'button' : undefined}
+        tabIndex={openable ? 0 : undefined}
+        onClick={() => {
+          if (openable) onOpen?.();
+        }}
+        onKeyDown={(e) => {
+          if (openable && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            onOpen?.();
+          }
+        }}
+      >
         {thumb ? (
           <img src={thumb} alt="" loading="lazy" />
         ) : (
@@ -79,7 +94,7 @@ export default function FeedMasonryCard({
             </span>
           </div>
         </div>
-      </a>
+      </div>
 
       <div className="feed-masonry-actions">
         <button

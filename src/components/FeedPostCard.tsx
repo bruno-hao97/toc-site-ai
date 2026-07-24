@@ -24,9 +24,11 @@ function isVideoItem(item: FeedItem): boolean {
 
 export default function FeedPostCard({
   item,
+  onOpen,
   onFavoriteChange,
 }: {
   item: FeedItem;
+  onOpen?: () => void;
   onFavoriteChange?: () => void;
 }) {
   const [fav, setFav] = useState(() => isFavorite(item.id_base));
@@ -37,6 +39,8 @@ export default function FeedPostCard({
   const likes = item.likes_count ?? item.like_count ?? 0;
   const comments = item.comments_count ?? 0;
   const prompt = (item.prompt || item.title || '').trim();
+
+  const openable = Boolean(onOpen && (media || thumb));
 
   useEffect(() => {
     const sync = () => setFav(isFavorite(item.id_base));
@@ -85,11 +89,19 @@ export default function FeedPostCard({
         </button>
       </header>
 
-      <a
-        className={`feed-post-media${video ? ' is-video' : ' is-image'}`}
-        href={media || thumb || '#'}
-        target="_blank"
-        rel="noreferrer"
+      <div
+        className={`feed-post-media${video ? ' is-video' : ' is-image'}${openable ? ' feed-post-media-openable' : ''}`}
+        role={openable ? 'button' : undefined}
+        tabIndex={openable ? 0 : undefined}
+        onClick={() => {
+          if (openable) onOpen?.();
+        }}
+        onKeyDown={(e) => {
+          if (openable && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            onOpen?.();
+          }
+        }}
       >
         <span className="feed-post-type-badge">{video ? 'VIDEO' : 'IMAGE'}</span>
         {thumb ? (
@@ -105,7 +117,7 @@ export default function FeedPostCard({
         {item.duration && Number(item.duration) > 0 && (
           <span className="feed-post-duration">{item.duration}s</span>
         )}
-      </a>
+      </div>
 
       {prompt && <p className="feed-post-prompt">{prompt}</p>}
 

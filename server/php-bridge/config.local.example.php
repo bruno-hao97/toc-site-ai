@@ -17,9 +17,12 @@ return [
     'db_password' => 'CHANGE_ME',
     'jwt_secret' => 'CHANGE_ME_SAME_AS_NODE_JWT_SECRET',
     'jwt_expires_seconds' => 604800,
-    'signup_bonus_credits' => 1000,
+    'signup_bonus_credits' => 0, // Không mint credit — user nhận qua cấp/chuyển/topup từ ví admin
     'transfer_min' => 1000,
     'transfer_max' => 20000000,
+    'migrate_key' => 'CHANGE_ME_MIGRATE_KEY',
+    // Node topup dùng BRIDGE_SERVICE_KEY = migrate_key này để gọi credit-from-admin.php
+    'service_key' => 'CHANGE_ME_MIGRATE_KEY',
     // Bắt buộc đúng một email; DB sẽ tự gỡ quyền admin khỏi mọi user khác.
     'admin_emails' => [
         'you@gmail.com',

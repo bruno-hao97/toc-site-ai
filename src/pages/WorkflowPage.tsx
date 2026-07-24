@@ -142,6 +142,7 @@ import {
   VFX_PORTS,
 } from '../services/workflowIoPorts';
 import { runImageUpscale } from '../services/imageUpscale';
+import { isJobAcceptedPendingError } from '../services/jobInfraErrors';
 import { askGommo, isGommoChatConfigured } from '../services/gommoChat';
 import { formatAgentDisplayContent } from '../services/agentDisplayContent';
 import {
@@ -2741,6 +2742,14 @@ function Flow() {
             });
             return { output: url };
           } catch (err) {
+            if (isJobAcceptedPendingError(err)) {
+              updateNode(node.id, {
+                status: 'running',
+                statusText: err.message,
+                error: undefined,
+              });
+              throw err;
+            }
             const msg = err instanceof Error ? err.message : String(err);
             updateNode(node.id, { status: 'error', statusText: undefined, error: msg });
             throw err;
@@ -2790,6 +2799,14 @@ function Flow() {
             });
             return { output: url };
           } catch (err) {
+            if (isJobAcceptedPendingError(err)) {
+              updateNode(node.id, {
+                status: 'running',
+                statusText: err.message,
+                error: undefined,
+              });
+              throw err;
+            }
             const msg = err instanceof Error ? err.message : String(err);
             updateNode(node.id, { status: 'error', statusText: undefined, error: msg });
             throw err;
@@ -2964,6 +2981,14 @@ function Flow() {
             });
             return { output: url };
           } catch (err) {
+            if (isJobAcceptedPendingError(err)) {
+              updateNode(node.id, {
+                status: 'running',
+                statusText: err.message,
+                error: undefined,
+              });
+              throw err;
+            }
             const msg = err instanceof Error ? err.message : String(err);
             updateNode(node.id, { status: 'error', statusText: undefined, error: msg });
             throw err;
@@ -3116,6 +3141,15 @@ function Flow() {
             });
             return { output: url };
           } catch (err) {
+            if (isJobAcceptedPendingError(err)) {
+              updateNode(node.id, {
+                status: 'running',
+                statusText: err.message,
+                error: undefined,
+                runEndedAt: undefined,
+              });
+              throw err;
+            }
             const msg = err instanceof Error ? err.message : String(err);
             updateNode(node.id, {
               status: 'error',
@@ -3205,7 +3239,12 @@ function Flow() {
       }
     } catch (err) {
       if ((err as { name?: string })?.name !== 'AbortError') {
-        setError(err instanceof Error ? err.message : String(err));
+        if (isJobAcceptedPendingError(err)) {
+          // Không coi là fail cứng — job vẫn chạy trên VMedia.
+          setError(err.message);
+        } else {
+          setError(err instanceof Error ? err.message : String(err));
+        }
       }
     } finally {
       setRunning(false);

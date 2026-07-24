@@ -1,4 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import ComposerLibraryPreviewModal, {
+  type ComposerPreviewHandlers,
+} from './ComposerLibraryPreviewModal';
+import FeedMasonryCard from './FeedMasonryCard';
 import { isLoggedIn } from '../services/authStore';
 import {
   feedMediaUrl,
@@ -8,17 +13,23 @@ import {
   type FeedItem,
 } from '../services/feedApi';
 import { UpstreamMeError } from '../services/upstreamMe';
-import FeedMasonryCard from './FeedMasonryCard';
+import {
+  canOpenFeedPreview,
+  feedPreviewKind,
+  navigateFeedItemReuse,
+} from '../utils/feedItemReuse';
 
 function hasVisual(item: FeedItem): boolean {
   return Boolean(feedThumb(item) || feedMediaUrl(item));
 }
 
 export default function HomeFeed() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const afterVideoRef = useRef('');
   const afterImageRef = useRef('');
@@ -112,13 +123,52 @@ export default function HomeFeed() {
     return () => observer.disconnect();
   }, [loadMore]);
 
+  const visualItems = useMemo(() => items.filter(canOpenFeedPreview), [items]);
+  const previewItem = previewIndex != null ? visualItems[previewIndex] : null;
+  const previewKindValue = previewItem ? feedPreviewKind(previewItem) : 'video';
+
+  const openItem = useCallback(
+    (item: FeedItem) => {
+      const idx = visualItems.findIndex((it) => it.id_base === item.id_base);
+      if (idx >= 0) setPreviewIndex(idx);
+    },
+    [visualItems],
+  );
+
+  const previewHandlers = useMemo((): ComposerPreviewHandlers => {
+    if (!previewItem) return {};
+    const close = () => setPreviewIndex(null);
+    const reuse = () => navigateFeedItemReuse(navigate, previewItem, close);
+    return {
+      onRegenerate: reuse,
+      onReuse: reuse,
+      onEdit: feedPreviewKind(previewItem) === 'video' ? reuse : undefined,
+    };
+  }, [previewItem, navigate]);
+
   return (
     <div className="home-feed">
       <div className="home-masonry home-masonry--feed">
         {items.map((item) => (
-          <FeedMasonryCard key={item.id_base} item={item} />
+          <FeedMasonryCard
+            key={item.id_base}
+            item={item}
+            onOpen={() => openItem(item)}
+          />
         ))}
       </div>
+
+      {previewIndex != null && visualItems.length > 0 && (
+        <ComposerLibraryPreviewModal
+          items={visualItems}
+          index={Math.min(previewIndex, visualItems.length - 1)}
+          kind={previewKindValue}
+          layout="home"
+          onClose={() => setPreviewIndex(null)}
+          onNavigate={setPreviewIndex}
+          handlers={previewHandlers}
+        />
+      )}
 
       {error && <p className="error feed-status">{error}</p>}
       {loading && <p className="muted feed-status">Đang tải…</p>}

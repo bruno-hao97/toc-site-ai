@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 
 export default function AccountSubscriptionPage() {
   const me = getUpstreamMe();
-  const { credits, isAdminVmedia } = useDisplayCredits();
+  const { credits, platformCredits, isAdminVmedia } = useDisplayCredits();
   const active = me?.userInfo?.activate === 1;
 
   return (
@@ -17,10 +17,23 @@ export default function AccountSubscriptionPage() {
             {active ? 'Active' : 'Free'}
           </span>
         </div>
-        <div className="account-detail-row-inline">
-          <span>{isAdminVmedia ? 'Credits Pro.agi.vn hiện tại' : 'Credits hiện tại'}</span>
-          <strong>{credits.toLocaleString('vi-VN')}</strong>
-        </div>
+        {isAdminVmedia ? (
+          <>
+            <div className="account-detail-row-inline">
+              <span>Ví nội bộ</span>
+              <strong>{platformCredits.toLocaleString('vi-VN')}</strong>
+            </div>
+            <div className="account-detail-row-inline">
+              <span>Credits Pro.agi.vn</span>
+              <strong>{credits.toLocaleString('vi-VN')}</strong>
+            </div>
+          </>
+        ) : (
+          <div className="account-detail-row-inline">
+            <span>Credits hiện tại</span>
+            <strong>{credits.toLocaleString('vi-VN')}</strong>
+          </div>
+        )}
         <Link
           to="/pricing"
           className="btn primary profile-upgrade-btn"

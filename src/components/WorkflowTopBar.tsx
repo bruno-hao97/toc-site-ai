@@ -34,7 +34,7 @@ export default function WorkflowTopBar({
 }: Props) {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
-  const { credits, isAdminVmedia, refresh } = useDisplayCredits();
+  const { credits, platformCredits, isAdminVmedia, refresh } = useDisplayCredits();
 
   const activeTab = tabs.find((t) => t.id === activeId);
 
@@ -111,9 +111,18 @@ export default function WorkflowTopBar({
               <Pin size={14} />
               <span>Ghim</span>
             </button>
-            <span className="credit-pill wf-tb-credit">{credits.toLocaleString('vi-VN')}</span>
+            {isAdminVmedia ? (
+              <span className="credit-pill wf-tb-credit wf-tb-credit--dual" title="Nội bộ / Pro.agi.vn">
+                {platformCredits.toLocaleString('vi-VN')}
+                <span className="wf-tb-credit-sep">/</span>
+                {credits.toLocaleString('vi-VN')}
+              </span>
+            ) : (
+              <span className="credit-pill wf-tb-credit">{credits.toLocaleString('vi-VN')}</span>
+            )}
             <UserMenuDropdown
               credits={credits}
+              platformCredits={platformCredits}
               isAdmin={isAdminVmedia}
               onCreditsRefresh={() => void refresh()}
             />

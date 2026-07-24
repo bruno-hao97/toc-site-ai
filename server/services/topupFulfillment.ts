@@ -1,5 +1,4 @@
 import { config, vndToCredits } from '../config.js';
-import { merchantSendBalances } from './gommoSendBalances.js';
 import { getTopupOrder, updateTopupOrder } from './topupOrders.js';
 
 export interface PayOsWebhookPayload {
@@ -13,6 +12,46 @@ function extractWebhookData(body: Record<string, unknown>): Record<string, unkno
   const nested = body.data;
   if (nested && typeof nested === 'object') return nested as Record<string, unknown>;
   return body;
+}
+
+/** Cộng credit platform từ ví admin (không mint / không sendBalances merchant). */
+async function creditUserFromAdminWallet(input: {
+  username: string;
+  credits: number;
+  message: string;
+}): Promise<void> {
+  const bridge = config.auth.bridgeUrl.replace(/\/$/, '');
+  const key = config.topup.bridgeServiceKey;
+  if (!bridge) {
+    throw new Error('AUTH_BRIDGE_URL chưa cấu hình — không cộng credit platform được');
+  }
+  if (!key) {
+    throw new Error('BRIDGE_SERVICE_KEY / MIGRATE_KEY chưa cấu hình (khớp migrate_key PHP)');
+  }
+
+  const url = `${bridge}/credit-from-admin.php`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      key,
+      to: input.username,
+      amount: input.credits,
+      message: input.message,
+      kind: 'topup_sale',
+    }),
+  });
+
+  const text = await res.text();
+  let parsed: { success?: boolean; message?: string };
+  try {
+    parsed = JSON.parse(text) as typeof parsed;
+  } catch {
+    throw new Error(text.slice(0, 200) || `HTTP ${res.status}`);
+  }
+  if (!res.ok || !parsed.success) {
+    throw new Error(parsed.message || `HTTP ${res.status}`);
+  }
 }
 
 export async function fulfillTopupFromWebhook(body: Record<string, unknown>): Promise<{
@@ -63,9 +102,9 @@ export async function fulfillTopupFromWebhook(body: Record<string, unknown>): Pr
   const message = `PayOS topup #${orderCode}`;
 
   try {
-    await merchantSendBalances({
+    await creditUserFromAdminWallet({
       username: order.username,
-      value: credits,
+      credits,
       message,
     });
     await updateTopupOrder(orderCode, {
@@ -75,13 +114,13 @@ export async function fulfillTopupFromWebhook(body: Record<string, unknown>): Pr
     });
     return {
       ok: true,
-      message: `Đã cộng ${credits} credit cho @${order.username}`,
+      message: `Đã cộng ${credits} credit (trừ ví admin) cho @${order.username}`,
       orderCode,
     };
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     await updateTopupOrder(orderCode, { status: 'failed', error: errMsg });
-    console.error('[payos/webhook] sendBalances failed', orderCode, errMsg);
+    console.error('[payos/webhook] credit-from-admin failed', orderCode, errMsg);
     return { ok: true, message: `Đã nhận webhook — lỗi cộng credit: ${errMsg}`, orderCode };
   }
 }
@@ -135,9 +174,9 @@ export async function fulfillTopupFromPay2sIpn(body: Record<string, unknown>): P
   const message = `Pay2S topup #${orderCode}`;
 
   try {
-    await merchantSendBalances({
+    await creditUserFromAdminWallet({
       username: order.username,
-      value: credits,
+      credits,
       message,
     });
     await updateTopupOrder(orderCode, {
@@ -147,13 +186,13 @@ export async function fulfillTopupFromPay2sIpn(body: Record<string, unknown>): P
     });
     return {
       ok: true,
-      message: `Đã cộng ${credits} credit cho @${order.username}`,
+      message: `Đã cộng ${credits} credit (trừ ví admin) cho @${order.username}`,
       orderCode,
     };
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     await updateTopupOrder(orderCode, { status: 'failed', error: errMsg });
-    console.error('[pay2s/ipn] sendBalances failed', orderCode, errMsg);
+    console.error('[pay2s/ipn] credit-from-admin failed', orderCode, errMsg);
     return { ok: true, message: `Đã nhận IPN — lỗi cộng credit: ${errMsg}`, orderCode };
   }
 }
