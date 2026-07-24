@@ -2874,7 +2874,7 @@ function Flow() {
             throw new Error('Agent: chưa có prompt');
           }
           if (!isGommoChatConfigured()) {
-            updateNode(node.id, { status: 'error', error: 'Chưa đăng nhập Gommo' });
+            updateNode(node.id, { status: 'error', error: 'Chưa đăng nhập' });
             throw new Error('Agent: chưa đăng nhập');
           }
           const chatModel = resolveAgentChatModel(String(node.data.modelId || ''));

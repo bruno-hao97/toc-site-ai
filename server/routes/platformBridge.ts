@@ -112,7 +112,7 @@ router.post('/job-create.php', async (req, res) => {
         envelope,
         bridgeVersion: PLATFORM_JOB_BRIDGE_BUILD,
         devNote:
-          'Local dev bridge: tạo job trực tiếp qua Gommo API + token admin. Upload job-create.php lên VPS để trừ credit + lưu lịch sử DB.',
+          'Local dev bridge: tạo job trực tiếp qua API merchant + token admin. Upload job-create.php lên VPS để trừ credit + lưu lịch sử DB.',
       },
     });
   } catch (err) {
@@ -227,13 +227,13 @@ router.get('/admin-vmedia-balance.php', async (req, res) => {
     const auth = authHeader(req);
     const user = await fetchBridgeUser(auth);
     if (!user.isAdmin) {
-      res.status(403).json({ success: false, message: 'Chỉ admin được xem số dư VMedia thật' });
+      res.status(403).json({ success: false, message: 'Chỉ admin được xem số dư merchant' });
       return;
     }
 
     const token = getGommoAdminToken();
     if (!token) {
-      res.status(503).json({ success: false, message: 'Chưa cấu hình GOMMO_ACCESS_TOKEN trên server' });
+      res.status(503).json({ success: false, message: 'Chưa cấu hình access token merchant trên server' });
       return;
     }
 
@@ -280,7 +280,6 @@ router.get('/admin-vmedia-balance.php', async (req, res) => {
       success: true,
       data: {
         credits_ai: Number(balances.credits_ai ?? 0),
-        domain,
         updated_time:
           typeof balances.updated_time === 'number' ? balances.updated_time : null,
       },
@@ -289,7 +288,7 @@ router.get('/admin-vmedia-balance.php', async (req, res) => {
     console.error('[platformBridge/admin-vmedia-balance]', err);
     res.status(500).json({
       success: false,
-      message: err instanceof Error ? err.message : 'Không lấy được số dư VMedia',
+      message: err instanceof Error ? err.message : 'Không lấy được số dư merchant',
     });
   }
 });

@@ -1,9 +1,10 @@
 import { GOMMO_AUTH_BASE, GOMMO_AUTH_PATH, UpstreamMeError } from './upstreamMe';
-import { clearAuth, isAdminUser, loadAuth, resolveProjectId } from './authStore';
+import { authUserKey, clearAuth, isAdminUser, loadAuth, resolveProjectId } from './authStore';
 import { GOMMO_CHAT_CONFIG } from './gommoChatConfig';
 import { buildDeviceInfo } from './audioVoices';
 import { usesPlatformJobs } from './platformJobClient';
 import { PLATFORM_BRIDGE } from './platformBridge';
+import { listHistory, type HistoryEntry } from './historyStore';
 
 /**
  * GET feed qua PHP bridge cho user thường (chỉ có platform_token).
@@ -61,7 +62,7 @@ async function parseFeedRes<T extends { success?: boolean; message?: string }>(
     const isHtml = /^\s*</.test(text) || /<!doctype|<br\s*\/?>|<b>Fatal/i.test(text);
     throw new UpstreamMeError(
       isHtml
-        ? 'Gateway lỗi (VPS gw.php cũ). Restart npm run dev hoặc upload gw.php mới lên VPS.'
+        ? 'Gateway tạm thời lỗi. Thử lại sau hoặc liên hệ hỗ trợ.'
         : text.slice(0, 200) || `HTTP ${res.status}`,
       res.status,
     );
@@ -138,6 +139,8 @@ export interface FeedItem {
   file_size?: number;
   category_name?: string;
   server_ai?: string;
+  /** TTS: voice id lưu từ meta job / history */
+  voice_id?: string;
 }
 
 export interface FeedPage {
@@ -350,6 +353,8 @@ function mapImageToFeedItem(img: MyImageItem): FeedItem {
   };
 }
 
+export type MineJobType = 'image' | 'video' | 'music' | 'tts';
+
 export async function fetchMyVideos(params: FetchMineParams = {}): Promise<MinePage> {
   if (usesPlatformJobs()) {
     return fetchPlatformMine('video', params);
@@ -395,6 +400,209 @@ export async function fetchMyImages(params: FetchMineParams = {}): Promise<MineP
   return { items, nextAfterId: parsed.next_after_id ?? last?.id_base ?? '' };
 }
 
+function feedItemTime(item: FeedItem): number {
+  const v = item.created_time;
+  const n = typeof v === 'string' ? Number(v) : v ?? 0;
+  return Number.isFinite(n) ? Number(n) : 0;
+}
+
+function paginateFeedItems(all: FeedItem[], params: FetchMineParams): MinePage {
+  const { limit = 30, afterId = '' } = params;
+  const sorted = [...all].sort((a, b) => feedItemTime(b) - feedItemTime(a));
+  let start = 0;
+  if (afterId) {
+    const idx = sorted.findIndex((e) => e.id_base === afterId);
+    start = idx >= 0 ? idx + 1 : 0;
+  }
+  const slice = sorted.slice(start, start + limit);
+  const last = slice.length ? slice[slice.length - 1] : undefined;
+  const nextAfterId =
+    slice.length === limit && last && start + limit < sorted.length ? last.id_base : '';
+  return { items: slice, nextAfterId };
+}
+
+function dedupeFeedItems(items: FeedItem[]): FeedItem[] {
+  const byId = new Map<string, FeedItem>();
+  const byUrl = new Map<string, string>();
+  for (const it of items) {
+    if (!it.id_base) continue;
+    const url = (it.download_url || it.resolutions?.[0]?.url || '').trim();
+    if (url) {
+      const existingId = byUrl.get(url);
+      if (existingId && existingId !== it.id_base) continue;
+      byUrl.set(url, it.id_base);
+    }
+    if (!byId.has(it.id_base)) byId.set(it.id_base, it);
+  }
+  return [...byId.values()];
+}
+
+async function collectPlatformMine(type: MineJobType, maxPages = 5): Promise<FeedItem[]> {
+  const out: FeedItem[] = [];
+  let afterId = '';
+  for (let i = 0; i < maxPages; i++) {
+    const page = await fetchPlatformMine(type, { limit: 50, afterId });
+    out.push(...page.items);
+    if (!page.nextAfterId || page.nextAfterId === afterId) break;
+    afterId = page.nextAfterId;
+  }
+  return out;
+}
+
+type AudioMusicCache = { userKey: string; at: number; items: FeedItem[] };
+const audioFeedCache: { current: AudioMusicCache | null } = { current: null };
+const musicFeedCache: { current: AudioMusicCache | null } = { current: null };
+const AUDIO_MUSIC_CACHE_MS = 20_000;
+
+export function invalidateMineAudioMusicCaches(): void {
+  audioFeedCache.current = null;
+  musicFeedCache.current = null;
+}
+
+function cacheMatchesUser(cache: AudioMusicCache | null): cache is AudioMusicCache {
+  return Boolean(cache && cache.userKey === authUserKey());
+}
+
+/** Job nhạc AI — platform job-list theo user + local history (scoped user). */
+export async function fetchMyMusic(params: FetchMineParams = {}): Promise<MinePage> {
+  const now = Date.now();
+  const userKey = authUserKey();
+  if (
+    !params.afterId
+    && cacheMatchesUser(musicFeedCache.current)
+    && now - musicFeedCache.current.at < AUDIO_MUSIC_CACHE_MS
+  ) {
+    return paginateFeedItems(musicFeedCache.current.items, params);
+  }
+  if (params.afterId && cacheMatchesUser(musicFeedCache.current)) {
+    return paginateFeedItems(musicFeedCache.current.items, params);
+  }
+
+  const chunks: FeedItem[] = listHistory('music').map(historyEntryToFeedItem);
+  if (usesPlatformJobs()) {
+    try {
+      chunks.push(...(await collectPlatformMine('music')));
+    } catch {
+      // giữ history
+    }
+  }
+  const items = dedupeFeedItems(chunks);
+  musicFeedCache.current = { userKey, at: now, items };
+  return paginateFeedItems(items, params);
+}
+
+/**
+ * Job âm thanh / TTS — chỉ job của user (job-list) + local history scoped.
+ * Không dùng Gommo getLists (token merchant chung).
+ */
+export async function fetchMyAudio(params: FetchMineParams = {}): Promise<MinePage> {
+  const now = Date.now();
+  const userKey = authUserKey();
+  if (
+    !params.afterId
+    && cacheMatchesUser(audioFeedCache.current)
+    && now - audioFeedCache.current.at < AUDIO_MUSIC_CACHE_MS
+  ) {
+    return paginateFeedItems(audioFeedCache.current.items, params);
+  }
+  if (params.afterId && cacheMatchesUser(audioFeedCache.current)) {
+    return paginateFeedItems(audioFeedCache.current.items, params);
+  }
+
+  const chunks: FeedItem[] = listHistory('tts').map(historyEntryToFeedItem);
+
+  if (usesPlatformJobs()) {
+    try {
+      chunks.push(...(await collectPlatformMine('tts')));
+    } catch {
+      // ignore
+    }
+  }
+
+  const items = dedupeFeedItems(chunks);
+  audioFeedCache.current = { userKey, at: now, items };
+  return paginateFeedItems(items, params);
+}
+
+/** Ghi TTS/music đã xong vào platform_jobs của user (không trừ credit). */
+export async function recordPlatformJob(input: {
+  type: 'tts' | 'music';
+  resultUrl: string;
+  modelId: string;
+  prompt?: string;
+  costCredits?: number;
+  providerJobId?: string;
+  meta?: Record<string, string>;
+}): Promise<string> {
+  const auth = loadAuth();
+  const token = auth?.platform_token?.trim();
+  if (!token) throw new UpstreamMeError('Chưa đăng nhập tài khoản hệ thống', 401);
+
+  const res = await fetch(PLATFORM_BRIDGE.jobRecord, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      type: input.type,
+      modelId: input.modelId,
+      resultUrl: input.resultUrl,
+      prompt: input.prompt || '',
+      costCredits: input.costCredits ?? 0,
+      providerJobId: input.providerJobId || '',
+      meta: input.meta || {},
+    }),
+  });
+  if (res.status === 401 || res.status === 403) {
+    clearAuth();
+    if (typeof window !== 'undefined') window.location.href = '/login';
+  }
+  const text = await res.text();
+  let parsed: { success?: boolean; message?: string; data?: { platformJobId?: string } };
+  try {
+    parsed = JSON.parse(text) as typeof parsed;
+  } catch {
+    throw new UpstreamMeError(text || `HTTP ${res.status}`, res.status);
+  }
+  if (!res.ok || parsed.success === false || !parsed.data?.platformJobId) {
+    throw new UpstreamMeError(parsed.message || 'Ghi job thất bại', res.status);
+  }
+  invalidateMineAudioMusicCaches();
+  return parsed.data.platformJobId;
+}
+
+function historyEntryToFeedItem(entry: HistoryEntry): FeedItem {
+  const url = (entry.resultUrl || '').trim();
+  const feedType = entry.type;
+  const cover = (entry.meta?.coverUrl || entry.meta?.cover_url || '').trim();
+  const visualThumb =
+    feedType === 'image' || feedType === 'video' || feedType === 'avatar-lipsync'
+      ? url || undefined
+      : cover || undefined;
+  const voiceId = (entry.meta?.voice_id || entry.meta?.voiceId || '').trim();
+  const server = (entry.meta?.server || entry.meta?.provider || '').trim();
+  return {
+    id_base: entry.id,
+    type: feedType,
+    status: url ? 'FINISH' : 'processing',
+    prompt: entry.prompt || undefined,
+    model: entry.modelSlug || entry.modelName || undefined,
+    download_url: url || undefined,
+    thumbnail_url: visualThumb,
+    created_time: entry.createdAt
+      ? Math.floor(new Date(entry.createdAt).getTime() / 1000)
+      : undefined,
+    duration: entry.meta?.duration || undefined,
+    voice_id: voiceId || undefined,
+    server_ai: server || undefined,
+    resolutions: url
+      ? [{ type: feedType, status: 'FINISH', url }]
+      : undefined,
+  };
+}
+
 interface PlatformJobListItem {
   id: string;
   providerJobId?: string | null;
@@ -406,14 +614,36 @@ interface PlatformJobListItem {
   ratio?: string | null;
   resolution?: string | null;
   mode?: string | null;
+  coverUrl?: string | null;
+  voiceId?: string | null;
+  server?: string | null;
+  duration?: string | number | null;
+  fileSize?: number | null;
   costCredits?: number;
   createdTime?: number | null;
 }
 
+function platformFeedType(jobType: string): string {
+  const t = (jobType || '').toLowerCase();
+  if (t === 'video' || t === 'avatar-lipsync') return t === 'avatar-lipsync' ? 'video' : 'video';
+  if (t === 'image' || t === 'image-upscale' || t === 'remove-bg') return 'image';
+  if (t === 'music') return 'music';
+  if (t === 'tts' || t.includes('audio')) return 'tts';
+  return t || 'image';
+}
+
 function platformJobToFeedItem(job: PlatformJobListItem): FeedItem {
   const url = (job.resultUrl || '').trim();
-  const feedType = job.jobType === 'video' ? 'video' : 'image';
+  const cover = (job.coverUrl || '').trim();
+  const feedType = platformFeedType(job.jobType);
+  const isVisual = feedType === 'video' || feedType === 'image';
   const status = (job.status || '').trim() || (url ? 'FINISH' : 'processing');
+  const voiceId = (job.voiceId || '').trim();
+  const server = (job.server || '').trim();
+  const duration =
+    job.duration != null && String(job.duration).trim() !== ''
+      ? String(job.duration)
+      : undefined;
   return {
     id_base: job.id,
     type: feedType,
@@ -423,10 +653,14 @@ function platformJobToFeedItem(job: PlatformJobListItem): FeedItem {
     ratio: job.ratio || undefined,
     resolution: job.resolution || undefined,
     mode: job.mode || undefined,
-    thumbnail_url: url || undefined,
+    thumbnail_url: isVisual ? url || undefined : cover || undefined,
     download_url: url || undefined,
     created_time: job.createdTime ?? undefined,
     credit_fee: typeof job.costCredits === 'number' ? job.costCredits : undefined,
+    voice_id: voiceId || undefined,
+    server_ai: server || undefined,
+    duration,
+    file_size: typeof job.fileSize === 'number' && job.fileSize > 0 ? job.fileSize : undefined,
     resolutions: url
       ? [{ type: feedType, status: 'FINISH', url, name: job.resolution || undefined }]
       : undefined,
@@ -435,17 +669,19 @@ function platformJobToFeedItem(job: PlatformJobListItem): FeedItem {
 
 /**
  * User thường → chỉ job trong DB theo user_id (job-list).
- * Admin → toàn bộ thư viện merchant Gommo (mine-media).
+ * Admin image/video → thư viện merchant Gommo (mine-media).
+ * Admin music/tts → job-list của chính họ (mine-media không có audio).
  */
 async function fetchPlatformMine(
-  type: 'image' | 'video',
+  type: MineJobType,
   params: FetchMineParams,
 ): Promise<MinePage> {
   const { limit = 30, afterId = '' } = params;
   const q: Record<string, string> = { type, limit: String(limit) };
   if (afterId) q.afterId = afterId;
 
-  if (!isAdminUser()) {
+  const useJobList = !isAdminUser() || type === 'music' || type === 'tts';
+  if (useJobList) {
     const parsed = await platformFeedGet<{
       success?: boolean;
       message?: string;
@@ -508,6 +744,18 @@ function isVideoMediaUrl(url: string): boolean {
   return /\.(mp4|webm|mov|m4v|m3u8|avi)(\?|$)/i.test(base) || base.includes('/video/');
 }
 
+export function isAudioMediaUrl(url: string): boolean {
+  const base = url.split('?')[0].split('#')[0].toLowerCase();
+  return /\.(mp3|wav|ogg|m4a|aac|flac|opus)(\?|$)/i.test(base) || base.includes('/audio/');
+}
+
+export function feedIsAudioItem(item: FeedItem): boolean {
+  const t = (item.type || '').toLowerCase();
+  if (t === 'music' || t === 'tts' || t.includes('audio')) return true;
+  const media = feedMediaUrl(item);
+  return Boolean(media && isAudioMediaUrl(media));
+}
+
 function mapVideoToFeedItem(raw: FeedItem): FeedItem {
   const ext = raw as FeedItem & {
     quality?: string | number;
@@ -525,6 +773,13 @@ function mapVideoToFeedItem(raw: FeedItem): FeedItem {
 }
 
 export function feedThumb(item: FeedItem): string | null {
+  if (feedIsAudioItem(item)) {
+    // Music cover_url lưu ở thumbnail_url — không dùng file audio làm thumb.
+    const cover = item.thumbnail_url?.trim() || item.url_preview?.trim();
+    if (cover && !isAudioMediaUrl(cover) && !isVideoMediaUrl(cover)) return cover;
+    return null;
+  }
+
   const candidates: string[] = [];
   const push = (u?: string | null) => {
     const t = u?.trim();
@@ -539,9 +794,9 @@ export function feedThumb(item: FeedItem): string | null {
   push(item.download_url);
   push(item.url);
 
-  const poster = candidates.find((u) => !isVideoMediaUrl(u));
+  const poster = candidates.find((u) => !isVideoMediaUrl(u) && !isAudioMediaUrl(u));
   if (poster) return poster;
-  return candidates[0] ?? null;
+  return candidates.find((u) => !isAudioMediaUrl(u)) ?? null;
 }
 
 /** URL poster ảnh cho video (không phải file .mp4). */

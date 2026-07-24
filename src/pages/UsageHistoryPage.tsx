@@ -306,7 +306,7 @@ export default function UsageHistoryPage() {
           </h1>
           <p className="uh-sub">Theo dõi model và credit usage của bạn</p>
           {source === 'local' && (
-            <p className="uh-fallback">Đang dùng lịch sử Studio local — chưa có billing upstream.</p>
+            <p className="uh-fallback">Đang dùng lịch sử Studio trên trình duyệt — chưa có lịch sử thanh toán từ hệ thống.</p>
           )}
         </div>
         <button type="button" className="uh-export" onClick={exportCsv} disabled={!filtered.length}>

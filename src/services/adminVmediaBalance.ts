@@ -3,7 +3,6 @@ import { PLATFORM_BRIDGE } from './platformBridge';
 
 export interface AdminVmediaBalance {
   credits_ai: number;
-  domain: string;
   updated_time: number | null;
 }
 

@@ -20,12 +20,12 @@ try {
 }
 
 if (!user_is_admin($admin)) {
-    json_out(403, ['success' => false, 'message' => 'Chỉ admin được xem số dư VMedia thật']);
+    json_out(403, ['success' => false, 'message' => 'Chỉ admin được xem số dư merchant']);
 }
 
 $g = gommo_cfg();
 if ($g['token'] === '') {
-    json_out(503, ['success' => false, 'message' => 'Chưa cấu hình gommo_access_token trên server']);
+    json_out(503, ['success' => false, 'message' => 'Chưa cấu hình access token merchant trên server']);
 }
 
 $url = rtrim($g['auth_base'], '/') . '/api/apps/go-mmo/ai/me';
@@ -76,7 +76,6 @@ json_out(200, [
     'success' => true,
     'data' => [
         'credits_ai' => $creditsAi,
-        'domain' => $g['domain'],
         'updated_time' => isset($balances['updated_time']) ? (int) $balances['updated_time'] : null,
     ],
 ]);

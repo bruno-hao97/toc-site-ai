@@ -59,7 +59,7 @@ const en: TranslationMap = {
   'composer.aiGenerating': 'Generating…',
   'composer.aiBriefPlaceholder': 'Briefly describe your idea…',
   'composer.aiHintLoggedIn':
-    'AI will expand this into a detailed prompt (Gommo token or app account).',
+    'AI will expand this into a detailed prompt when you are signed in.',
   'composer.aiHintGuest': 'Sign in to use AI; using a basic template for now.',
   'composer.multiPrompt.title': 'Multi-Prompt',
   'composer.multiPrompt.desc':
@@ -213,7 +213,7 @@ const en: TranslationMap = {
   'audio.noVoice': 'Please select a voice.',
   'audio.noModel': 'No TTS model available for this provider.',
   'audio.noScript': 'Please enter a script.',
-  'audio.loginRequired': 'Sign in with a Gommo access token.',
+  'audio.loginRequired': 'Please sign in to continue.',
   'audio.generateFailed': 'Audio generation failed.',
   'audio.preview': 'Preview',
   'audio.comingSoon': 'Coming soon',

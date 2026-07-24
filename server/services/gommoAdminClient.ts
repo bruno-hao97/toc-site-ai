@@ -24,7 +24,7 @@ export function getGommoProjectId(): string {
 
 function parseGommoError(text: string, status: number): string {
   if (text.trimStart().startsWith('<!')) {
-    return `Gommo upstream HTTP ${status} (HTML error page)`;
+    return `Upstream HTTP ${status} (HTML error page)`;
   }
   try {
     const parsed = JSON.parse(text) as { message?: string };

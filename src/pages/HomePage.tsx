@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import HomeFeed from '../components/HomeFeed';
+import HomeFavoritesFeed from '../components/HomeFavoritesFeed';
 import HomeMyContent, { type MineFilter } from '../components/HomeMyContent';
 import HomeQuickCreateBar from '../components/HomeQuickCreateBar';
 
@@ -16,11 +17,13 @@ const HOME_TABS = [
 
 type HomeTab = (typeof HOME_TABS)[number];
 
-// Tab dùng nội dung "của tôi" (gọi /ai/videos + /ai/images) → ánh xạ sang filter.
+// Tab dùng nội dung "của tôi" → ánh xạ sang filter job đúng loại.
 const MINE_TABS: Partial<Record<HomeTab, MineFilter>> = {
   'Của tôi': 'all',
   Videos: 'video',
   'Hình ảnh': 'image',
+  Nhạc: 'music',
+  'Âm thanh': 'tts',
 };
 
 export default function HomePage() {
@@ -42,7 +45,9 @@ export default function HomePage() {
         ))}
       </div>
 
-      {mineFilter ? (
+      {tab === 'Yêu thích' ? (
+        <HomeFavoritesFeed />
+      ) : mineFilter ? (
         <HomeMyContent key={mineFilter} filter={mineFilter} />
       ) : (
         <HomeFeed />

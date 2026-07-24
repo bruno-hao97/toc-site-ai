@@ -66,10 +66,6 @@ export default function WalletPage() {
         </p>
       </div>
 
-      <div className="banner warn">
-        Số dư &amp; lịch sử chi tiêu lấy trực tiếp từ Gommo. Nạp credit thực hiện trên hệ thống Gommo.
-      </div>
-
       {loading && <p className="muted">Đang tải…</p>}
       {error && <p className="error">{error}</p>}
 

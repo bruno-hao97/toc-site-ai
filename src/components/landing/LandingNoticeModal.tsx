@@ -11,20 +11,22 @@ import {
   X,
 } from 'lucide-react';
 import BrandLogo from '../BrandLogo';
-import { CONTACT_PHONE_TEL, contactPhoneLine } from '../../lib/brand';
+import { contactPhoneLine } from '../../lib/brand';
 
 interface Props {
   open: boolean;
   onAccept: () => void;
 }
 
+const GO_URL = 'https://toctoc.vn/go/';
+
 const QUICK_LINKS = [
-  { label: 'Nhóm Zalo', href: '#', icon: Users, external: true },
-  { label: 'Zalo hỗ trợ', href: CONTACT_PHONE_TEL, icon: Phone, external: false },
-  { label: 'Fanpage', href: 'https://facebook.com', icon: Share2, external: true },
-  { label: 'Nạp tiền & bảng giá', href: '#pricing', icon: Coins, external: false },
-  { label: 'Kết nối API', href: '#features', icon: Link2, external: false },
-  { label: 'Chat hỗ trợ', href: '#', icon: MessageCircle, external: false },
+  { label: 'Nhóm Zalo', href: GO_URL, icon: Users, external: true },
+  { label: 'Zalo hỗ trợ', href: GO_URL, icon: Phone, external: true },
+  { label: 'Fanpage', href: GO_URL, icon: Share2, external: true },
+  { label: 'Nạp tiền & bảng giá', href: GO_URL, icon: Coins, external: true },
+  { label: 'Kết nối API', href: GO_URL, icon: Link2, external: true },
+  { label: 'Chat hỗ trợ', href: GO_URL, icon: MessageCircle, external: true },
 ] as const;
 
 const PROHIBITED_ITEMS = [

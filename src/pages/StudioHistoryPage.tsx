@@ -108,7 +108,7 @@ export default function StudioHistoryPage() {
         <p className="kicker">Studio</p>
         <h1>Lịch sử tạo nội dung</h1>
         <p className="lead">
-          Kết quả gen thành công lưu trên trình duyệt (<code>ai_studio_history</code>).
+          Kết quả gen thành công được lưu trên trình duyệt của bạn.
         </p>
       </div>
 

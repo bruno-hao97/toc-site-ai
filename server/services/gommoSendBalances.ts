@@ -9,7 +9,7 @@ export interface MerchantSendBalancesInput {
 }
 
 function normalizeSendError(message?: string): string {
-  if (!message) return 'Gommo sendBalances thất bại';
+  if (!message) return 'Chuyển credit thất bại';
   if (/domain/i.test(message)) {
     return 'Merchant token chưa đúng domain — kiểm tra GOMMO_API_DOMAIN.';
   }

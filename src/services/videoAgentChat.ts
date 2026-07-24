@@ -61,7 +61,7 @@ export async function askVideoAgent(
   if (!text) return '';
 
   if (!isGommoChatConfigured()) {
-    throw new Error('Cần đăng nhập Gommo để dùng Video Agent.');
+    throw new Error('Cần đăng nhập để dùng Video Agent.');
   }
 
   return askGommo(text, {

@@ -13,6 +13,7 @@ export interface PollProgress {
   phase: StatusPhase;
   status: string;
   resultUrl: string | null;
+  coverUrl?: string | null;
   idBase?: string;
   envelope: unknown;
 }
@@ -23,6 +24,7 @@ export interface PollResult {
   error?: string;
   status?: string;
   resultUrl?: string | null;
+  coverUrl?: string | null;
   idBase?: string;
 }
 
@@ -59,6 +61,7 @@ export async function startPolling(
       phase,
       status: snap.status,
       resultUrl: snap.resultUrl,
+      coverUrl: snap.coverUrl,
       idBase: snap.idBase,
       envelope,
     });
@@ -87,18 +90,19 @@ export async function createJobAndPoll(
   createEnvelope: unknown;
   pollResult?: PollResult;
   resultUrl?: string | null;
+  coverUrl?: string | null;
 }> {
   onProgress?.({ phase: 'creating' });
   const createEnvelope = await client.createJob(type, modelId, fields);
   const snap = extractPollSnapshot(createEnvelope);
 
   if (snap.resultUrl && classifyGatewayStatus(snap.status, snap.resultUrl) === 'success') {
-    return { createEnvelope, resultUrl: snap.resultUrl };
+    return { createEnvelope, resultUrl: snap.resultUrl, coverUrl: snap.coverUrl };
   }
 
   const pollMedia = pollMediaForJobType(type);
   if (!pollMedia) {
-    return { createEnvelope, resultUrl: snap.resultUrl };
+    return { createEnvelope, resultUrl: snap.resultUrl, coverUrl: snap.coverUrl };
   }
 
   const jobId = snap.idBase;
@@ -106,6 +110,7 @@ export async function createJobAndPoll(
     return {
       createEnvelope,
       pollResult: { success: false, error: 'Không có id_base để poll' },
+      coverUrl: snap.coverUrl,
     };
   }
 
@@ -118,6 +123,7 @@ export async function createJobAndPoll(
     createEnvelope,
     pollResult,
     resultUrl: pollResult.resultUrl ?? snap.resultUrl,
+    coverUrl: pollResult.coverUrl ?? snap.coverUrl,
   };
 }
 

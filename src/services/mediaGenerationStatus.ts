@@ -119,7 +119,43 @@ export function checkVideoStatus(payload: VideoStatusPayload): {
 export interface PollSnapshot {
   status: string;
   resultUrl: string | null;
+  coverUrl?: string | null;
   idBase?: string;
+}
+
+type LooseRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): LooseRecord | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as LooseRecord)
+    : null;
+}
+
+function pickHttpUrl(...candidates: unknown[]): string | null {
+  for (const c of candidates) {
+    if (typeof c === 'string' && isValidResultUrl(c)) return c.trim();
+  }
+  return null;
+}
+
+/** Ảnh bìa nhạc từ Gommo (`cover_url`). */
+export function extractCoverUrl(envelope: unknown): string | null {
+  const root = asRecord(envelope);
+  if (!root) return null;
+  const data = asRecord(root.data) || {};
+  const raw = asRecord(root.raw) || {};
+  const musicInfo = asRecord(raw.musicInfo) || asRecord(data.musicInfo) || {};
+  const audioInfo = asRecord(raw.audioInfo) || asRecord(data.audioInfo) || {};
+  return pickHttpUrl(
+    data.cover_url,
+    data.coverUrl,
+    musicInfo.cover_url,
+    musicInfo.coverUrl,
+    audioInfo.cover_url,
+    audioInfo.coverUrl,
+    root.cover_url,
+    root.coverUrl,
+  );
 }
 
 /** Trích xuất snapshot từ envelope gateway. */
@@ -127,29 +163,64 @@ export function extractPollSnapshot(envelope: {
   data?: {
     status?: string;
     result_url?: string | null;
+    music_url?: string | null;
+    cover_url?: string | null;
+    coverUrl?: string | null;
     id_base?: string;
     job_id?: string;
   };
   raw?: {
     imageInfo?: { status?: string; result_url?: string };
     videoInfo?: { status?: string; result_url?: string; url?: string };
-    audioInfo?: { status?: string; result_url?: string; url?: string; file_url?: string };
+    audioInfo?: {
+      status?: string;
+      result_url?: string;
+      url?: string;
+      file_url?: string;
+      music_url?: string;
+      cover_url?: string;
+    };
+    musicInfo?: {
+      status?: string;
+      result_url?: string;
+      url?: string;
+      music_url?: string;
+      cover_url?: string;
+      coverUrl?: string;
+    };
   };
+  cover_url?: string;
+  music_url?: string;
 }): PollSnapshot {
   const data = envelope.data || {};
   const raw = envelope.raw || {};
   const audioInfo = raw.audioInfo;
+  const musicInfo = raw.musicInfo;
+  const coverUrl = extractCoverUrl(envelope);
   return {
-    status: data.status || raw.imageInfo?.status || raw.videoInfo?.status || audioInfo?.status || '',
-    resultUrl:
-      data.result_url ??
-      raw.imageInfo?.result_url ??
-      raw.videoInfo?.result_url ??
-      raw.videoInfo?.url ??
-      audioInfo?.file_url ??
-      audioInfo?.result_url ??
-      audioInfo?.url ??
-      null,
+    status:
+      data.status
+      || raw.imageInfo?.status
+      || raw.videoInfo?.status
+      || musicInfo?.status
+      || audioInfo?.status
+      || '',
+    resultUrl: pickHttpUrl(
+      data.result_url,
+      data.music_url,
+      raw.imageInfo?.result_url,
+      raw.videoInfo?.result_url,
+      raw.videoInfo?.url,
+      musicInfo?.music_url,
+      musicInfo?.result_url,
+      musicInfo?.url,
+      audioInfo?.file_url,
+      audioInfo?.music_url,
+      audioInfo?.result_url,
+      audioInfo?.url,
+      envelope.music_url,
+    ),
+    coverUrl,
     idBase: data.id_base || data.job_id,
   };
 }

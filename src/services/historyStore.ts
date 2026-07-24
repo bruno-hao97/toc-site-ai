@@ -1,3 +1,5 @@
+import { authUserKey } from './authStore';
+
 export type HistoryType = 'image' | 'video' | 'tts' | 'music' | 'avatar-lipsync';
 
 export interface HistoryEntry {
@@ -13,7 +15,7 @@ export interface HistoryEntry {
 
 export type HistoryMediaKind = 'image' | 'video' | 'audio' | 'file';
 
-const STORAGE_KEY = 'ai_studio_history';
+const LEGACY_STORAGE_KEY = 'ai_studio_history';
 const MAX_PER_TYPE = 80;
 
 export const JOB_TYPES: { value: HistoryType; label: string; icon: string }[] = [
@@ -24,18 +26,36 @@ export const JOB_TYPES: { value: HistoryType; label: string; icon: string }[] = 
   { value: 'avatar-lipsync', label: 'Avatar nói', icon: '👤' },
 ];
 
+function storageKey(): string {
+  return `${LEGACY_STORAGE_KEY}:${authUserKey()}`;
+}
+
 function loadAll(): HistoryEntry[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? (arr as HistoryEntry[]) : [];
+    const key = storageKey();
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? (arr as HistoryEntry[]) : [];
+    }
+
+    // Một lần: chuyển lịch sử cũ (chung browser) sang user hiện tại.
+    const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!legacyRaw) return [];
+    const legacy = JSON.parse(legacyRaw);
+    const entries = Array.isArray(legacy) ? (legacy as HistoryEntry[]) : [];
+    if (entries.length) {
+      localStorage.setItem(key, JSON.stringify(entries));
+    }
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    return entries;
   } catch {
     return [];
   }
 }
 
 function saveAll(entries: HistoryEntry[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  localStorage.setItem(storageKey(), JSON.stringify(entries));
 }
 
 function dispatchUpdated(detail?: HistoryEntry): void {
@@ -131,28 +151,4 @@ export function isMediaUrl(url: string, type?: HistoryType): HistoryMediaKind {
 
 export function isValidHistoryType(value: string | undefined): value is HistoryType {
   return JOB_TYPES.some((t) => t.value === value);
-}
-
-const FAV_KEY = 'ai_studio_favorites';
-
-export function loadFavorites(): Set<string> {
-  try {
-    const raw = localStorage.getItem(FAV_KEY);
-    const arr = raw ? JSON.parse(raw) : [];
-    return new Set(Array.isArray(arr) ? (arr as string[]) : []);
-  } catch {
-    return new Set();
-  }
-}
-
-export function isFavorite(id: string): boolean {
-  return loadFavorites().has(id);
-}
-
-export function toggleFavorite(id: string): void {
-  const favs = loadFavorites();
-  if (favs.has(id)) favs.delete(id);
-  else favs.add(id);
-  localStorage.setItem(FAV_KEY, JSON.stringify([...favs]));
-  dispatchUpdated();
 }

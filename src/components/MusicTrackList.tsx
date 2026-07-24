@@ -6,6 +6,8 @@ export interface MusicTrackItem {
   modelLabel?: string;
   createdAt?: string;
   resultUrl?: string;
+  /** Ảnh bìa từ API `cover_url`. */
+  coverUrl?: string;
   status?: 'processing' | 'failed' | 'success';
   progress?: number;
 }
@@ -69,6 +71,8 @@ export default function MusicTrackList({
             <div className="music-track-thumb" aria-hidden>
               {processing ? (
                 <span className="music-track-spinner" />
+              ) : item.coverUrl ? (
+                <img className="music-track-cover" src={item.coverUrl} alt="" loading="lazy" />
               ) : (
                 <Music2 size={22} />
               )}

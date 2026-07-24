@@ -337,7 +337,7 @@ export default function ComposerHistory({
   if (kind === 'unsupported') {
     return (
       <div className="chist-status">
-        Lịch sử Gommo hiện hỗ trợ ảnh và video. Hãy chuyển sang tab Ảnh hoặc Video.
+        Lịch sử hiện hỗ trợ ảnh và video. Hãy chuyển sang tab Ảnh hoặc Video.
       </div>
     );
   }

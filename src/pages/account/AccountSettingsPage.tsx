@@ -16,7 +16,7 @@ export default function AccountSettingsPage() {
     e.preventDefault();
     setNotice('');
     setError('');
-    setNotice('Cập nhật hồ sơ upstream sẽ có khi tích hợp API Gommo user.update.');
+    setNotice('Cập nhật hồ sơ sẽ sớm được hỗ trợ.');
   }
 
   async function handlePassword(e: FormEvent) {

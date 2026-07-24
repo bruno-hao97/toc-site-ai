@@ -1223,15 +1223,17 @@ export default function StudioPage({
     slug: string,
     promptOverride?: string,
     modelOverride?: GommoModel,
+    coverUrl?: string | null,
   ) {
     const prompt = promptOverride ?? historyPromptFromSelections(jobType, selections);
     const model = modelOverride ?? currentModel;
-    const meta = {
+    const meta: Record<string, string> = {
       mode: selections.mode || '',
       resolution: selections.resolution || '',
       ratio: selections.ratio || '',
       duration: selections.duration || '',
     };
+    if (coverUrl?.trim()) meta.coverUrl = coverUrl.trim();
     const createdAt = new Date().toISOString();
 
     addHistoryEntry({
@@ -1252,6 +1254,7 @@ export default function StudioPage({
         modelName: model?.name || slug,
         modelSlug: slug,
         createdAt,
+        meta,
       },
       ...prev,
     ]);
@@ -1288,12 +1291,12 @@ export default function StudioPage({
     loadRecentJobs();
 
     try {
-      const finalUrl = await generateViaGommo(slug, payload, pendingId);
+      const { resultUrl: finalUrl, coverUrl } = await generateViaGommo(slug, payload, pendingId);
 
       if (finalUrl) {
         setResultUrl(finalUrl);
         updateLocalJob(localId, { status: 'success', result_url: finalUrl });
-        recordSuccess(finalUrl, slug, prompt, model);
+        recordSuccess(finalUrl, slug, prompt, model, coverUrl);
         setPendingJobs((prev) => prev.filter((p) => p.id !== pendingId));
         loadRecentJobs();
         return true;
@@ -1633,8 +1636,8 @@ export default function StudioPage({
     slug: string,
     payload: Record<string, unknown>,
     pendingId?: string,
-  ): Promise<string | null> {
-    const { pollResult, resultUrl: url, createEnvelope } = await createJobAndPoll(
+  ): Promise<{ resultUrl: string | null; coverUrl?: string | null }> {
+    const { pollResult, resultUrl: url, coverUrl, createEnvelope } = await createJobAndPoll(
       client!,
       jobType,
       slug,
@@ -1655,7 +1658,9 @@ export default function StudioPage({
 
     const snap = extractPollSnapshot(createEnvelope as Parameters<typeof extractPollSnapshot>[0]);
     const finalUrl = url ?? snap.resultUrl;
-    if (finalUrl) return finalUrl;
+    if (finalUrl) {
+      return { resultUrl: finalUrl, coverUrl: coverUrl ?? snap.coverUrl };
+    }
     throw new Error(pollResult?.error || 'Job thất bại');
   }
 
@@ -3045,7 +3050,7 @@ export default function StudioPage({
                   <small>
                     {canUseComposerPromptAi()
                       ? 'Tự động chuẩn hóa prompt bằng AI trước khi tạo.'
-                      : 'Gộp khoảng trắng thừa (đăng nhập Gommo token để dùng AI).'}
+                      : 'Gộp khoảng trắng thừa (đăng nhập để dùng AI).'}
                   </small>
                 </span>
               </span>
@@ -3267,6 +3272,7 @@ export default function StudioPage({
                 modelLabel: e.modelName || e.modelSlug,
                 createdAt: e.createdAt,
                 resultUrl: e.resultUrl,
+                coverUrl: e.meta?.coverUrl || e.meta?.cover_url,
                 status: 'success',
               }));
               const items = [...pendingItems, ...doneItems];
@@ -3568,7 +3574,7 @@ export default function StudioPage({
         <p className="kicker">AI Studio</p>
         <h1>{t('composer.create', { type: typeLabel() })}</h1>
         <p className="lead">
-          Gọi thẳng <strong>v2.api.gommo.net</strong> — credit upstream:{' '}
+          Số dư credit:{' '}
           <strong>{credits.toLocaleString('vi-VN')}</strong>
           {isMotionView
             ? motionRatePerSec > 0 && (

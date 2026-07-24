@@ -18,6 +18,7 @@ export interface SessionItem {
   modelName?: string;
   modelSlug?: string;
   createdAt: string;
+  meta?: Record<string, string>;
 }
 
 type GalleryTab = 'current' | 'history';

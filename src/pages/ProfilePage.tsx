@@ -325,10 +325,6 @@ export default function ProfilePage() {
               <span className="profile-acc-key">Gói hiện tại</span>
               <span className="profile-acc-val">{planLabel}</span>
             </div>
-            <div className="profile-acc-row">
-              <span className="profile-acc-key">API Domain</span>
-              <span className="profile-acc-val mono accent">v2.api.gommo.net</span>
-            </div>
           </section>
 
           <section className="profile-upgrade-card">

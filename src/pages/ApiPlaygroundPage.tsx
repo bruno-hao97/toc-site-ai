@@ -1,7 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  BASE_URL,
   GommoApiError,
   type GommoModel,
   type JobType,
@@ -19,7 +18,6 @@ import {
   type JobSelections,
   type ModelSchema,
 } from '../services/modelSchema';
-import { DEFAULT_DOMAIN } from '../services/settingsStore';
 import { extractPollSnapshot } from '../services/mediaGenerationStatus';
 import { createJobAndPoll, type PollProgress } from '../services/polling';
 import {
@@ -248,17 +246,17 @@ export default function ApiPlaygroundPage() {
   }
 
   const requestUrl = currentModel
-    ? `${BASE_URL}/ai/jobs/${jobType}/${modelSlug(currentModel)}`
-    : `${BASE_URL}/ai/jobs/{type}/{model_id}`;
+    ? `/api/v2/ai/jobs/${jobType}/${modelSlug(currentModel)}`
+    : `/api/v2/ai/jobs/{type}/{model_id}`;
 
   return (
     <div className="playground">
       <div className="page-head">
-        <p className="kicker">Gommo Jobs Gateway</p>
+        <p className="kicker">Jobs Gateway</p>
         <h1>API Playground</h1>
         <p className="lead">
           Luồng: load <code>/ai/models</code> → chọn model → <code>POST /ai/jobs/…</code> → poll{' '}
-          <code>/ai/jobs/&#123;id&#125;?media=…</code>. Domain cố định <code>{DEFAULT_DOMAIN}</code>.
+          <code>/ai/jobs/&#123;id&#125;?media=…</code>.
         </p>
       </div>
 
@@ -510,9 +508,7 @@ export default function ApiPlaygroundPage() {
             <pre>
               {JSON.stringify(
                 {
-                  domain: client.domain,
-                  project_id: client.projectId,
-                  Authorization: loadAuth()?.platform_token ? 'Platform JWT ••••••••' : null,
+                  Authorization: loadAuth()?.platform_token ? 'Session ••••••••' : null,
                 },
                 null,
                 2,

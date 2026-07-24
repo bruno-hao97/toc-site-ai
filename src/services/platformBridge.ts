@@ -16,6 +16,7 @@ export const PLATFORM_BRIDGE = {
   jobPoll: '/api/platform/job-poll.php',
   jobUpload: '/api/platform/job-upload.php',
   jobList: '/api/platform/job-list.php',
+  jobRecord: '/api/platform/job-record.php',
   mineMedia: '/api/platform/mine-media.php',
   jobDelete: '/api/platform/job-delete.php',
   newfeeds: '/api/platform/newfeeds.php',

@@ -87,7 +87,7 @@ export default function ProjectsPage() {
   };
 
   const handleDelete = (p: Project) => {
-    if (!window.confirm(`Xóa dự án “${p.name}”? Các item sẽ được gỡ khỏi dự án (không xóa khỏi Gommo).`)) {
+    if (!window.confirm(`Xóa dự án “${p.name}”? Các item sẽ được gỡ khỏi dự án (không xóa khỏi thư viện).`)) {
       return;
     }
     deleteProject(p.id);

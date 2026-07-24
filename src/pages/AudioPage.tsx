@@ -29,7 +29,6 @@ import {
 import { getJobClient } from '../services/platformJobClient';
 import {
   createAudio,
-  getAudioLists,
   searchVoices,
   type AudioListItem,
   type VoiceItem,
@@ -50,6 +49,13 @@ import {
   addHistoryEntry,
   listHistory,
 } from '../services/historyStore';
+import {
+  fetchMyAudio,
+  feedMediaUrl,
+  invalidateMineAudioMusicCaches,
+  recordPlatformJob,
+  type FeedItem,
+} from '../services/feedApi';
 import { defaultSelectionsForType } from '../constants/studioTypes';
 import AudioTtsSettingsPanel, {
   STABILITY_MODE_VALUES,
@@ -93,7 +99,67 @@ function historyToAudioListItems(
     file_url: e.resultUrl,
     model: e.modelSlug || e.modelName,
     created_at: String(Math.floor(new Date(e.createdAt).getTime() / 1000)),
+    voice_id: e.meta?.voice_id,
+    server: e.meta?.server || e.meta?.provider,
   }));
+}
+
+function feedItemToAudioListItem(item: FeedItem): AudioListItem {
+  const url = feedMediaUrl(item) || item.download_url || '';
+  const created = item.created_time;
+  const createdAt =
+    typeof created === 'number'
+      ? String(created)
+      : typeof created === 'string' && created.trim()
+        ? created
+        : String(Math.floor(Date.now() / 1000));
+  const durationNum = item.duration != null ? Number(item.duration) : undefined;
+  return {
+    text: item.prompt || '',
+    status: item.status || (url ? 'SUCCESS' : 'processing'),
+    id_base: item.id_base,
+    file_url: url,
+    model: item.model,
+    created_at: createdAt,
+    voice_id: item.voice_id,
+    server: item.server_ai,
+    duration: Number.isFinite(durationNum) ? durationNum : undefined,
+    file_size: item.file_size,
+  };
+}
+
+async function persistTtsJob(opts: {
+  resultUrl: string;
+  text: string;
+  modelId: string;
+  voiceId?: string;
+  server?: string;
+  costCredits?: number;
+  providerJobId?: string;
+  duration?: number;
+  fileSize?: number;
+}): Promise<void> {
+  const meta: Record<string, string> = {};
+  if (opts.voiceId) meta.voice_id = opts.voiceId;
+  if (opts.server) {
+    meta.server = opts.server;
+    meta.provider = opts.server;
+  }
+  if (opts.duration != null && Number.isFinite(opts.duration)) {
+    meta.duration = String(opts.duration);
+  }
+  if (opts.fileSize != null && opts.fileSize > 0) {
+    meta.file_size = String(opts.fileSize);
+  }
+  await recordPlatformJob({
+    type: 'tts',
+    resultUrl: opts.resultUrl,
+    modelId: opts.modelId,
+    prompt: opts.text,
+    costCredits: opts.costCredits,
+    providerJobId: opts.providerJobId,
+    meta,
+  });
 }
 
 function audioListTimestamp(createdAt: string, locale: string): string {
@@ -393,15 +459,19 @@ export default function AudioPage() {
     setListsLoading(true);
     setListsError('');
     try {
-      const items = await getAudioLists({ locale });
-      setAudioLists(items);
+      invalidateMineAudioMusicCaches();
+      const page = await fetchMyAudio({ limit: 50 });
+      const items = page.items
+        .map(feedItemToAudioListItem)
+        .filter((item) => item.file_url);
+      setAudioLists(items.length ? items : historyToAudioListItems(listHistory('tts')));
     } catch (err) {
       setListsError(err instanceof Error ? err.message : String(err));
       setAudioLists(historyToAudioListItems(listHistory('tts')));
     } finally {
       setListsLoading(false);
     }
-  }, [auth?.platform_token, locale]);
+  }, [auth?.platform_token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -608,8 +678,23 @@ export default function AudioPage() {
         resultUrl: url,
         prompt: text,
         modelSlug: model,
-        meta: { voice_id: item.voice_id, provider: server },
+        meta: { voice_id: item.voice_id, provider: server, server },
       });
+      try {
+        await persistTtsJob({
+          resultUrl: url,
+          text,
+          modelId: model,
+          voiceId: item.voice_id,
+          server,
+          costCredits: result.audioInfo.price,
+          providerJobId: result.audioInfo.id_base,
+          duration: result.audioInfo.duration,
+          fileSize: undefined,
+        });
+      } catch {
+        /* local history vẫn giữ */
+      }
       void loadAudioLists();
       notifyCreditsUpdated();
       setProgress('');
@@ -686,9 +771,24 @@ export default function AudioPage() {
         meta: {
           voice_id: selectedVoice.voice_id,
           provider,
+          server: provider,
           language: selectedLanguage,
         },
       });
+      try {
+        await persistTtsJob({
+          resultUrl: url,
+          text,
+          modelId: slug || apiModelId,
+          voiceId: selectedVoice.voice_id,
+          server: provider,
+          costCredits: estimatedCost || result.audioInfo.price,
+          providerJobId: result.audioInfo.id_base,
+          duration: result.audioInfo.duration,
+        });
+      } catch {
+        /* local history vẫn giữ */
+      }
       void loadAudioLists();
 
       if (auth) {

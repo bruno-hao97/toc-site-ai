@@ -23,8 +23,7 @@ export default function WorkflowAgentChatSettingsModal({
           <div>
             <h3>Cài đặt Workflow Agent</h3>
             <p>
-              Thiết lập model chat dùng chung với Chat AI. Agent gọi qua hệ thống{' '}
-              <code>/api/v2/chat</code> hiện tại.
+              Thiết lập model chat dùng chung với Chat AI.
             </p>
           </div>
           <button type="button" className="wf-agent-set-x" onClick={onClose} aria-label="Đóng">

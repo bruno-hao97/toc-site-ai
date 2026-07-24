@@ -140,6 +140,7 @@ try {
 
     $providerJobId = extract_provider_job_id($envelope);
     $resultUrl = extract_result_url($envelope);
+    $coverUrl = extract_cover_url($envelope);
     $status = normalize_stored_job_status(extract_status($envelope), $resultUrl);
     if ($status === 'processing' && !$providerJobId && !$resultUrl) {
         $status = 'pending';
@@ -152,6 +153,10 @@ try {
         'mode' => isset($fields['mode']) ? (string) $fields['mode'] : null,
         'duration' => isset($fields['duration']) ? (string) $fields['duration'] : null,
     ];
+    if (is_string($coverUrl) && $coverUrl !== '') {
+        $meta['coverUrl'] = $coverUrl;
+        $meta['cover_url'] = $coverUrl;
+    }
     $meta = array_filter($meta, static function ($v) {
         return $v !== null && $v !== '';
     });

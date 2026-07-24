@@ -1,0 +1,101 @@
+import { useEffect, useState, type MouseEvent } from 'react';
+import { Heart, MessageCircle, Play, UserPlus } from 'lucide-react';
+import {
+  feedMediaUrl,
+  feedThumb,
+  type FeedItem,
+} from '../services/feedApi';
+import { isFavorite, toggleFavorite } from '../services/feedFavoritesStore';
+
+function isVideoItem(item: FeedItem): boolean {
+  const t = (item.type || '').toLowerCase();
+  if (t === 'image' || t === 'image-upscale' || t === 'remove-bg') return false;
+  if (t === 'video' || t === 'avatar-lipsync') return true;
+  const media = feedMediaUrl(item) || '';
+  return /\.(mp4|webm|mov|m4v)(\?|$)/i.test(media);
+}
+
+export default function FeedMasonryCard({
+  item,
+  onFavoriteChange,
+}: {
+  item: FeedItem;
+  onFavoriteChange?: () => void;
+}) {
+  const [fav, setFav] = useState(() => isFavorite(item.id_base));
+  const thumb = feedThumb(item);
+  const media = feedMediaUrl(item);
+  const video = isVideoItem(item);
+  const author = item.author?.name || 'Ẩn danh';
+  const likes = item.likes_count ?? item.like_count ?? 0;
+  const comments = item.comments_count ?? 0;
+  const href = media || thumb || '#';
+
+  useEffect(() => {
+    const sync = () => setFav(isFavorite(item.id_base));
+    document.addEventListener('favorites:updated', sync);
+    return () => document.removeEventListener('favorites:updated', sync);
+  }, [item.id_base]);
+
+  const onHeart = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const next = toggleFavorite(item.id_base, item);
+    setFav(next);
+    onFavoriteChange?.();
+  };
+
+  return (
+    <article className="feed-masonry-card">
+      <a className="feed-masonry-media" href={href} target="_blank" rel="noreferrer">
+        {thumb ? (
+          <img src={thumb} alt="" loading="lazy" />
+        ) : (
+          <span className="feed-masonry-empty">Đang xử lý…</span>
+        )}
+
+        {video && (
+          <span className="feed-masonry-play">
+            <Play size={18} fill="currentColor" />
+          </span>
+        )}
+
+        <span className="feed-masonry-type">{video ? 'VIDEO' : 'IMAGE'}</span>
+
+        {item.duration && Number(item.duration) > 0 && (
+          <span className="feed-masonry-duration">{item.duration}s</span>
+        )}
+
+        <div className="feed-masonry-overlay">
+          <div className="feed-masonry-user">
+            {item.author?.avatar ? (
+              <img className="feed-masonry-avatar" src={item.author.avatar} alt="" loading="lazy" />
+            ) : (
+              <span className="feed-masonry-avatar feed-masonry-avatar-empty" />
+            )}
+            <span className="feed-masonry-name">{author}</span>
+            <span className="feed-masonry-follow">
+              <UserPlus size={12} /> Follow
+            </span>
+          </div>
+        </div>
+      </a>
+
+      <div className="feed-masonry-actions">
+        <button
+          type="button"
+          className={`feed-masonry-icon${fav ? ' fav-on' : ''}`}
+          aria-label={fav ? 'Bỏ yêu thích' : 'Yêu thích'}
+          onClick={onHeart}
+        >
+          <Heart size={15} fill={fav ? 'currentColor' : 'none'} />
+          <span>{fav ? Math.max(likes, 1) : likes}</span>
+        </button>
+        <button type="button" className="feed-masonry-icon" aria-label="Bình luận">
+          <MessageCircle size={15} />
+          <span>{comments}</span>
+        </button>
+      </div>
+    </article>
+  );
+}

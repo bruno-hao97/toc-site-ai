@@ -66,7 +66,7 @@ export default function ComposerVideoAgentChat({
     if (!text || thinking || disabled) return;
 
     if (!canUseVideoAgentChat()) {
-      window.alert('Đăng nhập (Gommo token hoặc tài khoản app) để dùng Video Agent.');
+      window.alert('Đăng nhập để dùng Video Agent.');
       return;
     }
 

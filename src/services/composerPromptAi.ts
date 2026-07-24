@@ -35,7 +35,7 @@ async function callComposerAi(
   opts?: { signal?: AbortSignal },
 ): Promise<string> {
   if (!isGommoChatConfigured()) {
-    throw new Error('Cần đăng nhập Gommo và cấu hình chat để dùng AI.');
+    throw new Error('Cần đăng nhập để dùng AI.');
   }
 
   const system =

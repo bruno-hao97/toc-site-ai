@@ -326,7 +326,7 @@ export default function PricingPage() {
         <p className="kicker">Pricing</p>
         <h1>Bảng giá gói đăng ký</h1>
         <p className="lead">
-          Chọn đúng gói theo nhu cầu tạo ảnh/video. Dữ liệu tải trực tiếp từ endpoint plans theo từng tab.
+          Chọn đúng gói theo nhu cầu tạo ảnh/video.
         </p>
       </section>
 

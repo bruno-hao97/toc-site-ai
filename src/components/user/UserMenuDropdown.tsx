@@ -101,7 +101,7 @@ export default function UserMenuDropdown({ credits, isAdmin = false, onCreditsRe
   }
 
   function handleDeleteProject(p: Project) {
-    if (!window.confirm(`Xóa dự án “${p.name}”? Item sẽ được gỡ khỏi dự án (không xóa khỏi Gommo).`)) {
+    if (!window.confirm(`Xóa dự án “${p.name}”? Item sẽ được gỡ khỏi dự án (không xóa khỏi thư viện).`)) {
       return;
     }
     deleteProject(p.id);

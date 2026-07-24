@@ -147,18 +147,18 @@ export async function askGommo(userText: string, opts: AskOptions): Promise<stri
     });
 
     if (!res.ok) {
-      throw new Error(`Gommo chat lỗi HTTP ${res.status}`);
+      throw new Error(`Chat lỗi HTTP ${res.status}`);
     }
 
     // LỖI MỀM: 200 nhưng JSON (token/tham số sai).
     const contentType = res.headers.get('content-type') ?? '';
     if (contentType.includes('application/json')) {
       const j = (await res.json()) as { error?: number; message?: string };
-      throw new Error(`${j.message ?? 'Gommo từ chối yêu cầu'} (error ${j.error ?? '?'})`);
+      throw new Error(`${j.message ?? 'Yêu cầu chat bị từ chối'} (error ${j.error ?? '?'})`);
     }
 
     if (!res.body) {
-      throw new Error('Gommo không trả về luồng dữ liệu.');
+      throw new Error('Chat không trả về luồng dữ liệu.');
     }
 
     const reader = res.body.getReader();

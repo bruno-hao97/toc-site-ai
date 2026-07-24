@@ -59,7 +59,7 @@ const vi: TranslationMap = {
   'composer.aiGenerating': 'Đang sinh…',
   'composer.aiBriefPlaceholder': 'Mô tả ngắn ý tưởng của bạn…',
   'composer.aiHintLoggedIn':
-    'AI sẽ mở rộng thành prompt chi tiết (Gommo token hoặc tài khoản app).',
+    'AI sẽ mở rộng thành prompt chi tiết khi bạn đã đăng nhập.',
   'composer.aiHintGuest': 'Đăng nhập để dùng AI; hiện dùng mẫu mở rộng cơ bản.',
   'composer.multiPrompt.title': 'Đa câu lệnh',
   'composer.multiPrompt.desc': 'Tạo ảnh từ nhiều prompt con trong 1 prompt tổng.',

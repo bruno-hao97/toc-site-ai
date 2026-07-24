@@ -40,7 +40,7 @@ function gommo_upload_multipart(
 ): array {
     $g = gommo_cfg();
     if ($g['token'] === '') {
-        throw new RuntimeException('Chưa cấu hình gommo_access_token trên server');
+        throw new RuntimeException('Chưa cấu hình access token merchant trên server');
     }
     if ($tmpPath === '' || !is_file($tmpPath)) {
         throw new RuntimeException('File upload không hợp lệ');
@@ -76,12 +76,12 @@ function gommo_upload_multipart(
     curl_close($ch);
 
     if ($raw === false) {
-        throw new RuntimeException('Gommo upload failed: ' . $err);
+        throw new RuntimeException('Upload failed: ' . $err);
     }
 
     $parsed = json_decode($raw, true);
     if (!is_array($parsed)) {
-        throw new RuntimeException('Gommo upload response không phải JSON: ' . substr($raw, 0, 200));
+        throw new RuntimeException('Upload response không phải JSON: ' . substr($raw, 0, 200));
     }
     if ($status >= 400 || ($parsed['success'] ?? true) === false) {
         $msg = (string) ($parsed['message'] ?? ('HTTP ' . $status));
@@ -96,7 +96,7 @@ function gommo_request_form(string $base, string $path, array $fields): array
 {
     $g = gommo_cfg();
     if ($g['token'] === '') {
-        throw new RuntimeException('Chưa cấu hình gommo_access_token trên server');
+        throw new RuntimeException('Chưa cấu hình access token merchant trên server');
     }
 
     $fields['domain'] = $fields['domain'] ?? $g['domain'];
@@ -126,12 +126,12 @@ function gommo_request_form(string $base, string $path, array $fields): array
     curl_close($ch);
 
     if ($raw === false) {
-        throw new RuntimeException('Gommo request failed: ' . $err);
+        throw new RuntimeException('Request failed: ' . $err);
     }
 
     $parsed = json_decode($raw, true);
     if (!is_array($parsed)) {
-        throw new RuntimeException('Gommo response không phải JSON: ' . substr($raw, 0, 200));
+        throw new RuntimeException('Response không phải JSON: ' . substr($raw, 0, 200));
     }
     if ($status >= 400 || ($parsed['success'] ?? true) === false) {
         $msg = (string) ($parsed['message'] ?? ('HTTP ' . $status));
@@ -186,11 +186,54 @@ function extract_result_url(array $envelope): ?string
     if (!is_array($raw)) {
         $raw = [];
     }
+    $musicInfo = is_array($raw['musicInfo'] ?? null) ? $raw['musicInfo'] : [];
+    $audioInfo = is_array($raw['audioInfo'] ?? null) ? $raw['audioInfo'] : [];
     $candidates = [
         $data['result_url'] ?? null,
+        $data['music_url'] ?? null,
         $raw['imageInfo']['result_url'] ?? null,
         $raw['videoInfo']['result_url'] ?? null,
         $raw['videoInfo']['url'] ?? null,
+        $musicInfo['music_url'] ?? null,
+        $musicInfo['result_url'] ?? null,
+        $musicInfo['url'] ?? null,
+        $audioInfo['file_url'] ?? null,
+        $audioInfo['music_url'] ?? null,
+        $audioInfo['result_url'] ?? null,
+        $audioInfo['url'] ?? null,
+        $envelope['music_url'] ?? null,
+        $envelope['result_url'] ?? null,
+    ];
+    foreach ($candidates as $url) {
+        if (is_string($url) && preg_match('/^https?:\\/\\//i', $url)) {
+            return $url;
+        }
+    }
+    return null;
+}
+
+/** Ảnh bìa nhạc (`cover_url`) từ envelope Gommo. */
+function extract_cover_url(array $envelope): ?string
+{
+    $data = $envelope['data'] ?? [];
+    $raw = $envelope['raw'] ?? [];
+    if (!is_array($data)) {
+        $data = [];
+    }
+    if (!is_array($raw)) {
+        $raw = [];
+    }
+    $musicInfo = is_array($raw['musicInfo'] ?? null) ? $raw['musicInfo'] : [];
+    $audioInfo = is_array($raw['audioInfo'] ?? null) ? $raw['audioInfo'] : [];
+    $candidates = [
+        $data['cover_url'] ?? null,
+        $data['coverUrl'] ?? null,
+        $musicInfo['cover_url'] ?? null,
+        $musicInfo['coverUrl'] ?? null,
+        $audioInfo['cover_url'] ?? null,
+        $audioInfo['coverUrl'] ?? null,
+        $envelope['cover_url'] ?? null,
+        $envelope['coverUrl'] ?? null,
     ];
     foreach ($candidates as $url) {
         if (is_string($url) && preg_match('/^https?:\\/\\//i', $url)) {
@@ -247,6 +290,12 @@ function extract_status(array $envelope): string
         }
         if (!empty($raw['videoInfo']['status'])) {
             return (string) $raw['videoInfo']['status'];
+        }
+        if (!empty($raw['musicInfo']['status'])) {
+            return (string) $raw['musicInfo']['status'];
+        }
+        if (!empty($raw['audioInfo']['status'])) {
+            return (string) $raw['audioInfo']['status'];
         }
     }
     return '';

@@ -1,85 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Heart, MessageCircle, Play, Share2, Sparkles, Wand2 } from 'lucide-react';
 import { isLoggedIn } from '../services/authStore';
 import {
   feedMediaUrl,
-  feedSourceCount,
   feedThumb,
   fetchNewsfeed,
-  formatFeedTime,
+  fetchPublicVideos,
   type FeedItem,
 } from '../services/feedApi';
 import { UpstreamMeError } from '../services/upstreamMe';
+import FeedMasonryCard from './FeedMasonryCard';
 
-function FeedCard({ item }: { item: FeedItem }) {
-  const thumb = feedThumb(item);
-  const media = feedMediaUrl(item);
-  const isVideo = item.type === 'video';
-  const sources = feedSourceCount(item);
-
-  return (
-    <article className="feed-card">
-      <header className="feed-card-head">
-        {item.author?.avatar ? (
-          <img className="feed-avatar" src={item.author.avatar} alt="" loading="lazy" />
-        ) : (
-          <span className="feed-avatar feed-avatar-empty" />
-        )}
-        <span className="feed-author">{item.author?.name || 'Ẩn danh'}</span>
-        {item.resolution && <span className="feed-res">{item.resolution}</span>}
-      </header>
-
-      <a
-        className="feed-media"
-        href={media || thumb || '#'}
-        target="_blank"
-        rel="noreferrer"
-      >
-        {thumb ? (
-          <img src={thumb} alt="" loading="lazy" />
-        ) : (
-          <span className="feed-media-empty">Đang xử lý…</span>
-        )}
-        {isVideo && (
-          <span className="feed-play">
-            <Play size={20} fill="currentColor" />
-          </span>
-        )}
-        {sources > 1 && <span className="feed-count">{sources}</span>}
-        {item.duration && Number(item.duration) > 0 && (
-          <span className="feed-duration">{item.duration}s</span>
-        )}
-      </a>
-
-      <div className="feed-card-meta">
-        {item.model && (
-          <span className="feed-model">
-            <Sparkles size={11} /> {item.model}
-          </span>
-        )}
-        <span className="feed-time">{formatFeedTime(item.created_time)}</span>
-      </div>
-
-      <footer className="feed-card-foot">
-        <div className="feed-stats">
-          <span><Heart size={14} /> {item.likes_count ?? item.like_count ?? 0}</span>
-          <span><MessageCircle size={14} /> {item.comments_count ?? 0}</span>
-          <span><Share2 size={14} /></span>
-        </div>
-        <button type="button" className="feed-remix">
-          {isVideo ? (
-            <>
-              <Wand2 size={13} /> Edit video
-            </>
-          ) : (
-            <>
-              <Wand2 size={13} /> Remix
-            </>
-          )}
-        </button>
-      </footer>
-    </article>
-  );
+function hasVisual(item: FeedItem): boolean {
+  return Boolean(feedThumb(item) || feedMediaUrl(item));
 }
 
 export default function HomeFeed() {
@@ -90,6 +22,8 @@ export default function HomeFeed() {
 
   const afterVideoRef = useRef('');
   const afterImageRef = useRef('');
+  const publicAfterRef = useRef('');
+  const publicDoneRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const seenRef = useRef<Set<string>>(new Set());
 
@@ -104,29 +38,54 @@ export default function HomeFeed() {
     setLoading(true);
     setError('');
     try {
-      const page = await fetchNewsfeed({
-        limit: 30,
-        afterVideoId: afterVideoRef.current,
-        afterImageId: afterImageRef.current,
-      });
+      // Newsfeed (ảnh + video) + bổ sung public library nếu newsfeed thiếu ảnh.
+      const [page, pub] = await Promise.all([
+        fetchNewsfeed({
+          limit: 30,
+          afterVideoId: afterVideoRef.current,
+          afterImageId: afterImageRef.current,
+        }),
+        publicDoneRef.current
+          ? Promise.resolve(null)
+          : fetchPublicVideos({
+              type: 'public_home',
+              limit: 20,
+              afterId: publicAfterRef.current,
+            }).catch(() => null),
+      ]);
 
-      const fresh = page.items.filter((it) => {
-        if (!it.id_base || seenRef.current.has(it.id_base)) return false;
-        if (!feedThumb(it)) return false;
-        seenRef.current.add(it.id_base);
-        return true;
-      });
+      const fresh: FeedItem[] = [];
+      const ingest = (list: FeedItem[]) => {
+        for (const it of list) {
+          if (!it.id_base || seenRef.current.has(it.id_base)) continue;
+          if (!hasVisual(it)) continue;
+          seenRef.current.add(it.id_base);
+          fresh.push(it);
+        }
+      };
 
-      setItems((prev) => [...prev, ...fresh]);
+      ingest(page.items);
+      if (pub) {
+        ingest(pub.items);
+        const noPubProgress =
+          !pub.nextAfterId || pub.nextAfterId === publicAfterRef.current;
+        publicAfterRef.current = pub.nextAfterId;
+        if (!pub.items.length || noPubProgress) publicDoneRef.current = true;
+      }
 
-      const noProgress =
+      if (fresh.length) {
+        setItems((prev) => [...prev, ...fresh]);
+      }
+
+      const noNewsProgress =
         page.nextAfterVideoId === afterVideoRef.current &&
         page.nextAfterImageId === afterImageRef.current;
 
       afterVideoRef.current = page.nextAfterVideoId;
       afterImageRef.current = page.nextAfterImageId;
 
-      if (!page.items.length || noProgress) setDone(true);
+      const newsDone = !page.items.length || noNewsProgress;
+      if (newsDone && publicDoneRef.current) setDone(true);
     } catch (err) {
       setError(err instanceof UpstreamMeError ? err.message : String(err));
       setDone(true);
@@ -155,9 +114,9 @@ export default function HomeFeed() {
 
   return (
     <div className="home-feed">
-      <div className="home-masonry">
+      <div className="home-masonry home-masonry--feed">
         {items.map((item) => (
-          <FeedCard key={item.id_base} item={item} />
+          <FeedMasonryCard key={item.id_base} item={item} />
         ))}
       </div>
 

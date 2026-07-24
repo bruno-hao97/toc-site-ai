@@ -1,12 +1,10 @@
 import { FormEvent, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { clearAuth, loadAuth } from '../services/authStore';
+import { clearAuth } from '../services/authStore';
 import { loadOpenaiKey, saveOpenaiKey } from '../services/openaiKeyStore';
 import { loadTheme, saveTheme, type ThemeMode } from '../services/themeStore';
 
 export default function SettingsPage() {
-  const auth = loadAuth();
-  const domain = auth?.domain || '—';
   const [theme, setTheme] = useState<ThemeMode>(loadTheme());
   const [layoutWide, setLayoutWide] = useState(false);
   const [emailNotif, setEmailNotif] = useState(true);
@@ -40,17 +38,6 @@ export default function SettingsPage() {
       </div>
 
       <div className="settings-79-stack">
-        <section className="panel settings-79-section">
-          <h2>🌐 API &amp; WEBHOOK</h2>
-          <div className="settings-79-row">
-            <div>
-              <div className="settings-79-row-title">Domain kết nối</div>
-              <div className="settings-79-row-desc">Domain của bạn để nhận yêu cầu từ hệ thống.</div>
-            </div>
-            <span className="settings-79-domain">{domain}</span>
-          </div>
-        </section>
-
         <section className="panel settings-79-section">
           <h2>
             ✨ API Key OpenAI

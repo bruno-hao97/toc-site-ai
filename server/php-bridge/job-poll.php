@@ -45,11 +45,25 @@ try {
     $envelope = gommo_post_form($path, []);
 
     $resultUrl = extract_result_url($envelope);
+    $coverUrl = extract_cover_url($envelope);
     $status = normalize_stored_job_status(extract_status($envelope), $resultUrl);
 
+    $meta = [];
+    if (!empty($row['meta_json'])) {
+        $decoded = json_decode((string) $row['meta_json'], true);
+        if (is_array($decoded)) {
+            $meta = $decoded;
+        }
+    }
+    if (is_string($coverUrl) && $coverUrl !== '') {
+        $meta['coverUrl'] = $coverUrl;
+        $meta['cover_url'] = $coverUrl;
+    }
+    $metaJson = $meta === [] ? null : json_encode($meta, JSON_UNESCAPED_UNICODE);
+
     $pdo->prepare(
-        'UPDATE platform_jobs SET status = ?, result_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-    )->execute([$status, $resultUrl, $row['id']]);
+        'UPDATE platform_jobs SET status = ?, result_url = ?, meta_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    )->execute([$status, $resultUrl, $metaJson, $row['id']]);
 
     json_out(200, [
         'success' => true,
