@@ -163,7 +163,7 @@ export default function ComposerLibrary({
       if (modelFilter && feedModelLabel(it) !== modelFilter) return false;
       if (ratioFilter && (it.ratio || '') !== ratioFilter) return false;
       if (!q) return true;
-      return [it.prompt, it.model, it.id_base]
+      return [it.prompt, it.model, it.id_base, it.platform_job_id]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     });

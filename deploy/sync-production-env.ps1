@@ -16,6 +16,7 @@ $overrides = [ordered]@{
     'AUTH_BRIDGE_URL'           = 'http://127.0.0.1/api/platform'
     'PAY2S_REDIRECT_URL'        = 'https://pro.agi.vn/pricing'
     'PAY2S_IPN_URL'             = 'https://pro.agi.vn/api/pay2s/ipn'
+    'PAY2S_QR_ENABLED'          = 'false'
     'ALLOW_MOCK_TOPUP'          = 'false'
     'DEV_RETURN_RESET_LINK'     = 'false'
 }

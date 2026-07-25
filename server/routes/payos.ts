@@ -8,19 +8,28 @@ import {
 import { fulfillTopupFromWebhook } from '../services/topupFulfillment.js';
 import { createTopupOrder, getTopupOrder } from '../services/topupOrders.js';
 import { CREDIT_PACKAGES, getCreditPackage } from '../services/creditPackages.js';
-import { config, isGommoMerchantConfigured, isPayOsConfigured } from '../config.js';
+import {
+  config,
+  isGommoMerchantConfigured,
+  isPayOsConfigured,
+  isPayQrEnabled,
+  PAY_QR_DISABLED_MESSAGE,
+} from '../config.js';
 
 const router = Router();
 
 router.get('/status', async (_req, res) => {
   const configured = isPayOsConfigured();
   const verify = configured ? await verifyPayOsKeys() : { ok: false, message: 'Thiếu PayOS key trong .env' };
+  const qrEnabled = isPayQrEnabled();
   res.json({
     success: true,
     data: {
       configured,
       valid: verify.ok,
       message: verify.message,
+      qrEnabled,
+      qrDisabledMessage: qrEnabled ? null : PAY_QR_DISABLED_MESSAGE,
       returnUrl: config.payos.returnUrl,
       webhookUrl: config.payos.webhookUrl || null,
       merchantReady: isGommoMerchantConfigured(),
@@ -41,6 +50,10 @@ router.post('/payment-requests', async (req, res) => {
 
     if (!planId) {
       res.status(400).json({ success: false, message: 'Thiếu planId' });
+      return;
+    }
+    if (!isPayQrEnabled()) {
+      res.status(503).json({ success: false, message: PAY_QR_DISABLED_MESSAGE });
       return;
     }
 
@@ -68,6 +81,10 @@ router.post('/topup-requests', async (req, res) => {
     }
     if (!creditPackage) {
       res.status(400).json({ success: false, message: 'Gói credit không hợp lệ' });
+      return;
+    }
+    if (!isPayQrEnabled()) {
+      res.status(503).json({ success: false, message: PAY_QR_DISABLED_MESSAGE });
       return;
     }
     if (!isPayOsConfigured()) {

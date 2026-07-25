@@ -42,6 +42,16 @@ Dán **`deploy/aapanel-nginx-snippet.conf`** vào cấu hình site `pro.agi.vn` 
 - URL: `https://pro.agi.vn/api/pay2s/ipn`
 - Tài khoản: `01868692631111` (MBB)
 
+Sau khi gắn webhook xong, bật lại tạo QR trên VPS:
+
+```bash
+# trong .env
+PAY2S_QR_ENABLED=true
+pm2 startOrReload deploy/ecosystem.config.cjs --update-env
+```
+
+(`PAY2S_QR_ENABLED` mặc định `false` — chặn tạo QR nạp/thanh toán cho đến khi IPN sẵn sàng.)
+
 ## 5. Kiểm tra
 
 ```bash

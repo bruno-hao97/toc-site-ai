@@ -8,6 +8,7 @@ import { getDisplayUser, notifyCreditsUpdated, refreshSession } from '../service
 import {
   createTopupRequest,
   fetchCreditPackages,
+  fetchPay2sCheckoutStatus,
   fetchTopupOrder,
   type CreditPackage,
 } from '../services/topupApi';
@@ -19,6 +20,9 @@ import {
   type SubscriptionPlanType,
 } from '../services/subscriptionPlans';
 import { CONTACT_PHONE_TEL, contactPhoneLine } from '../lib/brand';
+
+const QR_DISABLED_FALLBACK =
+  'Nạp tiền QR tạm khóa — đang chờ kích hoạt webhook thanh toán. Vui lòng liên hệ hỗ trợ để được cấp credit.';
 
 type PlanFieldKey =
   | 'video_day'
@@ -122,7 +126,7 @@ function isFeaturedPlan(plan: SubscriptionPlan): boolean {
 }
 
 export default function PricingPage() {
-  const [tab, setTab] = useState<PricingTab>('credit');
+  const [tab, setTab] = useState<PricingTab>('combo');
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [creditPackages, setCreditPackages] = useState<CreditPackage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,7 +141,27 @@ export default function PricingPage() {
   const [creditOrderCode, setCreditOrderCode] = useState<number | null>(null);
   const [creditOrderStatus, setCreditOrderStatus] = useState('');
   const [openFaq, setOpenFaq] = useState(0);
+  const [qrEnabled, setQrEnabled] = useState(false);
+  const [qrDisabledMessage, setQrDisabledMessage] = useState(QR_DISABLED_FALLBACK);
   const username = getDisplayUser().username || '';
+
+  useEffect(() => {
+    let active = true;
+    fetchPay2sCheckoutStatus()
+      .then((status) => {
+        if (!active) return;
+        setQrEnabled(status.qrEnabled);
+        setQrDisabledMessage(status.qrDisabledMessage || QR_DISABLED_FALLBACK);
+      })
+      .catch(() => {
+        if (!active) return;
+        setQrEnabled(false);
+        setQrDisabledMessage(QR_DISABLED_FALLBACK);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -230,6 +254,10 @@ export default function PricingPage() {
   }, [plans]);
 
   function openSubscribeModal(plan: SubscriptionPlan): void {
+    if (!qrEnabled) {
+      setPayError(qrDisabledMessage);
+      return;
+    }
     if (!plan.id_base) {
       setPayError('Không tìm thấy plan_id cho gói này.');
       return;
@@ -255,6 +283,10 @@ export default function PricingPage() {
   }
 
   function openCreditModal(creditPackage: CreditPackage): void {
+    if (!qrEnabled) {
+      setPayError(qrDisabledMessage);
+      return;
+    }
     setPayError('');
     setConfirmCreditPackage(creditPackage);
   }
@@ -267,6 +299,10 @@ export default function PricingPage() {
 
   async function handleConfirmCredit(): Promise<void> {
     if (!confirmCreditPackage) return;
+    if (!qrEnabled) {
+      setPayError(qrDisabledMessage);
+      return;
+    }
     if (!username) {
       setPayError('Tài khoản chưa có username — không thể nạp credit.');
       return;
@@ -296,6 +332,10 @@ export default function PricingPage() {
   }
 
   async function handleConfirmSubscribe(_promoCode: string): Promise<void> {
+    if (!qrEnabled) {
+      setPayError(qrDisabledMessage);
+      return;
+    }
     if (!confirmPlan?.id_base) {
       setPayError('Không tìm thấy plan_id cho gói này.');
       return;
@@ -328,6 +368,15 @@ export default function PricingPage() {
         <p className="lead">
           Chọn đúng gói theo nhu cầu tạo ảnh/video.
         </p>
+        {!qrEnabled ? (
+          <div className="banner warn pricing-pay-error" style={{ marginTop: '1rem' }}>
+            <p style={{ margin: 0 }}>{qrDisabledMessage}</p>
+            <a className="pricing-contact-phone" href={CONTACT_PHONE_TEL} style={{ marginTop: '0.5rem', display: 'inline-flex' }}>
+              <Phone size={14} />
+              {contactPhoneLine('Liên hệ')}
+            </a>
+          </div>
+        ) : null}
       </section>
 
       <section className="pricing-tabs" aria-label="Pricing tabs">
@@ -400,14 +449,14 @@ export default function PricingPage() {
                         ) : null}
                         <strong>{creditPackage.amountVnd.toLocaleString('vi-VN')}đ</strong>
                       </div>
-                      <small>Thanh toán 1 lần</small>
+                      <small>{qrEnabled ? 'Thanh toán 1 lần' : 'Tạm khóa QR'}</small>
                       <button
                         type="button"
                         className="pricing-credit-buy-btn"
                         onClick={() => openCreditModal(creditPackage)}
-                        disabled={!!payingPlanId || !!confirmCreditPackage || !!paymentResult}
+                        disabled={!qrEnabled || !!payingPlanId || !!confirmCreditPackage || !!paymentResult}
                       >
-                        Mua ngay
+                        {qrEnabled ? 'Mua ngay' : 'Tạm khóa'}
                       </button>
                     </div>
                   </article>
@@ -498,10 +547,14 @@ export default function PricingPage() {
                     type="button"
                     className="btn primary pricing-cta-btn"
                     onClick={() => openSubscribeModal(plan)}
-                    disabled={!!payingPlanId || !!confirmPlan || !!paymentResult}
+                    disabled={!qrEnabled || !!payingPlanId || !!confirmPlan || !!paymentResult}
                   >
                     {payingPlanId === plan.id_base ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
-                    {payingPlanId === plan.id_base ? 'Đang tạo link thanh toán...' : 'Đăng ký ngay'}
+                    {payingPlanId === plan.id_base
+                      ? 'Đang tạo link thanh toán...'
+                      : qrEnabled
+                        ? 'Đăng ký ngay'
+                        : 'Tạm khóa QR'}
                   </button>
                 </article>
               );

@@ -8,19 +8,28 @@ import {
 import { fulfillTopupFromPay2sIpn } from '../services/topupFulfillment.js';
 import { createTopupOrder, getTopupOrder } from '../services/topupOrders.js';
 import { CREDIT_PACKAGES, getCreditPackage } from '../services/creditPackages.js';
-import { config, isGommoMerchantConfigured, isPay2sConfigured } from '../config.js';
+import {
+  config,
+  isGommoMerchantConfigured,
+  isPay2sConfigured,
+  isPayQrEnabled,
+  PAY_QR_DISABLED_MESSAGE,
+} from '../config.js';
 
 const router = Router();
 
 router.get('/status', async (_req, res) => {
   const configured = isPay2sConfigured();
   const verify = configured ? await verifyPay2sKeys() : { ok: false, message: 'Thiếu Pay2S key trong .env' };
+  const qrEnabled = isPayQrEnabled();
   res.json({
     success: true,
     data: {
       configured,
       valid: verify.ok,
       message: verify.message,
+      qrEnabled,
+      qrDisabledMessage: qrEnabled ? null : PAY_QR_DISABLED_MESSAGE,
       redirectUrl: config.pay2s.redirectUrl,
       ipnUrl: config.pay2s.ipnUrl || null,
       apiCreateUrl: config.pay2s.apiCreateUrl,
@@ -46,6 +55,10 @@ router.post('/payment-requests', async (req, res) => {
 
     if (!planId) {
       res.status(400).json({ success: false, message: 'Thiếu planId' });
+      return;
+    }
+    if (!isPayQrEnabled()) {
+      res.status(503).json({ success: false, message: PAY_QR_DISABLED_MESSAGE });
       return;
     }
     if (!isPay2sConfigured()) {
@@ -77,6 +90,10 @@ router.post('/topup-requests', async (req, res) => {
     }
     if (!creditPackage) {
       res.status(400).json({ success: false, message: 'Gói credit không hợp lệ' });
+      return;
+    }
+    if (!isPayQrEnabled()) {
+      res.status(503).json({ success: false, message: PAY_QR_DISABLED_MESSAGE });
       return;
     }
     if (!isPay2sConfigured()) {

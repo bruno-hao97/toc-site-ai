@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
+import type { RowDataPacket } from 'mysql2';
 import { config } from '../config.js';
+import { getPool, isDatabaseConfigured } from '../db/pool.js';
 import {
   extractProviderJobId,
   extractResultUrl,
@@ -413,7 +415,7 @@ router.get('/mine-media.php', async (req, res) => {
     if (afterId) fields.after_id = afterId;
 
     const envelope = await gommoAdminPostForm(path, fields, authBase);
-    res.json(envelope);
+    res.json(await attachPlatformJobIds(envelope));
   } catch (err) {
     console.error('[platformBridge/mine-media]', err);
     res.status(500).json({
@@ -422,5 +424,54 @@ router.get('/mine-media.php', async (req, res) => {
     });
   }
 });
+
+/** Gắn platform_jobs.id (UUID) theo Gommo id_base = provider_job_id. */
+async function attachPlatformJobIds(envelope: unknown): Promise<unknown> {
+  if (!envelope || typeof envelope !== 'object') return envelope;
+  const env = envelope as { data?: unknown };
+  if (!Array.isArray(env.data) || env.data.length === 0) return envelope;
+  if (!isDatabaseConfigured()) return envelope;
+
+  const providerIds = [
+    ...new Set(
+      env.data
+        .map((item) => {
+          if (!item || typeof item !== 'object') return '';
+          return String((item as { id_base?: string }).id_base ?? '').trim();
+        })
+        .filter(Boolean),
+    ),
+  ];
+  if (providerIds.length === 0) return envelope;
+
+  try {
+    const placeholders = providerIds.map(() => '?').join(',');
+    const [rows] = await getPool().query<RowDataPacket[]>(
+      `SELECT id, provider_job_id
+       FROM platform_jobs
+       WHERE provider_job_id IN (${placeholders})
+       ORDER BY created_at DESC`,
+      providerIds,
+    );
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      const key = String(row.provider_job_id ?? '').trim();
+      if (!key || map.has(key)) continue;
+      map.set(key, String(row.id));
+    }
+
+    env.data = env.data.map((item) => {
+      if (!item || typeof item !== 'object') return item;
+      const row = item as Record<string, unknown>;
+      const pid = String(row.id_base ?? '').trim();
+      const platformId = pid ? map.get(pid) : undefined;
+      return platformId ? { ...row, platform_job_id: platformId } : item;
+    });
+  } catch (err) {
+    console.warn('[platformBridge/mine-media] attachPlatformJobIds', err);
+  }
+
+  return envelope;
+}
 
 export default router;

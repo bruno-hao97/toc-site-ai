@@ -46,6 +46,27 @@ export interface CreditPackage {
   prioritySupport?: boolean;
 }
 
+export interface Pay2sCheckoutStatus {
+  qrEnabled: boolean;
+  qrDisabledMessage: string | null;
+}
+
+export async function fetchPay2sCheckoutStatus(): Promise<Pay2sCheckoutStatus> {
+  const res = await fetch('/api/pay2s/status');
+  const raw = await readJsonResponse<{
+    success?: boolean;
+    message?: string;
+    data?: { qrEnabled?: boolean; qrDisabledMessage?: string | null };
+  }>(res);
+  if (!res.ok || !raw.success || !raw.data) {
+    throw new Error(raw.message || apiUnavailableMessage(res.status));
+  }
+  return {
+    qrEnabled: Boolean(raw.data.qrEnabled),
+    qrDisabledMessage: raw.data.qrDisabledMessage ?? null,
+  };
+}
+
 export async function fetchCreditPackages(): Promise<CreditPackage[]> {
   const res = await fetch('/api/platform/credit-packages.php');
   const raw = await readJsonResponse<{ success?: boolean; message?: string; data?: CreditPackage[] }>(res);

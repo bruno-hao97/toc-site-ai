@@ -42,6 +42,15 @@ export const config = {
     ordersFile: process.env.TOPUP_ORDERS_FILE || path.join(process.cwd(), 'data', 'topup-orders.json'),
     /** Khớp migrate_key / service_key trên PHP bridge — trừ ví admin khi user nạp. */
     bridgeServiceKey: (process.env.BRIDGE_SERVICE_KEY || process.env.MIGRATE_KEY || '').trim(),
+    /**
+     * Cho phép tạo QR nạp/thanh toán Pay2S|PayOS.
+     * Mặc định tắt — bật lại khi webhook IPN đã gắn: PAY2S_QR_ENABLED=true
+     */
+    qrEnabled:
+      process.env.PAY2S_QR_ENABLED === '1' ||
+      process.env.PAY2S_QR_ENABLED === 'true' ||
+      process.env.TOPUP_QR_ENABLED === '1' ||
+      process.env.TOPUP_QR_ENABLED === 'true',
   },
   payos: {
     clientId: (process.env.PAYOS_CLIENT_ID || '').trim().replace(/\r/g, ''),
@@ -91,6 +100,14 @@ export function isPay2sConfigured(): boolean {
 export function isGommoMerchantConfigured(): boolean {
   return Boolean(config.gommo.accessToken && config.gommo.apiDomain);
 }
+
+/** Tạo QR nạp credit / thanh toán gói qua cổng — tắt khi chưa gắn webhook. */
+export function isPayQrEnabled(): boolean {
+  return config.topup.qrEnabled;
+}
+
+export const PAY_QR_DISABLED_MESSAGE =
+  'Nạp tiền QR tạm khóa — đang chờ kích hoạt webhook thanh toán. Vui lòng liên hệ hỗ trợ để được cấp credit.';
 
 export function vndToCredits(amountVnd: number): number {
   const rate = config.topup.creditsPerVnd;

@@ -14,6 +14,7 @@ import {
 import ComposerSelectCircle from './ComposerSelectCircle';
 import {
   deleteFeedPost,
+  feedDisplayJobId,
   feedMediaUrl,
   feedThumb,
   fetchMyImages,
@@ -238,7 +239,7 @@ export default function ComposerHistory({
     const q = query.trim().toLowerCase();
     if (!q) return items;
     return items.filter((it) =>
-      [it.title, it.prompt, it.id_base, it.model]
+      [it.title, it.prompt, it.id_base, it.platform_job_id, it.model]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q)),
     );
@@ -478,6 +479,7 @@ export default function ComposerHistory({
               const processing = isFeedItemProcessing(item);
               const d = tsToDate(item.created_time);
               const name = (item.title || item.prompt || '(Không có mô tả)').trim();
+              const displayId = feedDisplayJobId(item);
               const urls = open ? blockUrls(item) : [];
               const allUrls = blockUrls(item);
               const blockThumb = item.thumbnail_url || allUrls[0];
@@ -559,7 +561,7 @@ export default function ComposerHistory({
                           </span>
                         </>
                       )}
-                      {item.id_base && <span className="chist-id">ID: {item.id_base}</span>}
+                      {displayId && <span className="chist-id">ID: {displayId}</span>}
                     </div>
                   </button>
                   <div className="chist-block-actions">

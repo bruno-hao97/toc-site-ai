@@ -110,6 +110,8 @@ export interface FeedModelInfo {
 
 export interface FeedItem {
   id_base: string;
+  /** UUID platform_jobs.id — dùng để đối chiếu user/admin (admin feed gắn từ provider_job_id). */
+  platform_job_id?: string;
   type: 'video' | 'image' | string;
   status: string;
   model?: string;
@@ -283,6 +285,8 @@ interface MyImageResolution {
 
 interface MyImageItem {
   id_base: string;
+  /** UUID từ platform_jobs khi admin mine-media đã enrich. */
+  platform_job_id?: string;
   url?: string;
   url_preview?: string;
   prompt?: string;
@@ -334,8 +338,10 @@ function mapImageToFeedItem(img: MyImageItem): FeedItem {
     url: img.url,
   }));
   const resolutionName = img.resolutions?.[0]?.name || img.resolutions?.[0]?.value;
+  const platformJobId = (img.platform_job_id || '').trim() || undefined;
   return {
     id_base: img.id_base,
+    platform_job_id: platformJobId,
     type: 'image',
     status: img.status || 'SUCCESS',
     prompt: img.prompt,
@@ -646,6 +652,7 @@ function platformJobToFeedItem(job: PlatformJobListItem): FeedItem {
       : undefined;
   return {
     id_base: job.id,
+    platform_job_id: job.id,
     type: feedType,
     status,
     prompt: job.prompt || undefined,
@@ -761,15 +768,23 @@ function mapVideoToFeedItem(raw: FeedItem): FeedItem {
     quality?: string | number;
     fileSize?: number;
     size?: number;
+    platform_job_id?: string;
   };
+  const platformJobId = (ext.platform_job_id || raw.platform_job_id || '').trim() || undefined;
   return {
     ...raw,
     type: 'video',
+    platform_job_id: platformJobId,
     thumbnail_url: raw.thumbnail_url || raw.url_preview || undefined,
     download_url: raw.download_url || raw.url || undefined,
     quality: ext.quality ?? raw.quality,
     file_size: raw.file_size || ext.fileSize || ext.size || undefined,
   };
+}
+
+/** ID hiển thị để đối chiếu user ↔ admin: ưu tiên platform UUID. */
+export function feedDisplayJobId(item: FeedItem): string {
+  return (item.platform_job_id || item.id_base || '').trim();
 }
 
 export function feedThumb(item: FeedItem): string | null {
