@@ -94,6 +94,28 @@ function buildCreateSignature(params: {
   return hmacSha256(rawHash, config.pay2s.secretKey);
 }
 
+/** Webhook dashboard "Tiền vào" — Authorization: Bearer <PAY2S_WEBHOOK_TOKEN>. */
+export function verifyPay2sWebhookBearer(authorizationHeader: string | undefined): boolean {
+  const expected = config.pay2s.webhookToken;
+  if (!expected) return false;
+  const raw = String(authorizationHeader || '').trim();
+  const match = /^Bearer\s+(\S+)$/i.exec(raw);
+  const token = match?.[1] || raw;
+  if (!token) return false;
+  try {
+    const a = Buffer.from(expected, 'utf8');
+    const b = Buffer.from(token, 'utf8');
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return expected === token;
+  }
+}
+
+export function isPay2sBankWebhookPayload(body: Record<string, unknown>): boolean {
+  return Array.isArray(body.transactions);
+}
+
 export function verifyPay2sIpnSignature(body: Record<string, unknown>): boolean {
   if (!isPay2sConfigured()) return false;
   const m2signature = String(body.m2signature || body.signature || '');

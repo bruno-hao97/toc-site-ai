@@ -9,6 +9,10 @@ import { fulfillTopupFromWebhook } from '../services/topupFulfillment.js';
 import { createTopupOrder, getTopupOrder } from '../services/topupOrders.js';
 import { CREDIT_PACKAGES, getCreditPackage } from '../services/creditPackages.js';
 import {
+  assertTopupWalletsCanCover,
+  MerchantBalanceError,
+} from '../services/topupCapacity.js';
+import {
   config,
   isGommoMerchantConfigured,
   isPayOsConfigured,
@@ -92,6 +96,16 @@ router.post('/topup-requests', async (req, res) => {
       return;
     }
 
+    try {
+      await assertTopupWalletsCanCover(creditPackage.credits);
+    } catch (err) {
+      if (err instanceof MerchantBalanceError) {
+        res.status(503).json({ success: false, message: err.message });
+        return;
+      }
+      throw err;
+    }
+
     const payment = await createTopupPayOsPayment({
       username,
       amountVnd: creditPackage.amountVnd,
@@ -115,6 +129,10 @@ router.post('/topup-requests', async (req, res) => {
       },
     });
   } catch (err) {
+    if (err instanceof MerchantBalanceError) {
+      res.status(503).json({ success: false, message: err.message });
+      return;
+    }
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ success: false, message });
   }

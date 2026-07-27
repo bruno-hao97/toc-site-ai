@@ -80,6 +80,8 @@ export const config = {
     bankId: (process.env.PAY2S_BANK_ID || 'ACB').trim().replace(/\r/g, ''),
     redirectUrl: (process.env.PAY2S_REDIRECT_URL || `${appUrl}/pricing`).trim().replace(/\r/g, ''),
     ipnUrl: (process.env.PAY2S_IPN_URL || `${appUrl}/api/pay2s/ipn`).trim().replace(/\r/g, ''),
+    /** Token Bearer từ dashboard Pay2S khi tạo webhook "Tiền vào" (chỉ hiện 1 lần). */
+    webhookToken: (process.env.PAY2S_WEBHOOK_TOKEN || '').trim().replace(/\r/g, ''),
   },
 };
 

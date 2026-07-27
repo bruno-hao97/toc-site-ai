@@ -1,13 +1,22 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import {
   createPay2sPayment,
   createTopupPay2sPayment,
+  isPay2sBankWebhookPayload,
   verifyPay2sIpnSignature,
   verifyPay2sKeys,
+  verifyPay2sWebhookBearer,
 } from '../services/pay2s.js';
-import { fulfillTopupFromPay2sIpn } from '../services/topupFulfillment.js';
+import {
+  fulfillTopupFromPay2sBankWebhook,
+  fulfillTopupFromPay2sIpn,
+} from '../services/topupFulfillment.js';
 import { createTopupOrder, getTopupOrder } from '../services/topupOrders.js';
 import { CREDIT_PACKAGES, getCreditPackage } from '../services/creditPackages.js';
+import {
+  assertTopupWalletsCanCover,
+  MerchantBalanceError,
+} from '../services/topupCapacity.js';
 import {
   config,
   isGommoMerchantConfigured,
@@ -30,6 +39,7 @@ router.get('/status', async (_req, res) => {
       message: verify.message,
       qrEnabled,
       qrDisabledMessage: qrEnabled ? null : PAY_QR_DISABLED_MESSAGE,
+      webhookTokenConfigured: Boolean(config.pay2s.webhookToken),
       redirectUrl: config.pay2s.redirectUrl,
       ipnUrl: config.pay2s.ipnUrl || null,
       apiCreateUrl: config.pay2s.apiCreateUrl,
@@ -101,6 +111,17 @@ router.post('/topup-requests', async (req, res) => {
       return;
     }
 
+    // Check 2 ví TRƯỚC khi tạo QR — tránh user CK rồi không cộng được credit
+    try {
+      await assertTopupWalletsCanCover(creditPackage.credits);
+    } catch (err) {
+      if (err instanceof MerchantBalanceError) {
+        res.status(503).json({ success: false, message: err.message });
+        return;
+      }
+      throw err;
+    }
+
     const payment = await createTopupPay2sPayment({
       username,
       amountVnd: creditPackage.amountVnd,
@@ -124,6 +145,10 @@ router.post('/topup-requests', async (req, res) => {
       },
     });
   } catch (err) {
+    if (err instanceof MerchantBalanceError) {
+      res.status(503).json({ success: false, message: err.message });
+      return;
+    }
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ success: false, message });
   }
@@ -153,24 +178,48 @@ router.get('/ipn', (_req, res) => {
   res.json({ success: true, message: 'Pay2S IPN endpoint ready' });
 });
 
-router.post('/ipn', async (req, res) => {
-  try {
-    const body = (req.body || {}) as Record<string, unknown>;
+async function handlePay2sNotify(req: Request, res: Response, logPrefix: string): Promise<void> {
+  const body = (req.body || {}) as Record<string, unknown>;
 
-    if (!verifyPay2sIpnSignature(body)) {
-      console.warn('[pay2s/ipn] invalid signature');
-      res.status(200).json({ success: false, message: 'ERROR! Fail checksum' });
+  // Dashboard webhook "Tiền vào" — Bearer token + transactions[]
+  if (isPay2sBankWebhookPayload(body)) {
+    const auth = String(req.headers.authorization || '');
+    if (!config.pay2s.webhookToken) {
+      console.warn(`[${logPrefix}] bank webhook: thiếu PAY2S_WEBHOOK_TOKEN trong .env`);
+      res.status(503).json({ success: false, message: 'PAY2S_WEBHOOK_TOKEN chưa cấu hình' });
+      return;
+    }
+    if (!verifyPay2sWebhookBearer(auth)) {
+      console.warn(`[${logPrefix}] bank webhook: invalid Bearer token`);
+      res.status(403).json({ success: false, message: 'Unauthorized' });
       return;
     }
 
-    const result = await fulfillTopupFromPay2sIpn(body);
-    if (!result.ok) {
-      console.error('[pay2s/ipn]', result.message, result.orderCode ?? '');
-    } else {
-      console.log('[pay2s/ipn]', result.message);
-    }
-
+    const result = await fulfillTopupFromPay2sBankWebhook(body);
+    console.log(`[${logPrefix}]`, result.message);
     res.status(200).json({ success: true, message: result.message });
+    return;
+  }
+
+  // Payment gateway IPN — m2signature
+  if (!verifyPay2sIpnSignature(body)) {
+    console.warn(`[${logPrefix}] invalid signature`);
+    res.status(200).json({ success: false, message: 'ERROR! Fail checksum' });
+    return;
+  }
+
+  const result = await fulfillTopupFromPay2sIpn(body);
+  if (!result.ok) {
+    console.error(`[${logPrefix}]`, result.message, result.orderCode ?? '');
+  } else {
+    console.log(`[${logPrefix}]`, result.message);
+  }
+  res.status(200).json({ success: true, message: result.message });
+}
+
+router.post('/ipn', async (req, res) => {
+  try {
+    await handlePay2sNotify(req, res, 'pay2s/ipn');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[pay2s/ipn] unhandled', message);
@@ -185,17 +234,7 @@ router.get('/webhook', (_req, res) => {
 
 router.post('/webhook', async (req, res) => {
   try {
-    const body = (req.body || {}) as Record<string, unknown>;
-
-    if (!verifyPay2sIpnSignature(body)) {
-      console.warn('[pay2s/webhook] invalid signature');
-      res.status(200).json({ success: false, message: 'ERROR! Fail checksum' });
-      return;
-    }
-
-    const result = await fulfillTopupFromPay2sIpn(body);
-    console.log('[pay2s/webhook]', result.message);
-    res.status(200).json({ success: true, message: result.message });
+    await handlePay2sNotify(req, res, 'pay2s/webhook');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[pay2s/webhook] unhandled', message);

@@ -83,11 +83,20 @@ try {
     if (!$fromRow) {
         throw new RuntimeException('Admin không tồn tại');
     }
-    if ((int) $fromRow['credits'] < $amount) {
+    // Giữ buffer an toàn giống rule Gommo: sau trừ còn ≥ 500.001
+    $minRemain = 500001;
+    $adminCredits = (int) $fromRow['credits'];
+    if ($adminCredits < $amount + $minRemain) {
         $pdo->rollBack();
         json_out(400, [
             'success' => false,
-            'message' => 'Ví nội bộ admin không đủ (cần ' . number_format($amount) . ')',
+            'message' => 'Ví nội bộ admin không đủ để nạp an toàn (cần giữ ≥ '
+                . number_format($minRemain)
+                . ' sau khi trừ; hiện có '
+                . number_format($adminCredits)
+                . ', gói '
+                . number_format($amount)
+                . ')',
         ]);
     }
 

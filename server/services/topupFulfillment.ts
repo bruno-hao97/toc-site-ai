@@ -1,5 +1,10 @@
 import { config, vndToCredits } from '../config.js';
-import { getTopupOrder, updateTopupOrder } from './topupOrders.js';
+import { assertTopupWalletsCanCover } from './topupCapacity.js';
+import {
+  findTopupOrderByBankTransfer,
+  getTopupOrder,
+  updateTopupOrder,
+} from './topupOrders.js';
 
 export interface PayOsWebhookPayload {
   code?: string;
@@ -19,7 +24,11 @@ async function creditUserFromAdminWallet(input: {
   username: string;
   credits: number;
   message: string;
+  orderCode?: number;
 }): Promise<void> {
+  // Re-check 2 ví trước khi trừ (phòng race nhiều đơn cùng lúc)
+  await assertTopupWalletsCanCover(input.credits, input.orderCode);
+
   const bridge = config.auth.bridgeUrl.replace(/\/$/, '');
   const key = config.topup.bridgeServiceKey;
   if (!bridge) {
@@ -106,6 +115,7 @@ export async function fulfillTopupFromWebhook(body: Record<string, unknown>): Pr
       username: order.username,
       credits,
       message,
+      orderCode,
     });
     await updateTopupOrder(orderCode, {
       status: 'credited',
@@ -178,6 +188,7 @@ export async function fulfillTopupFromPay2sIpn(body: Record<string, unknown>): P
       username: order.username,
       credits,
       message,
+      orderCode,
     });
     await updateTopupOrder(orderCode, {
       status: 'credited',
@@ -195,4 +206,99 @@ export async function fulfillTopupFromPay2sIpn(body: Record<string, unknown>): P
     console.error('[pay2s/ipn] credit-from-admin failed', orderCode, errMsg);
     return { ok: true, message: `Đã nhận IPN — lỗi cộng credit: ${errMsg}`, orderCode };
   }
+}
+
+interface Pay2sBankTransaction {
+  id?: string;
+  content?: string;
+  transferType?: string;
+  transferAmount?: number | string;
+  transactionNumber?: string;
+}
+
+/** Webhook dashboard Pay2S — body.transactions (Tiền vào). */
+export async function fulfillTopupFromPay2sBankWebhook(body: Record<string, unknown>): Promise<{
+  ok: boolean;
+  message: string;
+  orderCode?: number;
+}> {
+  const rows = body.transactions;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return { ok: true, message: 'Webhook bank — không có transactions' };
+  }
+
+  const messages: string[] = [];
+  let lastOrderCode: number | undefined;
+
+  for (const raw of rows) {
+    if (!raw || typeof raw !== 'object') continue;
+    const tx = raw as Pay2sBankTransaction;
+    const transferType = String(tx.transferType || 'IN').toUpperCase();
+    if (transferType && transferType !== 'IN') {
+      messages.push(`Bỏ qua ${tx.id || '?'} (transferType=${transferType})`);
+      continue;
+    }
+
+    const amount = Math.round(Number(tx.transferAmount));
+    const content = String(tx.content || '');
+    const txRef = String(tx.id || tx.transactionNumber || '').trim();
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      messages.push(`Bỏ qua tx — amount không hợp lệ`);
+      continue;
+    }
+
+    const order = await findTopupOrderByBankTransfer({ content, amountVnd: amount });
+    if (!order) {
+      messages.push(`Không khớp đơn pending (amount=${amount}, content=${content.slice(0, 48)})`);
+      continue;
+    }
+
+    lastOrderCode = order.orderCode;
+
+    if (order.status === 'credited') {
+      messages.push(`Đơn #${order.orderCode} đã cộng trước đó`);
+      continue;
+    }
+
+    if (txRef && order.payosReference === txRef) {
+      messages.push(`Đơn #${order.orderCode} đã xử lý tx ${txRef}`);
+      continue;
+    }
+
+    await updateTopupOrder(order.orderCode, {
+      status: 'paid',
+      paidAt: new Date().toISOString(),
+      payosReference: txRef || order.payosReference,
+    });
+
+    const credits = order.credits || vndToCredits(order.amountVnd);
+    const message = `Pay2S bank webhook #${order.orderCode}`;
+
+    try {
+      await creditUserFromAdminWallet({
+        username: order.username,
+        credits,
+        message,
+        orderCode: order.orderCode,
+      });
+      await updateTopupOrder(order.orderCode, {
+        status: 'credited',
+        creditedAt: new Date().toISOString(),
+        error: undefined,
+      });
+      messages.push(`Đã cộng ${credits} credit cho @${order.username} (#${order.orderCode})`);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      await updateTopupOrder(order.orderCode, { status: 'failed', error: errMsg });
+      console.error('[pay2s/bank-webhook] credit-from-admin failed', order.orderCode, errMsg);
+      messages.push(`Đơn #${order.orderCode} lỗi cộng credit: ${errMsg}`);
+    }
+  }
+
+  return {
+    ok: true,
+    message: messages.join(' | ') || 'Webhook bank đã nhận',
+    orderCode: lastOrderCode,
+  };
 }
