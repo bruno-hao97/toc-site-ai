@@ -43,6 +43,56 @@ function serializeMessages(history: ChatTurn[]): string {
   );
 }
 
+const VN_WEEKDAYS = [
+  'Chủ Nhật',
+  'Thứ Hai',
+  'Thứ Ba',
+  'Thứ Tư',
+  'Thứ Năm',
+  'Thứ Sáu',
+  'Thứ Bảy',
+] as const;
+
+/** Chuỗi thời gian thực tế (Asia/Ho_Chi_Minh) để model không đoán ngày. */
+export function formatVietnamNow(date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? '';
+
+  const weekdayEn = get('weekday'); // Mon, Tue, …
+  const weekdayMap: Record<string, (typeof VN_WEEKDAYS)[number]> = {
+    Sun: 'Chủ Nhật',
+    Mon: 'Thứ Hai',
+    Tue: 'Thứ Ba',
+    Wed: 'Thứ Tư',
+    Thu: 'Thứ Năm',
+    Fri: 'Thứ Sáu',
+    Sat: 'Thứ Bảy',
+  };
+  const weekday = weekdayMap[weekdayEn] ?? VN_WEEKDAYS[date.getDay()];
+  const day = get('day');
+  const month = get('month');
+  const year = get('year');
+  const hour = get('hour');
+  const minute = get('minute');
+
+  return `${weekday}, ngày ${day}/${month}/${year}, ${hour}:${minute} (Asia/Ho_Chi_Minh)`;
+}
+
+function nowContextBlock(): string {
+  return `[Thời gian hiện tại: ${formatVietnamNow()}]\nDùng mốc thời gian này khi trả lời câu hỏi về ngày/giờ hôm nay.`;
+}
+
 /** API 1 & 3 — lưu tin nhắn (best-effort, không chặn câu trả lời). */
 async function saveMessage(
   cfg: GommoChatConfig,
@@ -92,12 +142,13 @@ export async function askGommo(userText: string, opts: AskOptions): Promise<stri
   const userMessageId = uuid();
   const assistantMessageId = uuid();
 
-  // System prompt chỉ chèn lượt đầu; snapshot canvas gửi kèm mỗi lượt.
+  // System prompt chỉ chèn lượt đầu; ngày giờ VN + snapshot gửi kèm mỗi lượt.
   const snapshotBlock = opts.workflowSnapshot
     ? `\n\n[Canvas hiện tại]\n${opts.workflowSnapshot}`
     : '';
   const sendText =
     (opts.firstTurn && cfg.systemPrompt ? `${cfg.systemPrompt}\n\n` : '') +
+    `${nowContextBlock()}\n\n` +
     userText +
     snapshotBlock;
 

@@ -197,6 +197,8 @@ function AppShell() {
     location.pathname === '/audio' ||
     isWorkflow;
   const hideHeader = isBarePage || isWorkflow;
+  // Chat sidebar theo ngữ cảnh route (Image/Video/Audio/Music/Home…).
+  // /workflow dùng Moon Agent riêng (canvas) — không chồng Quick Chat.
   const showQuickChat = isLoggedIn() && !isBarePage && !isWorkflow;
 
   return (
