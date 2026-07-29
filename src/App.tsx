@@ -11,6 +11,7 @@ import { useCreditsUpdated } from './hooks/useCreditsUpdated';
 import { useDisplayCredits } from './hooks/useDisplayCredits';
 import type { JobType } from './services/api';
 import BrandLogo from './components/BrandLogo';
+import AdminRoute from './components/AdminRoute';
 import ProtectedRoute from './components/ProtectedRoute';
 import QuickChatWidget from './components/QuickChatWidget';
 import UserMenuDropdown from './components/user/UserMenuDropdown';
@@ -241,7 +242,9 @@ function AppShell() {
               <Route index element={<AccountSettingsPage />} />
               <Route path="promo" element={<AccountPromoPage />} />
               <Route path="subscription" element={<AccountSubscriptionPage />} />
-              <Route path="transfer" element={<AccountTransferPage />} />
+              <Route element={<AdminRoute />}>
+                <Route path="transfer" element={<AccountTransferPage />} />
+              </Route>
               <Route path="topup" element={<Navigate to="/pricing" replace />} />
               <Route path="transactions" element={<AccountTransactionsPage />} />
             </Route>

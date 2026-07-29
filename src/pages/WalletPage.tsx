@@ -228,7 +228,7 @@ export default function WalletPage() {
           >
             {syncing ? 'Đang đồng bộ…' : 'Đồng bộ quỹ nội bộ'}
           </button>
-          <Link to="/account/transfer" className="btn ghost sm">Chuyển / cấp credit</Link>
+          <Link to="/account/transfer" className="btn ghost sm">Cấp credit</Link>
         </div>
       )}
 
@@ -237,7 +237,7 @@ export default function WalletPage() {
           <section className="panel">
             <div className="panel-head">
               <h2>Lịch sử cấp / chuyển / topup</h2>
-              <Link to="/account/transfer" className="btn ghost sm">Chuyển tiền →</Link>
+              <Link to="/account/transfer" className="btn ghost sm">Cấp credit →</Link>
             </div>
             {!adminStats?.recent_transfers?.length ? (
               <p className="muted">Chưa có giao dịch.</p>

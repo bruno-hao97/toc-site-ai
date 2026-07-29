@@ -59,7 +59,7 @@ async function forwardToBridge(
   res.send(text);
 }
 
-/** User → user (trừ ví người gửi) */
+/** @deprecated Chuyển P2P đã tắt — chỉ admin cấp qua grant.php. Endpoint giữ để trả 403 từ bridge. */
 router.post('/transfer', async (req, res) => {
   try {
     await forwardToBridge(req, res, 'transfer.php');

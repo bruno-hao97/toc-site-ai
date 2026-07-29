@@ -88,11 +88,11 @@ async function creditsRequest(
   };
 }
 
-/** User → user: trừ credit người gửi. */
+/** @deprecated Chuyển P2P đã tắt — dùng grantPlatformCredits (admin only). */
 export async function transferPlatformCredits(
-  input: PlatformTransferInput,
+  _input: PlatformTransferInput,
 ): Promise<PlatformTransferResult> {
-  return creditsRequest(PLATFORM_BRIDGE.transfer, input);
+  throw new Error('Chuyển credit giữa user đã tắt. Chỉ admin cấp credit qua trang Cấp credit.');
 }
 
 /** Admin → user: cấp từ quỹ (không trừ ví admin). */

@@ -1,7 +1,19 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { getDisplayUser } from '../../services/authStore';
+import { getDisplayUser, isAdminUser } from '../../services/authStore';
 
-const NAV = [
+type NavItem = {
+  to: string;
+  icon: string;
+  label: string;
+  end?: boolean;
+};
+
+type NavGroup = {
+  section: string;
+  items: NavItem[];
+};
+
+const NAV: NavGroup[] = [
   {
     section: 'CÀI ĐẶT TÀI KHOẢN',
     items: [
@@ -18,14 +30,19 @@ const NAV = [
   {
     section: 'TÀI CHÍNH',
     items: [
-      { to: '/account/transfer', icon: '↔', label: 'Chuyển tiền' },
       { to: '/account/transactions', icon: '🕐', label: 'Lịch sử giao dịch' },
     ],
   },
 ];
 
+const ADMIN_NAV: NavGroup = {
+  section: 'QUẢN TRỊ',
+  items: [{ to: '/account/transfer', icon: '↔', label: 'Cấp credit' }],
+};
+
 export default function AccountLayout() {
   const user = getDisplayUser();
+  const navGroups = isAdminUser() ? [...NAV.slice(0, 2), ADMIN_NAV, ...NAV.slice(2)] : NAV;
 
   return (
     <div className="page account-page">
@@ -42,7 +59,7 @@ export default function AccountLayout() {
           </div>
         </div>
 
-        {NAV.map((group) => (
+        {navGroups.map((group) => (
           <div key={group.section} className="account-nav-group">
             <p className="account-nav-section">{group.section}</p>
             {group.items.map((item) => (
