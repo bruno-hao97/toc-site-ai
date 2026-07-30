@@ -2,6 +2,7 @@ import type { TranslationMap } from '../types';
 
 const vi: TranslationMap = {
   'nav.home': 'Trang chủ',
+  'nav.chat': 'Chat',
   'nav.explore': 'Khám phá',
   'nav.projects': 'Dự án',
   'nav.image': 'Ảnh',

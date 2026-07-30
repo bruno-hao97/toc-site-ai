@@ -2,6 +2,7 @@ export type AppLocale = 'vi' | 'en';
 
 export type TranslationKey =
   | 'nav.home'
+  | 'nav.chat'
   | 'nav.explore'
   | 'nav.projects'
   | 'nav.image'

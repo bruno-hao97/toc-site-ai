@@ -32,6 +32,7 @@ import ApiPlaygroundPage from './pages/ApiPlaygroundPage';
 import DashboardPage from './pages/DashboardPage';
 import WalletPage from './pages/WalletPage';
 import PricingPage from './pages/PricingPage';
+import ChatPage from './pages/ChatPage';
 import AccountLayout from './pages/account/AccountLayout';
 import AccountSettingsPage from './pages/account/AccountSettingsPage';
 import AccountPromoPage from './pages/account/AccountPromoPage';
@@ -43,6 +44,7 @@ import type { TranslationKey } from './i18n';
 
 const MAIN_NAV: { to: string; labelKey: TranslationKey }[] = [
   { to: '/home', labelKey: 'nav.home' },
+  { to: '/chat', labelKey: 'nav.chat' },
   { to: '/explore', labelKey: 'nav.explore' },
   { to: '/projects', labelKey: 'nav.projects' },
   { to: '/image', labelKey: 'nav.image' },
@@ -193,20 +195,22 @@ function AppShell() {
   const BARE_PAGES = ['/', '/login', '/register'];
   const isBarePage = BARE_PAGES.includes(location.pathname);
   const isWorkflow = location.pathname === '/workflow';
+  const isChat = location.pathname === '/chat';
   const isFullBleed =
     location.pathname in STUDIO_NAV ||
     location.pathname === '/audio' ||
-    isWorkflow;
-  const hideHeader = isBarePage || isWorkflow;
+    isWorkflow ||
+    isChat;
+  const hideHeader = isBarePage || isWorkflow || isChat;
   // Chat sidebar theo ngữ cảnh route (Image/Video/Audio/Music/Home…).
-  // /workflow dùng Moon Agent riêng (canvas) — không chồng Quick Chat.
-  const showQuickChat = isLoggedIn() && !isBarePage && !isWorkflow;
+  // /workflow dùng Moon Agent riêng (canvas); /chat có trang riêng — không chồng Quick Chat.
+  const showQuickChat = isLoggedIn() && !isBarePage && !isWorkflow && !isChat;
 
   return (
     <div className={isBarePage ? '' : 'app'}>
       {!hideHeader && <AppHeader />}
       <main
-        className={isBarePage ? '' : `app-main ${isFullBleed ? 'app-main-full' : ''} ${isWorkflow ? 'app-main-workflow' : ''}`}
+        className={isBarePage ? '' : `app-main ${isFullBleed ? 'app-main-full' : ''} ${isWorkflow ? 'app-main-workflow' : ''} ${isChat ? 'app-main-chat' : ''}`}
       >
         <Routes>
           <Route path="/" element={<LandingPage />} />
@@ -214,6 +218,7 @@ function AppShell() {
           <Route path="/register" element={isLoggedIn() ? <Navigate to="/home" /> : <RegisterPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/home" element={<HomePage />} />
+            <Route path="/chat" element={<ChatPage />} />
             <Route path="/explore" element={<ExplorePage />} />
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/workflow" element={<WorkflowPage />} />

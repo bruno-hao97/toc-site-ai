@@ -2,6 +2,7 @@ import type { TranslationMap } from '../types';
 
 const en: TranslationMap = {
   'nav.home': 'Home',
+  'nav.chat': 'Chat',
   'nav.explore': 'Explore',
   'nav.projects': 'Projects',
   'nav.image': 'Image',

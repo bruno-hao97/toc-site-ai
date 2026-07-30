@@ -361,7 +361,7 @@ export default function HomeQuickCreateBar() {
   const onMenuSelect = (item: QuickMenuItem) => {
     setTypeMenuOpen(false);
     if (item.action === 'open-chat') {
-      window.dispatchEvent(new CustomEvent('quick-chat:open'));
+      navigate('/chat');
       return;
     }
     if (item.href) {
