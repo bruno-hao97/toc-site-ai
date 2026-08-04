@@ -1,4 +1,5 @@
-import { ChevronDown, Menu, Moon, Plus, Share2 } from 'lucide-react';
+import { ChevronDown, Menu, Plus, Share2, Sparkles } from 'lucide-react';
+import { BRAND_NAME } from '../../lib/brand';
 import type { ChatAiModel } from '../../services/chatAiModels';
 
 interface Props {
@@ -41,8 +42,8 @@ export default function ChatTopBar({ model, onOpenModelPicker, onNewChat, onOpen
           <ChevronDown size={14} />
         </button>
         <button type="button" className="chat-topbar-pill chat-topbar-pill--agent" disabled>
-          <Moon size={14} />
-          <span>Moon</span>
+          <Sparkles size={14} />
+          <span>{BRAND_NAME}</span>
           <ChevronDown size={14} />
         </button>
       </div>

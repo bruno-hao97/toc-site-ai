@@ -87,6 +87,9 @@ export default function ChatPage() {
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const sendGenRef = useRef(0);
+  const userStoppedRef = useRef(false);
+  const mountedRef = useRef(true);
   const selectedModel = resolveChatAiModel(modelId);
 
   const refreshSessions = useCallback(() => {
@@ -115,7 +118,9 @@ export default function ChatPage() {
   }, [messages, thinking]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       abortRef.current?.abort();
     };
   }, []);
@@ -224,6 +229,7 @@ export default function ChatPage() {
   };
 
   const stop = useCallback(() => {
+    userStoppedRef.current = true;
     abortRef.current?.abort();
   }, []);
 
@@ -236,6 +242,10 @@ export default function ChatPage() {
       window.alert('Bạn cần đăng nhập để dùng Chat AI.');
       return;
     }
+
+    abortRef.current?.abort();
+    userStoppedRef.current = false;
+    const gen = ++sendGenRef.current;
 
     setInput('');
 
@@ -268,6 +278,7 @@ export default function ChatPage() {
 
     let imageUrl = previewUrl;
     let turnAttachments: ChatAttachment[] = [];
+    let acc = '';
 
     try {
       if (pending) {
@@ -292,7 +303,6 @@ export default function ChatPage() {
         }
       }
 
-      let acc = '';
       await askGommo(text || 'Mô tả ảnh này giúp tôi.', {
         history,
         firstTurn,
@@ -311,6 +321,7 @@ export default function ChatPage() {
       });
 
       const assistantContent = acc.trim() || '(Không có nội dung trả về.)';
+      if (sendGenRef.current !== gen || !mountedRef.current) return;
       const finalMessages: ChatMessage[] = [
         ...priorMessages,
         { id: userMsgId, role: 'user', content: text, imageUrl },
@@ -319,16 +330,20 @@ export default function ChatPage() {
       setMessages(finalMessages);
       persistSession(sessionId, finalMessages);
     } catch (err) {
+      if (sendGenRef.current !== gen || !mountedRef.current) return;
       if (isAbortError(err)) {
-        const stopped = '(Đã dừng.)';
+        const stoppedMsg = userStoppedRef.current
+          ? '(Đã dừng.)'
+          : '⚠️ Kết nối bị gián đoạn. Vui lòng gửi lại tin nhắn.';
+        const partial = acc.trim();
         setMessages((prev) => {
-          const acc = prev.find((m) => m.id === assistantId)?.content.trim();
+          const streamed = prev.find((m) => m.id === assistantId)?.content.trim() || partial;
           const finalMessages = prev.map((m) => {
             if (m.id === userMsgId) return { ...m, imageUrl };
-            if (m.id === assistantId) return { ...m, content: acc || stopped };
+            if (m.id === assistantId) return { ...m, content: streamed || stoppedMsg };
             return m;
           });
-          persistSession(sessionId, finalMessages);
+          if (streamed) persistSession(sessionId, finalMessages);
           return finalMessages;
         });
       } else {
@@ -343,9 +358,12 @@ export default function ChatPage() {
         persistSession(sessionId, finalMessages);
       }
     } finally {
+      if (sendGenRef.current !== gen) return;
       if (abortRef.current === ac) abortRef.current = null;
-      setUploading(false);
-      setThinking(false);
+      if (mountedRef.current) {
+        setUploading(false);
+        setThinking(false);
+      }
     }
   };
 

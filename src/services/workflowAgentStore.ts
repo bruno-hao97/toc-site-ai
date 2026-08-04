@@ -118,7 +118,7 @@ function welcomeMessage(): AgentMessage {
     id: newId('msg'),
     role: 'assistant',
     content:
-      'Xin chào! Tôi là **Moon Agent** — giúp bạn tạo và chỉnh workflow trên canvas.\n\n' +
+      'Xin chào! Tôi là **AGI Workflow Agent** — giúp bạn tạo và chỉnh workflow trên canvas.\n\n' +
       'Mô tả workflow bạn muốn (vd: tạo ảnh từ prompt → xuất kết quả), tôi sẽ áp dụng lên canvas.',
     createdAt: new Date().toISOString(),
   };

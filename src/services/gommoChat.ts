@@ -1,6 +1,14 @@
+import { CHAT_BRAND_IDENTITY } from '../lib/brand';
 import { loadAuth } from './authStore';
 import { DEFAULT_DOMAIN } from './settingsStore';
 import { GOMMO_CHAT_CONFIG, type GommoChatConfig } from './gommoChatConfig';
+
+/** Chat hội thoại (persistHistory) — luôn chèn quy tắc thương hiệu AGI. */
+function resolveChatSystemPrompt(cfg: GommoChatConfig): string | undefined {
+  const base = cfg.systemPrompt?.trim();
+  if (cfg.persistHistory === false) return base || undefined;
+  return base ? `${CHAT_BRAND_IDENTITY}\n\n${base}` : CHAT_BRAND_IDENTITY;
+}
 
 export interface ChatAttachment {
   type: 'image';
@@ -108,7 +116,7 @@ function nowContextBlock(): string {
 }
 
 /** API 1 & 3 — lưu tin nhắn (best-effort, không chặn câu trả lời). */
-async function saveMessage(
+function saveMessage(
   cfg: GommoChatConfig,
   platformToken: string,
   domain: string,
@@ -120,31 +128,36 @@ async function saveMessage(
     attachments?: ChatAttachment[];
     metadata: Record<string, unknown>;
   },
-): Promise<void> {
-  try {
-    const form = new URLSearchParams();
-    form.set('action', 'save_message');
-    form.set('domain', domain);
-    form.set('message_id', args.messageId);
-    form.set('session_id', args.sessionId);
-    form.set('role', args.role);
-    form.set('text', args.text);
-    form.set('attachments', JSON.stringify(args.attachments?.length ? args.attachments : []));
-    form.set('timestamp', String(Date.now()));
-    form.set('metadata', JSON.stringify(args.metadata));
-    form.set('device_id', cfg.deviceId);
-    form.set('device_name', cfg.deviceName);
-    await fetch(`${cfg.baseUrl}/ai-chat-sessions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${platformToken}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: form.toString(),
-    });
-  } catch (err) {
-    console.warn('[gommoChat] save_message failed (bỏ qua):', err);
-  }
+  signal?: AbortSignal,
+): void {
+  void (async () => {
+    try {
+      const form = new URLSearchParams();
+      form.set('action', 'save_message');
+      form.set('domain', domain);
+      form.set('message_id', args.messageId);
+      form.set('session_id', args.sessionId);
+      form.set('role', args.role);
+      form.set('text', args.text);
+      form.set('attachments', JSON.stringify(args.attachments?.length ? args.attachments : []));
+      form.set('timestamp', String(Date.now()));
+      form.set('metadata', JSON.stringify(args.metadata));
+      form.set('device_id', cfg.deviceId);
+      form.set('device_name', cfg.deviceName);
+      await fetch(`${cfg.baseUrl}/ai-chat-sessions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${platformToken}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: form.toString(),
+        signal,
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      console.warn('[gommoChat] save_message failed (bỏ qua):', err);
+    }
+  })();
 }
 
 /**
@@ -165,11 +178,12 @@ export async function askGommo(userText: string, opts: AskOptions): Promise<stri
   const turnAttachments = opts.attachments?.length ? opts.attachments : [];
 
   // System prompt chỉ chèn lượt đầu; ngày giờ VN + snapshot gửi kèm mỗi lượt.
+  const systemPrompt = resolveChatSystemPrompt(cfg);
   const snapshotBlock = opts.workflowSnapshot
     ? `\n\n[Canvas hiện tại]\n${opts.workflowSnapshot}`
     : '';
   const sendText =
-    (opts.firstTurn && cfg.systemPrompt ? `${cfg.systemPrompt}\n\n` : '') +
+    (opts.firstTurn && systemPrompt ? `${systemPrompt}\n\n` : '') +
     `${nowContextBlock()}\n\n` +
     userText +
     snapshotBlock;
@@ -181,20 +195,24 @@ export async function askGommo(userText: string, opts: AskOptions): Promise<stri
 
   // Timeout: linked abort + tự hủy sau timeoutMs.
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), cfg.timeoutMs);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    ac.abort();
+  }, cfg.timeoutMs);
   const onExternalAbort = () => ac.abort();
   opts.signal?.addEventListener('abort', onExternalAbort);
 
   try {
     if (cfg.persistHistory) {
-      await saveMessage(cfg, platformToken, domain, {
+      saveMessage(cfg, platformToken, domain, {
         messageId: userMessageId,
         sessionId: opts.sessionId,
         role: 'user',
         text: userText,
         attachments: turnAttachments,
         metadata: { version: 1 },
-      });
+      }, ac.signal);
     }
 
     const form = new URLSearchParams();
@@ -280,7 +298,7 @@ export async function askGommo(userText: string, opts: AskOptions): Promise<stri
     if (!done && buffer.trim()) consumeLine(buffer.trim());
 
     if (cfg.persistHistory) {
-      await saveMessage(cfg, platformToken, domain, {
+      saveMessage(cfg, platformToken, domain, {
         messageId: assistantMessageId,
         sessionId: opts.sessionId,
         role: 'model',
@@ -295,6 +313,15 @@ export async function askGommo(userText: string, opts: AskOptions): Promise<stri
     }
 
     return reply;
+  } catch (err) {
+    if (
+      timedOut &&
+      ((err instanceof DOMException && err.name === 'AbortError') ||
+        (err instanceof Error && err.name === 'AbortError'))
+    ) {
+      throw new Error('Chat quá thời gian chờ. Vui lòng thử lại.');
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
     opts.signal?.removeEventListener('abort', onExternalAbort);

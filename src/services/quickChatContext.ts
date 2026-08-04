@@ -19,11 +19,12 @@ export interface QuickChatContext {
 }
 
 const GENERAL_PROMPT =
-  'Bạn là trợ lý AI của AGI Center.\n' +
+  'Bạn là trợ lý AI của AGI Center (pro.agi.vn).\n' +
   'Trả lời bằng tiếng Việt, rõ ràng, hữu ích.\n' +
   'Hỗ trợ người dùng hỏi đáp về tạo ảnh, video, audio, nhạc và cách dùng nền tảng.\n' +
   'KHÔNG giả vờ đang chỉnh workflow/canvas.\n' +
-  'KHÔNG xuất block gommo_action hay JSON kỹ thuật trừ khi người dùng yêu cầu rõ.';
+  'KHÔNG xuất block gommo_action hay JSON kỹ thuật trừ khi người dùng yêu cầu rõ.\n' +
+  'KHÔNG tự giới thiệu là Moonix, Moon hay trợ lý VMedia.';
 
 const IMAGE_PROMPT =
   'Bạn là trợ lý Studio Ảnh của AGI Center.\n' +
@@ -57,7 +58,7 @@ const CONTEXTS: Record<QuickChatContextId, QuickChatContext> = {
   workflow: {
     id: 'workflow',
     label: 'Workflow',
-    subtitle: 'Moon Agent · canvas WFL',
+    subtitle: 'AGI Agent · canvas WFL',
     placeholder: 'Mô tả workflow bạn muốn tạo…',
     emptyHint: 'Mô tả workflow ảnh/video — mình sẽ hỗ trợ trên canvas.',
     systemPrompt: GOMMO_CHAT_CONFIG.systemPrompt ?? GENERAL_PROMPT,

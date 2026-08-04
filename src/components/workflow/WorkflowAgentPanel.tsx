@@ -224,7 +224,7 @@ export default function WorkflowAgentPanel({
               <Bot size={18} />
             </span>
             <div>
-              <div className="wf-agent-title">Moon Agent</div>
+              <div className="wf-agent-title">AGI Workflow Agent</div>
               <div className="wf-agent-meta">
                 {tabName} · {nodes.length} nodes · {edges.length} connections · 0 groups
               </div>

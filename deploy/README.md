@@ -50,3 +50,5 @@ curl -s https://pro.agi.vn/api/health
 ## PHP bridge
 
 Đảm bảo `server/php-bridge/` đã deploy tại `/api/platform/` và có `config.local.php`.
+
+Hotfix **phiên JWT / lỗi token hết hạn**: xem **[UPLOAD-AUTH-SESSION-HOTFIX.md](./UPLOAD-AUTH-SESSION-HOTFIX.md)**.

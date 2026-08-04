@@ -4,9 +4,18 @@ import { fetchUpstreamMe, type UpstreamMeResponse } from './upstreamMe';
 import { GOMMO_CHAT_CONFIG } from './gommoChatConfig';
 import { PLATFORM_BRIDGE } from './platformBridge';
 import { loadSettings, normalizeDomain, saveSettings } from './settingsStore';
+import {
+  humanizePlatformError,
+  parsePlatformJson,
+} from './platformApiError';
+import { dispatchSessionExpired, DEFAULT_SESSION_EXPIRED_MESSAGE } from './sessionExpired';
 
 const SESSION_KEY = 'gommo_session';
 export const DEFAULT_PROJECT_ID = 'default';
+/** Gia hạn token trước khi hết hạn (24 giờ). */
+const TOKEN_REFRESH_BEFORE_SEC = 86400;
+
+let refreshInFlight: Promise<AuthState> | null = null;
 
 export interface PlatformUser {
   id: string;
@@ -123,6 +132,15 @@ export function clearAuth(): void {
   localStorage.removeItem(SESSION_KEY);
   saveSettings({ accessToken: '' });
   clearAdminVmediaCreditsCache();
+}
+
+export function handlePlatformAuthFailure(status: number, message?: string): void {
+  if (status !== 401 && status !== 403) return;
+  clearAuth();
+  if (typeof window === 'undefined') return;
+  const path = window.location.pathname;
+  if (path === '/login' || path === '/register') return;
+  dispatchSessionExpired(message || DEFAULT_SESSION_EXPIRED_MESSAGE);
 }
 
 export function isLoggedIn(): boolean {
@@ -254,25 +272,127 @@ export async function loginWithGommoToken(
   return state;
 }
 
+export function decodeJwtExp(token: string): number | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded)) as { exp?: unknown };
+    return typeof payload.exp === 'number' ? payload.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+export function platformTokenExpired(token: string): boolean {
+  const exp = decodeJwtExp(token);
+  if (exp == null) return false;
+  return Date.now() / 1000 >= exp;
+}
+
+export function platformTokenNeedsRefresh(token: string): boolean {
+  const exp = decodeJwtExp(token);
+  if (exp == null) return true;
+  return Date.now() / 1000 >= exp - TOKEN_REFRESH_BEFORE_SEC;
+}
+
+export async function refreshPlatformToken(): Promise<AuthState> {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    const auth = loadAuth();
+    if (!auth?.platform_token?.trim()) {
+      throw new Error('Chưa đăng nhập');
+    }
+
+    const res = await fetch(PLATFORM_BRIDGE.refreshToken, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${auth.platform_token.trim()}`,
+        Accept: 'application/json',
+      },
+    });
+    const text = await res.text();
+    const parsed = parsePlatformJson<{
+      success?: boolean;
+      message?: string;
+      data?: { token?: string; user?: PlatformUser };
+    }>(text, res.status);
+
+    if (res.status === 401 || res.status === 403) {
+      const msg = humanizePlatformError(text, res.status, parsed.message);
+      handlePlatformAuthFailure(res.status, msg);
+      throw new Error(msg);
+    }
+    if (!res.ok || !parsed.success || !parsed.data?.token || !parsed.data.user) {
+      throw new Error(
+        humanizePlatformError(text, res.status, parsed.message || 'Không làm mới được phiên đăng nhập'),
+      );
+    }
+
+    return loginWithPlatformSession(parsed.data.token, parsed.data.user);
+  })();
+
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
+  }
+}
+
+/** Gia hạn JWT im lặng khi sắp hết hạn hoặc đã hết hạn (trong grace period). */
+export async function ensureValidPlatformSession(): Promise<void> {
+  const auth = loadAuth();
+  const token = auth?.platform_token?.trim();
+  if (!token) return;
+  if (!platformTokenNeedsRefresh(token) && !platformTokenExpired(token)) return;
+
+  try {
+    await refreshPlatformToken();
+  } catch {
+    if (platformTokenExpired(token)) {
+      handlePlatformAuthFailure(401, DEFAULT_SESSION_EXPIRED_MESSAGE);
+    }
+  }
+}
+
 export async function refreshSession(): Promise<AuthState> {
   const auth = loadAuth();
   if (!auth) throw new Error('Chưa đăng nhập');
 
   if (auth.platform_token) {
+    if (platformTokenExpired(auth.platform_token) || platformTokenNeedsRefresh(auth.platform_token)) {
+      return refreshPlatformToken();
+    }
+
     const res = await fetch(PLATFORM_BRIDGE.me, {
       headers: { Authorization: `Bearer ${auth.platform_token}` },
     });
     const text = await res.text();
-    let parsed: { success?: boolean; message?: string; data?: { user: PlatformUser } };
-    try {
-      parsed = JSON.parse(text) as typeof parsed;
-    } catch {
-      throw new Error(text || `HTTP ${res.status}`);
+    const parsed = parsePlatformJson<{
+      success?: boolean;
+      message?: string;
+      data?: { user: PlatformUser; token?: string };
+    }>(text, res.status);
+
+    if (res.status === 401 || res.status === 403) {
+      try {
+        return await refreshPlatformToken();
+      } catch {
+        const msg = humanizePlatformError(text, res.status, parsed.message);
+        handlePlatformAuthFailure(res.status, msg);
+        throw new Error(msg);
+      }
     }
     if (!res.ok || !parsed.success || !parsed.data?.user) {
-      throw new Error(parsed.message || 'Không làm mới được phiên đăng nhập');
+      throw new Error(
+        humanizePlatformError(text, res.status, parsed.message || 'Không làm mới được phiên đăng nhập'),
+      );
     }
-    const next = { ...auth, user: parsed.data.user };
+
+    const nextToken = parsed.data.token?.trim() || auth.platform_token;
+    const next = { ...auth, platform_token: nextToken, user: parsed.data.user };
     saveAuth(next);
     return next;
   }

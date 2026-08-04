@@ -119,14 +119,26 @@ function sign_jwt(string $userId): string
     return $header . '.' . $payload . '.' . $sig;
 }
 
-function verify_jwt(string $token): string
+function jwt_auth_user_message(string $code): string
 {
-    $cfg = platform_config();
+    if ($code === 'Token đã hết hạn') {
+        return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+    }
+    if ($code === 'Token không hợp lệ') {
+        return 'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.';
+    }
+    return 'Không xác thực được phiên đăng nhập. Vui lòng đăng nhập lại.';
+}
+
+/** @return array{sub: string, exp?: int} */
+function decode_jwt_payload(string $token): array
+{
     $parts = explode('.', $token);
     if (count($parts) !== 3) {
         throw new RuntimeException('Token không hợp lệ');
     }
     [$header, $payload, $sig] = $parts;
+    $cfg = platform_config();
     $expected = b64url_encode(hash_hmac('sha256', $header . '.' . $payload, $cfg['jwt_secret'], true));
     if (!hash_equals($expected, $sig)) {
         throw new RuntimeException('Token không hợp lệ');
@@ -135,10 +147,33 @@ function verify_jwt(string $token): string
     if (!is_array($data) || empty($data['sub'])) {
         throw new RuntimeException('Token không hợp lệ');
     }
+    return [
+        'sub' => (string) $data['sub'],
+        'exp' => isset($data['exp']) ? (int) $data['exp'] : null,
+    ];
+}
+
+function verify_jwt(string $token): string
+{
+    $data = decode_jwt_payload($token);
     if (!empty($data['exp']) && time() >= (int) $data['exp']) {
         throw new RuntimeException('Token đã hết hạn');
     }
-    return (string) $data['sub'];
+    return $data['sub'];
+}
+
+/** Chỉ dùng cho refresh-token — cho phép token hết hạn trong cửa sổ grace. */
+function verify_jwt_for_refresh(string $token): string
+{
+    $cfg = platform_config();
+    $data = decode_jwt_payload($token);
+    if (!empty($data['exp']) && time() >= (int) $data['exp']) {
+        $grace = (int) ($cfg['jwt_refresh_grace_seconds'] ?? 2592000);
+        if ($grace <= 0 || time() >= (int) $data['exp'] + $grace) {
+            throw new RuntimeException('Token đã hết hạn');
+        }
+    }
+    return $data['sub'];
 }
 
 function user_public(array $row): array
@@ -207,9 +242,13 @@ function require_bearer_user(): array
 {
     $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
     if (!preg_match('/^Bearer\s+(\S+)/i', $auth, $m)) {
-        json_out(401, ['success' => false, 'message' => 'Thiếu token đăng nhập']);
+        json_out(401, ['success' => false, 'message' => 'Vui lòng đăng nhập để tiếp tục']);
     }
-    $userId = verify_jwt($m[1]);
+    try {
+        $userId = verify_jwt($m[1]);
+    } catch (RuntimeException $e) {
+        json_out(401, ['success' => false, 'message' => jwt_auth_user_message($e->getMessage())]);
+    }
     $pdo = db();
     $user = find_user_by_id($pdo, $userId);
     if (!$user) {

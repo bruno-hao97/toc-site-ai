@@ -1,5 +1,6 @@
 import { GOMMO_AUTH_BASE, GOMMO_AUTH_PATH, UpstreamMeError } from './upstreamMe';
-import { clearAuth, loadAuth, resolveProjectId } from './authStore';
+import { handlePlatformAuthFailure, loadAuth, resolveProjectId } from './authStore';
+import { humanizePlatformError } from './platformApiError';
 import { GOMMO_CHAT_CONFIG } from './gommoChatConfig';
 import type { AppLocale } from '../i18n/types';
 import { normalizeElevenLabsCheapModel } from './audioCatalog';
@@ -244,9 +245,10 @@ async function postAudioApi(body: URLSearchParams): Promise<Record<string, unkno
       });
 
       if (res.status === 401 || res.status === 403) {
-        clearAuth();
-        if (typeof window !== 'undefined') window.location.href = '/login';
-        throw new UpstreamMeError('Phiên đăng nhập hết hạn', res.status);
+        const errText = await res.text();
+        const msg = humanizePlatformError(errText, res.status);
+        handlePlatformAuthFailure(res.status, msg);
+        throw new UpstreamMeError(msg, res.status);
       }
 
       const text = await res.text();
@@ -254,7 +256,7 @@ async function postAudioApi(body: URLSearchParams): Promise<Record<string, unkno
       try {
         parsed = JSON.parse(text) as Record<string, unknown>;
       } catch {
-        throw new UpstreamMeError(text || `HTTP ${res.status}`, res.status);
+        throw new UpstreamMeError(humanizePlatformError(text, res.status), res.status);
       }
 
       const dataBlock = parsed.data as { success?: boolean } | undefined;
@@ -264,7 +266,7 @@ async function postAudioApi(body: URLSearchParams): Promise<Record<string, unkno
 
       if (!res.ok || failed) {
         throw new UpstreamMeError(
-          (parsed.message as string) || `HTTP ${res.status}`,
+          humanizePlatformError(text, res.status, parsed.message as string | undefined),
           res.status,
         );
       }

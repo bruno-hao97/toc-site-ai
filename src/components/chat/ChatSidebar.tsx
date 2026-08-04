@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
-import { Moon, Plus, Search, Trash2, Workflow, X } from 'lucide-react';
+import { Plus, Search, Sparkles, Trash2, Workflow, X } from 'lucide-react';
 import BrandLogo from '../BrandLogo';
+import { BRAND_NAME } from '../../lib/brand';
 import { getDisplayUser } from '../../services/authStore';
 import type { ChatSessionSummary } from '../../services/chatSessionsLocal';
 
@@ -111,8 +112,8 @@ export default function ChatSidebar({
         <div className="chat-sidebar-section">
           <span className="chat-sidebar-section-label">Agent</span>
           <button type="button" className="chat-sidebar-row chat-sidebar-row--static active">
-            <Moon size={16} className="chat-sidebar-row-icon-svg" />
-            <span className="chat-sidebar-row-text">Moon</span>
+            <Sparkles size={16} className="chat-sidebar-row-icon-svg" />
+            <span className="chat-sidebar-row-text">{BRAND_NAME}</span>
           </button>
         </div>
 

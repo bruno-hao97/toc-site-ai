@@ -7,6 +7,8 @@ export const PLATFORM_BRIDGE = {
   register: '/api/platform/register.php',
   tokenMe: '/api/platform/token-me.php',
   me: '/api/platform/me.php',
+  refreshToken: '/api/platform/refresh-token.php',
+  authSessionHealth: '/api/platform/auth-session-health.php',
   changePassword: '/api/platform/change-password.php',
   transfer: '/api/platform/transfer.php',
   grant: '/api/platform/grant.php',

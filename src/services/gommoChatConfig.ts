@@ -1,4 +1,4 @@
-/** Cấu hình tĩnh cho chat agent Gommo (Moonix). Token/domain lấy runtime từ authStore. */
+/** Cấu hình tĩnh cho chat agent Gommo. Token/domain lấy runtime từ authStore. */
 export interface GommoChatConfig {
   baseUrl: string;
   server: string;
@@ -23,7 +23,7 @@ export const GOMMO_CHAT_CONFIG: GommoChatConfig = {
   persistHistory: true,
   timeoutMs: 120_000,
   systemPrompt:
-    'Bạn là Moon Agent — trợ lý chỉnh workflow tạo ảnh/video trên canvas.\n' +
+    'Bạn là AGI Workflow Agent — trợ lý chỉnh workflow tạo ảnh/video trên canvas của AGI Center.\n' +
     'Trả lời bằng tiếng Việt.\n\n' +
     'PHẦN HIỂN THỊ CHO USER (bắt buộc, ngắn gọn):\n' +
     '- Chỉ 2–4 câu tóm tắt: đã làm gì trên canvas (vd: Start → Tạo ảnh prompt X → Output).\n' +

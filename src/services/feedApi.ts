@@ -1,5 +1,14 @@
 import { GOMMO_AUTH_BASE, GOMMO_AUTH_PATH, UpstreamMeError } from './upstreamMe';
-import { authUserKey, clearAuth, isAdminUser, loadAuth, resolveProjectId } from './authStore';
+import {
+  authUserKey,
+  ensureValidPlatformSession,
+  handlePlatformAuthFailure,
+  isAdminUser,
+  loadAuth,
+  refreshPlatformToken,
+  resolveProjectId,
+} from './authStore';
+import { humanizePlatformError } from './platformApiError';
 import { GOMMO_CHAT_CONFIG } from './gommoChatConfig';
 import { buildDeviceInfo } from './audioVoices';
 import { usesPlatformJobs } from './platformJobClient';
@@ -14,13 +23,27 @@ async function platformFeedGet<T extends { success?: boolean; message?: string }
   baseUrl: string,
   params: Record<string, string>,
 ): Promise<T> {
+  await ensureValidPlatformSession();
   const auth = loadAuth();
   const token = auth?.platform_token?.trim();
   if (!token) throw new UpstreamMeError('Chưa đăng nhập tài khoản hệ thống', 401);
   const qs = new URLSearchParams(params).toString();
-  const res = await fetch(`${baseUrl}?${qs}`, {
+  let res = await fetch(`${baseUrl}?${qs}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
   });
+  if (res.status === 401 || res.status === 403) {
+    try {
+      await refreshPlatformToken();
+      const nextToken = loadAuth()?.platform_token?.trim();
+      if (nextToken) {
+        res = await fetch(`${baseUrl}?${qs}`, {
+          headers: { Authorization: `Bearer ${nextToken}`, Accept: 'application/json' },
+        });
+      }
+    } catch {
+      /* handled in parseFeedRes */
+    }
+  }
   return parseFeedRes<T>(res);
 }
 
@@ -49,30 +72,37 @@ async function feedRequest<T extends { success?: boolean; message?: string }>(
 async function parseFeedRes<T extends { success?: boolean; message?: string }>(
   res: Response,
 ): Promise<T> {
-  // Token (Gommo hoặc JWT backend) hết hạn → đăng xuất, về trang login.
-  if (res.status === 401 || res.status === 403) {
-    clearAuth();
-    if (typeof window !== 'undefined') window.location.href = '/login';
-  }
   const text = await res.text();
   let parsed: T;
   try {
     parsed = JSON.parse(text) as T;
   } catch {
-    const isHtml = /^\s*</.test(text) || /<!doctype|<br\s*\/?>|<b>Fatal/i.test(text);
+    if (res.status === 401 || res.status === 403) {
+      const msg = humanizePlatformError(text, res.status);
+      handlePlatformAuthFailure(res.status, msg);
+      throw new UpstreamMeError(msg, res.status);
+    }
+    throw new UpstreamMeError(humanizePlatformError(text, res.status), res.status);
+  }
+
+  if (res.status === 401 || res.status === 403) {
+    const msg = humanizePlatformError(text, res.status, parsed.message);
+    handlePlatformAuthFailure(res.status, msg);
+    throw new UpstreamMeError(msg, res.status);
+  }
+
+  if (!res.ok || parsed.success === false) {
     throw new UpstreamMeError(
-      isHtml
-        ? 'Gateway tạm thời lỗi. Thử lại sau hoặc liên hệ hỗ trợ.'
-        : text.slice(0, 200) || `HTTP ${res.status}`,
+      humanizePlatformError(text, res.status, parsed.message),
       res.status,
     );
   }
-  if (!res.ok || parsed.success === false) {
-    throw new UpstreamMeError(parsed.message || `HTTP ${res.status}`, res.status);
-  }
   const softErr = (parsed as { error?: number }).error;
   if (typeof softErr === 'number' && softErr !== 0) {
-    throw new UpstreamMeError(parsed.message || `Upstream error ${softErr}`, res.status);
+    throw new UpstreamMeError(
+      humanizePlatformError(text, res.status, parsed.message),
+      res.status,
+    );
   }
   return parsed;
 }
@@ -561,19 +591,23 @@ export async function recordPlatformJob(input: {
       meta: input.meta || {},
     }),
   });
-  if (res.status === 401 || res.status === 403) {
-    clearAuth();
-    if (typeof window !== 'undefined') window.location.href = '/login';
-  }
   const text = await res.text();
+  if (res.status === 401 || res.status === 403) {
+    const msg = humanizePlatformError(text, res.status);
+    handlePlatformAuthFailure(res.status, msg);
+    throw new UpstreamMeError(msg, res.status);
+  }
   let parsed: { success?: boolean; message?: string; data?: { platformJobId?: string } };
   try {
     parsed = JSON.parse(text) as typeof parsed;
   } catch {
-    throw new UpstreamMeError(text || `HTTP ${res.status}`, res.status);
+    throw new UpstreamMeError(humanizePlatformError(text, res.status), res.status);
   }
   if (!res.ok || parsed.success === false || !parsed.data?.platformJobId) {
-    throw new UpstreamMeError(parsed.message || 'Ghi job thất bại', res.status);
+    throw new UpstreamMeError(
+      humanizePlatformError(text, res.status, parsed.message || 'Ghi job thất bại'),
+      res.status,
+    );
   }
   invalidateMineAudioMusicCaches();
   return parsed.data.platformJobId;
@@ -726,19 +760,23 @@ async function deletePlatformJob(jobId: string): Promise<void> {
     },
     body: JSON.stringify({ platformJobId: jobId }),
   });
-  if (res.status === 401 || res.status === 403) {
-    clearAuth();
-    if (typeof window !== 'undefined') window.location.href = '/login';
-  }
   const text = await res.text();
+  if (res.status === 401 || res.status === 403) {
+    const msg = humanizePlatformError(text, res.status);
+    handlePlatformAuthFailure(res.status, msg);
+    throw new UpstreamMeError(msg, res.status);
+  }
   let parsed: { success?: boolean; message?: string };
   try {
     parsed = JSON.parse(text) as typeof parsed;
   } catch {
-    throw new UpstreamMeError(text || `HTTP ${res.status}`, res.status);
+    throw new UpstreamMeError(humanizePlatformError(text, res.status), res.status);
   }
   if (!res.ok || parsed.success === false) {
-    throw new UpstreamMeError(parsed.message || 'Xóa thất bại', res.status);
+    throw new UpstreamMeError(
+      humanizePlatformError(text, res.status, parsed.message || 'Xóa thất bại'),
+      res.status,
+    );
   }
 }
 

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { Coins, Globe, Menu, X } from 'lucide-react';
 import {
-  clearAuth,
+  ensureValidPlatformSession,
+  handlePlatformAuthFailure,
   isAdminUser,
   isLoggedIn,
 } from './services/authStore';
@@ -11,6 +12,7 @@ import { useCreditsUpdated } from './hooks/useCreditsUpdated';
 import { useDisplayCredits } from './hooks/useDisplayCredits';
 import type { JobType } from './services/api';
 import BrandLogo from './components/BrandLogo';
+import SessionExpiredHost from './components/SessionExpiredHost';
 import AdminRoute from './components/AdminRoute';
 import ProtectedRoute from './components/ProtectedRoute';
 import QuickChatWidget from './components/QuickChatWidget';
@@ -86,8 +88,7 @@ function AppHeader() {
   function refreshCredits() {
     void refresh().catch((err) => {
       if (err instanceof UpstreamMeError && (err.status === 401 || err.status === 403)) {
-        clearAuth();
-        window.location.href = '/login';
+        handlePlatformAuthFailure(err.status, err.message);
       }
     });
   }
@@ -192,6 +193,13 @@ function AppHeader() {
 
 function AppShell() {
   const location = useLocation();
+  const loggedIn = isLoggedIn();
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    void ensureValidPlatformSession();
+  }, [loggedIn]);
+
   const BARE_PAGES = ['/', '/login', '/register'];
   const isBarePage = BARE_PAGES.includes(location.pathname);
   const isWorkflow = location.pathname === '/workflow';
@@ -266,5 +274,10 @@ function AppShell() {
 }
 
 export default function App() {
-  return <AppShell />;
+  return (
+    <>
+      <AppShell />
+      <SessionExpiredHost />
+    </>
+  );
 }

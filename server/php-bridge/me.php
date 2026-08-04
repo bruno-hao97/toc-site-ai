@@ -9,7 +9,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 try {
     [, $user] = require_bearer_user();
-    json_out(200, ['success' => true, 'data' => ['user' => user_public($user)]]);
+    json_out(200, [
+        'success' => true,
+        'data' => [
+            'user' => user_public($user),
+            'token' => sign_jwt((string) $user['id']),
+        ],
+    ]);
 } catch (Throwable $e) {
-    json_out(401, ['success' => false, 'message' => $e->getMessage()]);
+    json_out(401, ['success' => false, 'message' => jwt_auth_user_message($e->getMessage())]);
 }

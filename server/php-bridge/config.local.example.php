@@ -16,7 +16,9 @@ return [
     'db_user' => 'sql_pro_agi_vn',
     'db_password' => 'CHANGE_ME',
     'jwt_secret' => 'CHANGE_ME_SAME_AS_NODE_JWT_SECRET',
-    'jwt_expires_seconds' => 604800,
+    'jwt_expires_seconds' => 2592000,
+    /** Token hết hạn vẫn refresh được trong khoảng này (giây). Mặc định 30 ngày. */
+    'jwt_refresh_grace_seconds' => 2592000,
     'signup_bonus_credits' => 0, // Không mint credit — user nhận qua cấp/chuyển/topup từ ví admin
     'transfer_min' => 1000,
     'transfer_max' => 20000000,
