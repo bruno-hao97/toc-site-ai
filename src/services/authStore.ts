@@ -64,7 +64,7 @@ function safeString(value: unknown): string | null {
 function pickProjectId(id?: string | null): string | null {
   const trimmed = id?.trim();
   if (!trimmed || trimmed === DEFAULT_PROJECT_ID) return null;
-  if (trimmed === GOMMO_CHAT_CONFIG.projectId) return null;
+  if (trimmed === WORKFLOW_CHAT_PROJECT_ID) return null;
   return trimmed;
 }
 
