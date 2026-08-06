@@ -22,7 +22,8 @@ import {
   type AgentMessage,
   type AgentState,
 } from '../../services/workflowAgentStore';
-import { askGommo, isGommoChatConfigured, type ChatTurn } from '../../services/gommoChat';
+import { askGommo, isGommoChatConfigured, resolveChatAssistantContent, type ChatTurn } from '../../services/gommoChat';
+import { WORKFLOW_CHAT_AGENT_ID, WORKFLOW_CHAT_PROJECT_ID } from '../../services/gommoChatConfig';
 import {
   applyWorkflowActions,
   buildWorkflowSnapshot,
@@ -148,7 +149,13 @@ export default function WorkflowAgentPanel({
         firstTurn,
         sessionId: session.id,
         workflowSnapshot: snapshot,
-        config: { model: chatModel.model, server: chatModel.server },
+        config: {
+          model: chatModel.model,
+          server: chatModel.server,
+          agentId: WORKFLOW_CHAT_AGENT_ID,
+          projectId: WORKFLOW_CHAT_PROJECT_ID,
+          chatApiMode: 'stream',
+        },
         onDelta: (chunk) => {
           acc += chunk;
           patchAssistant(session.id, assistantMsg.id, { content: acc });
@@ -157,7 +164,7 @@ export default function WorkflowAgentPanel({
 
       if (!acc.trim()) {
         patchAssistant(session.id, assistantMsg.id, {
-          content: '(Agent không trả về nội dung.)',
+          content: resolveChatAssistantContent(acc),
         });
         return;
       }

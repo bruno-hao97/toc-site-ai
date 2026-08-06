@@ -1,7 +1,7 @@
 import { getCachedAdminVmediaCredits, clearAdminVmediaCreditsCache } from './creditsCache';
 import { GommoClient } from './api';
 import { fetchUpstreamMe, type UpstreamMeResponse } from './upstreamMe';
-import { GOMMO_CHAT_CONFIG } from './gommoChatConfig';
+import { WORKFLOW_CHAT_PROJECT_ID } from './gommoChatConfig';
 import { PLATFORM_BRIDGE } from './platformBridge';
 import { loadSettings, normalizeDomain, saveSettings } from './settingsStore';
 import {
@@ -91,7 +91,7 @@ export function loadAuth(): AuthState | null {
         dirty = true;
       }
     }
-    if (state.projectId === GOMMO_CHAT_CONFIG.projectId) {
+    if (state.projectId === WORKFLOW_CHAT_PROJECT_ID) {
       state.projectId = DEFAULT_PROJECT_ID;
       dirty = true;
     }

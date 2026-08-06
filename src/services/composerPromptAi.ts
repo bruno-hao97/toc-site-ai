@@ -58,6 +58,7 @@ async function callComposerAi(
     config: {
       systemPrompt: system,
       persistHistory: false,
+      chatApiMode: 'stream',
       timeoutMs: action === 'shots' ? 120_000 : 90_000,
     },
   });

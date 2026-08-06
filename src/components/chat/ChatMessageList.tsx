@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 import { Bot } from 'lucide-react';
 import type { ChatMessage } from '../../services/chatSessionsLocal';
+import { stripChatDisplayText } from '../../services/stripChatMarkdown';
 
 interface Props {
   messages: ChatMessage[];
@@ -25,7 +26,7 @@ export default function ChatMessageList({ messages, thinking, listRef }: Props) 
             {m.role === 'assistant' && !m.content ? (
               <span className="chat-thread-typing">Đang trả lời…</span>
             ) : (
-              m.content.split('\n').map((line, i, arr) => (
+              stripChatDisplayText(m.content).split('\n').map((line, i, arr) => (
                 <span key={i}>
                   {line}
                   {i < arr.length - 1 && <br />}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ArrowUp, Bot, ChevronDown, Paperclip, Plus, X } from 'lucide-react';
-import { askGommo, isGommoChatConfigured, type ChatTurn } from '../services/gommoChat';
+import { askGommo, isGommoChatConfigured, resolveChatAssistantContent, syncAgentChatModel, type ChatTurn } from '../services/gommoChat';
 import {
   loadQuickChatModelId,
   resolveChatAiModel,
@@ -9,6 +9,7 @@ import {
 } from '../services/chatAiModels';
 import { resolveQuickChatContext } from '../services/quickChatContext';
 import { formatAgentDisplayContent } from '../services/agentDisplayContent';
+import { stripChatDisplayText } from '../services/stripChatMarkdown';
 import ChatAiModelPickerModal from './ChatAiModelPickerModal';
 
 interface QuickMessage {
@@ -94,12 +95,19 @@ export default function QuickChatWidget() {
   const onSelectModel = (id: string) => {
     setModelId(id);
     saveQuickChatModelId(id);
+    const model = resolveChatAiModel(id);
+    void syncAgentChatModel({
+      sessionId,
+      server: model.server,
+      model: model.model,
+    });
   };
 
   const displayText = (role: QuickMessage['role'], content: string) => {
     if (role === 'assistant' && chatCtx.id === 'workflow') {
       return formatAgentDisplayContent(content) || content;
     }
+    if (role === 'assistant') return stripChatDisplayText(content);
     return content;
   };
 
@@ -148,10 +156,11 @@ export default function QuickChatWidget() {
         },
         onDelta: (chunk) => {
           acc += chunk;
-          patchAssistant(assistantId, acc);
+          patchAssistant(assistantId, resolveChatAssistantContent(acc));
         },
       });
-      if (!acc.trim()) patchAssistant(assistantId, '(Không có nội dung trả về.)');
+      const finalContent = resolveChatAssistantContent(acc);
+      if (finalContent !== acc.trim()) patchAssistant(assistantId, finalContent);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       patchAssistant(assistantId, `⚠️ Lỗi: ${msg}`);

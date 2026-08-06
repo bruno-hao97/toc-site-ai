@@ -9,6 +9,7 @@ import {
   parseVideoAgentScript,
   type VideoAgentMessage,
 } from '../services/videoAgentChat';
+import { resolveChatAssistantContent } from '../services/gommoChat';
 
 function newId(): string {
   return `va_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
@@ -94,10 +95,12 @@ export default function ComposerVideoAgentChat({
           patchAssistant(assistantId, acc);
         },
       });
-      if (!acc.trim()) {
-        patchAssistant(assistantId, '(Không có nội dung trả về.)');
-      } else {
-        const parsed = parseVideoAgentScript(acc, maxShots);
+      const finalContent = resolveChatAssistantContent(acc);
+      if (!acc.trim() || finalContent !== acc.trim()) {
+        patchAssistant(assistantId, finalContent);
+      }
+      if (finalContent && !finalContent.startsWith('Model agent') && !finalContent.startsWith('(Không')) {
+        const parsed = parseVideoAgentScript(finalContent, maxShots);
         if (parsed.shots?.length || parsed.prompt) {
           onScriptParsed(parsed);
         }

@@ -73,6 +73,7 @@ export async function askVideoAgent(
     config: {
       systemPrompt: VIDEO_AGENT_SYSTEM,
       persistHistory: false,
+      chatApiMode: 'stream',
       timeoutMs: 120_000,
     },
   });

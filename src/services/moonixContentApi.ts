@@ -1,5 +1,5 @@
 import { loadAuth } from './authStore';
-import { GOMMO_CHAT_CONFIG } from './gommoChatConfig';
+import { GOMMO_CHAT_CONFIG, WORKFLOW_CHAT_AGENT_ID } from './gommoChatConfig';
 import { DEFAULT_DOMAIN } from './settingsStore';
 
 const BASE = '/api/platform/gw.php/api/v2';
@@ -252,7 +252,7 @@ export async function fetchMoonixContent(opts?: {
 
 function parseMcpRequirements(data: unknown): McpConnectionRequirementsResult {
   const obj = data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
-  const agentId = String(obj.agent_id ?? GOMMO_CHAT_CONFIG.agentId);
+  const agentId = String(obj.agent_id ?? WORKFLOW_CHAT_AGENT_ID);
   const raw = Array.isArray(obj.requirements) ? obj.requirements : [];
   const requirements = raw
     .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
@@ -264,7 +264,7 @@ function parseMcpRequirements(data: unknown): McpConnectionRequirementsResult {
 export async function fetchMcpConnectionRequirements(opts?: {
   agentId?: string;
 }): Promise<McpConnectionRequirementsResult> {
-  const agentId = opts?.agentId ?? GOMMO_CHAT_CONFIG.agentId;
+  const agentId = opts?.agentId ?? WORKFLOW_CHAT_AGENT_ID;
   const data = await postPlatformForm('mcp', {
     action: 'connection_requirements',
     agent_id: agentId,

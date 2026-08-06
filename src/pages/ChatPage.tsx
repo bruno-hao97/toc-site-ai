@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { askGommo, isGommoChatConfigured, type ChatAttachment, type ChatTurn } from '../services/gommoChat';
+import { askGommo, isGommoChatConfigured, resolveChatAssistantContent, syncAgentChatModel, type ChatAttachment, type ChatTurn } from '../services/gommoChat';
 import {
   loadQuickChatModelId,
   resolveChatAiModel,
@@ -214,6 +214,12 @@ export default function ChatPage() {
   const onSelectModel = (id: string) => {
     setModelId(id);
     saveQuickChatModelId(id);
+    const model = resolveChatAiModel(id);
+    void syncAgentChatModel({
+      sessionId,
+      server: model.server,
+      model: model.model,
+    });
   };
 
   const onPill = (pill: ChatPill) => {
@@ -316,11 +322,11 @@ export default function ChatPage() {
         },
         onDelta: (chunk) => {
           acc += chunk;
-          patchAssistant(assistantId, acc);
+          patchAssistant(assistantId, resolveChatAssistantContent(acc));
         },
       });
 
-      const assistantContent = acc.trim() || '(Không có nội dung trả về.)';
+      const assistantContent = resolveChatAssistantContent(acc);
       if (sendGenRef.current !== gen || !mountedRef.current) return;
       const finalMessages: ChatMessage[] = [
         ...priorMessages,
