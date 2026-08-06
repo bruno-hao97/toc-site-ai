@@ -67,6 +67,10 @@ export function getReferenceLimits(
 
   if (!image && schema?.limits.maxReference) image = schema.limits.maxReference;
   if (!image && model?.withReference) image = 4;
+  // Model subject (vd. Nano Banana Pro): giới hạn qua maxSubject, không qua reference.limits.
+  if (!image && model?.withSubject) {
+    image = positiveNum(model.maxSubject, schema?.limits.maxSubject) ?? 1;
+  }
 
   // Video job thường cho phép ref video; nếu API không khai báo, mirror limit ảnh.
   if (!video && jobType === 'video' && image > 0) video = image;

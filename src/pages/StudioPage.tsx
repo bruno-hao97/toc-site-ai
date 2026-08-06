@@ -2187,26 +2187,6 @@ export default function StudioPage({
     }
   }
 
-  async function enhanceCurrentPrompt() {
-    const source = selections.prompt?.trim() || aiBrief.trim() || '';
-    if (!source) {
-      setError('Nhập prompt trước.');
-      return;
-    }
-    setEnhancingPrompt(true);
-    setError('');
-    try {
-      const expanded = canUseComposerPromptAi()
-        ? await enhancePromptWithAi(source, jobType)
-        : expandBriefToPrompt(source, jobType);
-      updateSelection('prompt', expanded);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setEnhancingPrompt(false);
-    }
-  }
-
   async function normalizePromptsList(prompts: string[]): Promise<string[]> {
     if (!normalizePrompt) return prompts;
     return Promise.all(
@@ -3095,15 +3075,6 @@ export default function StudioPage({
                     onClick={() => setPromptModalOpen(true)}
                   >
                     <Maximize2 size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    className="composer-enhance"
-                    disabled={enhancingPrompt}
-                    onClick={() => void enhanceCurrentPrompt()}
-                  >
-                    <Sparkles size={13} />
-                    {enhancingPrompt ? 'Đang nâng cao…' : 'Nâng cao'}
                   </button>
                 </div>
               </div>

@@ -145,7 +145,8 @@ function getReferenceLimitsFromModel(model: GommoModel): {
   const image =
     Number(ref?.limits?.image) ||
     Number(tpl?.override?.reference?.limits?.image) ||
-    (model.withReference ? 3 : 0);
+    (model.withReference ? 3 : 0) ||
+    (model.withSubject ? Number(model.maxSubject) || 1 : 0);
   const video =
     Number(ref?.limits?.video) ||
     Number(tpl?.override?.reference?.limits?.video) ||
