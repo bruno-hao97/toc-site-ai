@@ -1,57 +1,30 @@
 import BrandLogo from '../BrandLogo';
 import { CONTACT_PHONE_TEL, contactPhoneLine } from '../../lib/brand';
 
-const footerLinks = {
-  'Nền tảng': [
-    { label: 'Models', href: '#models' },
-    { label: 'Bảng giá', href: '#pricing' },
-    { label: 'Tài liệu', href: '#features' },
-    { label: 'Phiên chuyển API', href: '#features' },
-  ],
-  'Bảng giá': [
-    { label: 'Giá cả', href: '#pricing' },
-    { label: 'Gói dịch vụ', href: '#pricing' },
-  ],
-  'Công ty': [
-    { label: 'Về chúng tôi', href: '#' },
-    { label: contactPhoneLine('Liên hệ'), href: CONTACT_PHONE_TEL },
-  ],
-} as const;
+const footLinks = [
+  { label: 'Models', href: '#models' },
+  { label: 'Bảng giá', href: '#pricing' },
+  { label: 'API', href: '#features' },
+  { label: contactPhoneLine('Liên hệ'), href: CONTACT_PHONE_TEL },
+];
 
 export default function LandingFooter() {
   return (
     <footer className="footer">
       <div className="container">
-        <div className="footer-grid">
-          <div className="footer-logo-col">
-            <div className="logo-row" style={{ marginBottom: 12 }}>
-              <BrandLogo to="/" />
-            </div>
-            <p className="footer-tagline">
-              Nền tảng AI đa phương thức — ảnh, video, âm nhạc, text và code trong một cổng API thống nhất.
-            </p>
-            <div className="social-icons">
-              <a href="https://facebook.com" target="_blank" rel="noreferrer" className="social-icon" aria-label="Facebook">f</a>
-              <a href="https://github.com" target="_blank" rel="noreferrer" className="social-icon" aria-label="GitHub">⌘</a>
-            </div>
-          </div>
-
-          {Object.entries(footerLinks).map(([heading, links]) => (
-            <div key={heading} className="footer-col">
-              <h4>{heading}</h4>
-              <ul>
-                {links.map((link) => (
-                  <li key={link.label}>
-                    <a href={link.href}>{link.label}</a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        <div className="footer-bottom">
-          <span className="copyright">© {new Date().getFullYear()} AGI Center. All rights reserved.</span>
+        <p className="foot-stmt-line">
+          Model mới, giá thật — một cổng cho ảnh, video, nhạc và code.
+        </p>
+        <div className="foot-stmt-meta">
+          <BrandLogo to="/" />
+          <nav className="foot-links" aria-label="Footer">
+            {footLinks.map((link) => (
+              <a key={link.label} href={link.href}>
+                {link.label}
+              </a>
+            ))}
+          </nav>
+          <span className="copyright">© {new Date().getFullYear()} AGI Center</span>
         </div>
       </div>
     </footer>

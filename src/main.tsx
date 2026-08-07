@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { LanguageProvider } from './i18n';
 import './styles/tailwind.css';
+import './styles/landing-tokens.css';
 import './styles/app.css';
 import './services/themeStore';
 

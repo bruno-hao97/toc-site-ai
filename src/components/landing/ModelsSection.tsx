@@ -1,52 +1,57 @@
 import { Link } from 'react-router-dom';
-import { motion, useInView } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
-import { useRef } from 'react';
 import { appEntryPath } from '../../lib/landingConfig';
+import LandingShot from './LandingShot';
 
 const models = [
-  { name: 'Gemini 1.5 Pro', desc: 'Model AI mạnh nhất của Google tại thời điểm hiện tại', badge: 'MỚI NHẤT', badgeClass: 'badge-new', icon: '♊' },
-  { name: 'Google Veo', desc: 'Tạo video 1080p từ mô tả văn bản hoặc hình ảnh', badge: 'TRENDING', badgeClass: 'badge-trending', icon: '▶️' },
-  { name: 'Imagen 3', desc: 'Trải nghiệm hình ảnh chất lượng thực với độ chi tiết vượt trội', badge: 'STABLE', badgeClass: 'badge-stable', icon: '🎨' },
-  { name: 'Claude 3.5 Sonnet', desc: 'Tiêu chuẩn vàng cho lập trình và suy luận logic nâng cao', badge: 'POPULAR', badgeClass: 'badge-popular', icon: '🤖' },
+  { name: 'Gemini 1.5 Pro', vendor: 'Google', desc: 'Model AI mạnh nhất của Google tại thời điểm hiện tại' },
+  { name: 'Google Veo', vendor: 'Video', desc: 'Tạo video 1080p từ mô tả văn bản hoặc hình ảnh' },
+  { name: 'Imagen 3', vendor: 'Ảnh', desc: 'Hình ảnh chất lượng cao với độ chi tiết vượt trội' },
+  { name: 'Claude 3.5 Sonnet', vendor: 'Code', desc: 'Tiêu chuẩn cho lập trình và suy luận logic nâng cao' },
 ];
 
 export default function ModelsSection() {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: '-80px' });
   const appPath = appEntryPath();
 
   return (
-    <section id="models" className="models-section" ref={ref}>
-      <div className="container">
-        <div className="models-header">
-          <div>
-            <h2>Các Model Phổ Biến</h2>
-            <p className="models-header-sub">Khám phá các model AI được sử dụng nhiều nhất</p>
+    <section id="models" className="split-section">
+      <div className="container split-row">
+        <div className="split-copy">
+          <div className="models-header">
+            <div>
+              <h2>Studio &amp; model phổ biến</h2>
+              <p className="models-header-sub">Khám phá các model AI được sử dụng nhiều nhất</p>
+            </div>
+            <a href="#models" className="view-all-link">
+              Xem tất cả
+              <ArrowRight size={14} />
+            </a>
           </div>
-          <a href="#models" className="view-all-link">
-            Xem tất cả Model <ArrowRight size={14} />
-          </a>
+
+          <div className="model-index">
+            {models.map((model) => (
+              <div key={model.name} className="model-row">
+                <div className="model-row-main">
+                  <h3>{model.name}</h3>
+                  <p>{model.desc}</p>
+                </div>
+                <span className="model-row-tag">{model.vendor}</span>
+                <Link to={appPath} className="model-row-link">
+                  Thử ngay →
+                </Link>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.5 }}
-          className="models-grid"
-        >
-          {models.map((model) => (
-            <article key={model.name} className="model-card">
-              <span className={`model-badge ${model.badgeClass}`}>{model.badge}</span>
-              <span className="model-icon">{model.icon}</span>
-              <h3 className="model-name">{model.name}</h3>
-              <p className="model-desc">{model.desc}</p>
-              <Link to={appPath} className="model-btn">
-                Thử ngay
-              </Link>
-            </article>
-          ))}
-        </motion.div>
+        <div className="split-proof">
+          <LandingShot
+            slot="studio"
+            alt="Tạo ảnh & icon — demo Magnific"
+            sizes="(min-width: 960px) 42vw, 100vw"
+            className="landing-shot-tall"
+          />
+        </div>
       </div>
     </section>
   );

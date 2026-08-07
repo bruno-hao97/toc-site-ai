@@ -1731,9 +1731,6 @@ export default function AudioPage() {
                       )}
                     </div>
                     <p>{voice.labels?.gender} · {voice.labels?.accent || voice.labels?.language}</p>
-                    {voice.price != null && (
-                      <span className="audio-voice-price">{voice.price} cr</span>
-                    )}
                   </div>
                 ))
               )}

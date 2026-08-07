@@ -45,6 +45,7 @@ import { isModelAvailable, normalizeOptions } from '../services/modelSchema';
 import { downloadMediaUrl } from '../utils/downloadMedia';
 import { probeFileSize } from '../utils/probeFileSize';
 import { isJobAcceptedPendingError } from '../services/jobInfraErrors';
+import { useLocale } from '../i18n';
 
 export type ComposerPreviewHandlers = {
   onRegenerate?: () => void;
@@ -77,6 +78,7 @@ export default function ComposerLibraryPreviewModal({
   handlers?: ComposerPreviewHandlers;
   deleting?: boolean;
 }) {
+  const { t } = useLocale();
   const item = items[index];
   const playUrl = item ? feedMediaUrl(item) || feedThumb(item) : null;
   const poster = item ? feedPosterUrl(item) : null;
@@ -149,7 +151,7 @@ export default function ComposerLibraryPreviewModal({
     try {
       const models = await fetchUpscaleModels();
       const model = pickUpscaleModel(models);
-      if (!model) throw new Error('Không tìm thấy model upscale');
+      if (!model) throw new Error(t('composer.preview.upscaleModelMissing'));
       setUpscaleModel(model);
       const modes = normalizeOptions(model.mode || model.modes);
       const resolutions = normalizeOptions(model.resolutions);
@@ -163,7 +165,7 @@ export default function ComposerLibraryPreviewModal({
     } finally {
       setUpscaleLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (upscaleOpen && !upscaleModel && !upscaleLoading) {
@@ -201,7 +203,7 @@ export default function ComposerLibraryPreviewModal({
     || item.author?.username?.trim()
     || me.name
     || me.username
-    || 'Bạn';
+    || t('composer.preview.defaultAuthor');
   const authorAvatar = item.author?.avatar || me.avatar;
   const refImages = [
     ...(item.images ?? []),
@@ -223,13 +225,13 @@ export default function ComposerLibraryPreviewModal({
     }
   }
 
-  function showSoon(label: string) {
-    setSoonMsg(`${label} — sắp hỗ trợ trên AGI Center.`);
+  function showSoon(feature: string) {
+    setSoonMsg(t('composer.preview.soon', { feature }));
     window.setTimeout(() => setSoonMsg(''), 2800);
   }
 
   function reportIssue() {
-    setReportMsg('Đã ghi nhận báo lỗi. Cảm ơn bạn!');
+    setReportMsg(t('composer.preview.reportDone'));
     window.setTimeout(() => setReportMsg(''), 2800);
   }
 
@@ -237,7 +239,7 @@ export default function ComposerLibraryPreviewModal({
     if (!playUrl || !upscaleMode || !upscaleRes || upscaleBusy) return;
     setUpscaleBusy(true);
     setUpscaleError('');
-    setUpscaleStatus('Đang bắt đầu…');
+    setUpscaleStatus(t('composer.preview.upscaleStarting'));
     try {
       const resultUrl = await runImageUpscale(playUrl, {
         mode: upscaleMode,
@@ -273,7 +275,7 @@ export default function ComposerLibraryPreviewModal({
             <button
               type="button"
               className="clib-preview-nav prev"
-              aria-label="Trước"
+              aria-label={t('composer.preview.ariaPrev')}
               onClick={() => onNavigate(index - 1)}
             >
               <ChevronLeft size={28} />
@@ -299,7 +301,7 @@ export default function ComposerLibraryPreviewModal({
             <button
               type="button"
               className="clib-preview-nav next"
-              aria-label="Sau"
+              aria-label={t('composer.preview.ariaNext')}
               onClick={() => onNavigate(index + 1)}
             >
               <ChevronRight size={28} />
@@ -323,7 +325,7 @@ export default function ComposerLibraryPreviewModal({
                 <span className="clib-preview-time">{feedTimeAgo(item.created_time)}</span>
               </div>
             </div>
-            <button type="button" className="clib-preview-close" aria-label="Đóng" onClick={onClose}>
+            <button type="button" className="clib-preview-close" aria-label={t('composer.aria.close')} onClick={onClose}>
               <X size={18} />
             </button>
           </header>
@@ -337,7 +339,7 @@ export default function ComposerLibraryPreviewModal({
                   className="clib-preview-copy-text"
                   onClick={() => void copyPrompt()}
                 >
-                  <Copy size={13} /> Sao chép
+                  <Copy size={13} /> {t('composer.preview.copy')}
                 </button>
               </div>
               <p>{promptShown}</p>
@@ -348,7 +350,7 @@ export default function ComposerLibraryPreviewModal({
                     className="clib-preview-link-btn"
                     onClick={() => setPromptExpanded((v) => !v)}
                   >
-                    {promptExpanded ? 'Thu gọn' : 'Xem thêm'}
+                    {promptExpanded ? t('composer.preview.showLess') : t('composer.preview.showMore')}
                   </button>
                 )}
                 <button
@@ -356,7 +358,7 @@ export default function ComposerLibraryPreviewModal({
                   className="clib-preview-link-btn"
                   onClick={reportIssue}
                 >
-                  <Flag size={12} /> Báo lỗi
+                  <Flag size={12} /> {t('composer.preview.report')}
                 </button>
               </div>
               {reportMsg && <p className="clib-preview-toast">{reportMsg}</p>}
@@ -364,47 +366,47 @@ export default function ComposerLibraryPreviewModal({
           )}
 
           <section className="clib-preview-info">
-            <h4>{isHomeVideo ? 'v-video info' : isHomeLayout ? 'v-image info' : 'Thông tin'}</h4>
+            <h4>{isHomeVideo ? t('composer.preview.infoVideo') : isHomeLayout ? t('composer.preview.infoImage') : t('composer.preview.info')}</h4>
             <dl>
               {model && (
                 <>
-                  <dt>Model</dt>
+                  <dt>{t('composer.preview.label.model')}</dt>
                   <dd className="accent-gold">{model}</dd>
                 </>
               )}
               {quality && (
                 <>
-                  <dt>Chất lượng</dt>
+                  <dt>{t('composer.preview.label.quality')}</dt>
                   <dd className="accent-cyan">{quality}</dd>
                 </>
               )}
               {dimensions && (
                 <>
-                  <dt>Kích thước</dt>
+                  <dt>{t('composer.preview.label.dimensions')}</dt>
                   <dd className="accent-cyan">{dimensions}</dd>
                 </>
               )}
               {size && (
                 <>
-                  <dt>Dung lượng</dt>
+                  <dt>{t('composer.preview.label.fileSize')}</dt>
                   <dd className="accent-green">{size}</dd>
                 </>
               )}
               {item.duration && Number(item.duration) > 0 && kind === 'video' && (
                 <>
-                  <dt>Thời lượng</dt>
+                  <dt>{t('composer.preview.label.duration')}</dt>
                   <dd className="accent-cyan">{item.duration}s</dd>
                 </>
               )}
               {ratio && (
                 <>
-                  <dt>Tỷ lệ</dt>
+                  <dt>{t('composer.preview.label.ratio')}</dt>
                   <dd className="accent-cyan">{ratio}</dd>
                 </>
               )}
               {createdDate && (
                 <>
-                  <dt>Ngày tạo</dt>
+                  <dt>{t('composer.preview.label.created')}</dt>
                   <dd className="accent-cyan">{createdDate}</dd>
                 </>
               )}
@@ -417,13 +419,13 @@ export default function ComposerLibraryPreviewModal({
                 rel="noreferrer"
               >
                 <ExternalLink size={13} />
-                {kind === 'video' ? 'Xem video' : 'Xem ảnh'}
+                {kind === 'video' ? t('composer.preview.viewVideo') : t('composer.preview.viewImage')}
               </a>
             )}
           </section>
 
           <section className="clib-preview-refs">
-            <h4>Ảnh tham chiếu</h4>
+            <h4>{t('composer.preview.refs')}</h4>
             <div className="clib-preview-refs-grid">
               {(refImages.length ? refImages : primaryRef ? [{ url: primaryRef }] : []).length > 0 ? (
                 (refImages.length ? refImages : primaryRef ? [{ url: primaryRef }] : []).map(
@@ -440,7 +442,7 @@ export default function ComposerLibraryPreviewModal({
                   ),
                 )
               ) : (
-                <span className="clib-preview-ref-empty">Không có ảnh tham chiếu</span>
+                <span className="clib-preview-ref-empty">{t('composer.preview.noRefs')}</span>
               )}
             </div>
           </section>
@@ -450,15 +452,15 @@ export default function ComposerLibraryPreviewModal({
           {upscaleOpen && isImage ? (
             <div className="clib-upscale-panel">
               <div className="clib-upscale-head">
-                <h4>Upscale ảnh</h4>
+                <h4>{t('composer.preview.upscaleTitle')}</h4>
                 <button type="button" className="clib-upscale-back" onClick={() => setUpscaleOpen(false)}>
                   <ChevronLeft size={16} />
-                  Quay lại
+                  {t('composer.back')}
                 </button>
               </div>
               {upscaleLoading ? (
                 <p className="clib-upscale-status">
-                  <Loader2 size={16} className="clib-spin" /> Đang tải model…
+                  <Loader2 size={16} className="clib-spin" /> {t('composer.preview.upscaleLoading')}
                 </p>
               ) : (
                 <>
@@ -466,7 +468,7 @@ export default function ComposerLibraryPreviewModal({
                     <p className="clib-upscale-model">{upscaleModel.name}</p>
                   )}
                   <label className="clib-upscale-field">
-                    <span>Chế độ</span>
+                    <span>{t('composer.preview.upscaleMode')}</span>
                     <select
                       value={upscaleMode}
                       onChange={(e) => setUpscaleMode(e.target.value)}
@@ -480,7 +482,7 @@ export default function ComposerLibraryPreviewModal({
                     </select>
                   </label>
                   <label className="clib-upscale-field">
-                    <span>Độ phân giải</span>
+                    <span>{t('composer.preview.upscaleResolution')}</span>
                     <select
                       value={upscaleRes}
                       onChange={(e) => setUpscaleRes(e.target.value)}
@@ -494,7 +496,7 @@ export default function ComposerLibraryPreviewModal({
                     </select>
                   </label>
                   {upscalePrice != null && (
-                    <p className="clib-upscale-price">Chi phí: {upscalePrice} credit</p>
+                    <p className="clib-upscale-price">{t('composer.preview.upscalePrice', { price: upscalePrice })}</p>
                   )}
                   {upscaleStatus && (
                     <p className="clib-upscale-status">{upscaleStatus}</p>
@@ -509,12 +511,12 @@ export default function ComposerLibraryPreviewModal({
                     {upscaleBusy ? (
                       <>
                         <Loader2 size={16} className="clib-spin" />
-                        Đang upscale…
+                        {t('composer.preview.upscaleBusy')}
                       </>
                     ) : (
                       <>
                         <Maximize2 size={16} />
-                        Bắt đầu upscale
+                        {t('composer.preview.upscaleStart')}
                       </>
                     )}
                   </button>
@@ -530,25 +532,25 @@ export default function ComposerLibraryPreviewModal({
                 onClick={onRegenerate}
               >
                 <RotateCcw size={16} />
-                Tạo lại
+                {t('composer.preview.regenerate')}
               </button>
               {isHomeVideo ? (
                 <>
                   <button
                     type="button"
                     className="clib-preview-action-row"
-                    onClick={() => showSoon('Upscale Video')}
+                    onClick={() => showSoon(t('composer.preview.upscaleVideo'))}
                   >
                     <Maximize2 size={16} />
-                    Upscale Video
+                    {t('composer.preview.upscaleVideo')}
                   </button>
                   <button
                     type="button"
                     className="clib-preview-action-row"
-                    onClick={() => showSoon('Cải thiện thiết kế')}
+                    onClick={() => showSoon(t('composer.preview.enhanceDesign'))}
                   >
                     <Sparkles size={16} />
-                    Cải thiện thiết kế
+                    {t('composer.preview.enhanceDesign')}
                   </button>
                 </>
               ) : (
@@ -562,15 +564,15 @@ export default function ComposerLibraryPreviewModal({
                     }}
                   >
                     <Maximize2 size={16} />
-                    Upscale ảnh
+                    {t('composer.preview.upscale')}
                   </button>
                   <button
                     type="button"
                     className="clib-preview-action-row"
-                    onClick={() => showSoon('Cải thiện thiết kế')}
+                    onClick={() => showSoon(t('composer.preview.enhanceDesign'))}
                   >
                     <Sparkles size={16} />
-                    Cải thiện thiết kế
+                    {t('composer.preview.enhanceDesign')}
                   </button>
                 </>
               )}
@@ -582,7 +584,7 @@ export default function ComposerLibraryPreviewModal({
                   onClick={onReuse || onRegenerate}
                 >
                   <Copy size={18} />
-                  <span>Dùng lại</span>
+                  <span>{t('composer.action.reuse')}</span>
                 </button>
                 <button
                   type="button"
@@ -590,7 +592,7 @@ export default function ComposerLibraryPreviewModal({
                   onClick={() => void downloadMediaUrl(playUrl)}
                 >
                   <Download size={18} />
-                  <span>Tải xuống</span>
+                  <span>{t('composer.preview.download')}</span>
                 </button>
               </div>
               <div className="clib-preview-actions-grid">
@@ -601,7 +603,7 @@ export default function ComposerLibraryPreviewModal({
                   onClick={onEdit}
                 >
                   <Wand2 size={18} />
-                  <span>{isHomeVideo ? 'Edit Video' : 'Chỉnh sửa'}</span>
+                  <span>{isHomeVideo ? t('composer.video.edit') : t('composer.preview.edit')}</span>
                 </button>
                 <button
                   type="button"
@@ -610,7 +612,7 @@ export default function ComposerLibraryPreviewModal({
                   onClick={onDelete}
                 >
                   <Trash2 size={18} />
-                  <span>{deleting ? 'Đang xóa…' : 'Xóa'}</span>
+                  <span>{deleting ? t('composer.preview.deleting') : t('composer.action.deleteOne')}</span>
                 </button>
               </div>
             </div>
@@ -623,18 +625,18 @@ export default function ComposerLibraryPreviewModal({
                 onClick={onRegenerate}
               >
                 <RotateCcw size={16} />
-                Tạo lại
+                {t('composer.preview.regenerate')}
               </button>
               <div className="clib-preview-actions-grid">
                 <button
                   type="button"
                   className="clib-preview-action-tile"
                   disabled={!onPublish}
-                  title={onPublish ? undefined : 'Chưa hỗ trợ'}
+                  title={onPublish ? undefined : t('composer.preview.notSupported')}
                   onClick={onPublish}
                 >
                   <Upload size={18} />
-                  <span>Đăng tải</span>
+                  <span>{t('composer.preview.publish')}</span>
                 </button>
                 <button
                   type="button"
@@ -643,7 +645,7 @@ export default function ComposerLibraryPreviewModal({
                   onClick={onCreateVideo}
                 >
                   <Video size={18} />
-                  <span>Video</span>
+                  <span>{t('jobType.video')}</span>
                 </button>
                 <button
                   type="button"
@@ -651,7 +653,7 @@ export default function ComposerLibraryPreviewModal({
                   onClick={() => void downloadMediaUrl(playUrl)}
                 >
                   <Download size={18} />
-                  <span>Tải xuống</span>
+                  <span>{t('composer.preview.download')}</span>
                 </button>
                 <button
                   type="button"
@@ -663,7 +665,7 @@ export default function ComposerLibraryPreviewModal({
                   }}
                 >
                   <Maximize2 size={18} />
-                  <span>Upscale ảnh</span>
+                  <span>{t('composer.preview.upscale')}</span>
                 </button>
                 <button
                   type="button"
@@ -672,7 +674,7 @@ export default function ComposerLibraryPreviewModal({
                   onClick={onEdit}
                 >
                   <Pencil size={18} />
-                  <span>Chỉnh sửa</span>
+                  <span>{t('composer.preview.edit')}</span>
                 </button>
                 <button
                   type="button"
@@ -681,7 +683,7 @@ export default function ComposerLibraryPreviewModal({
                   onClick={onDelete}
                 >
                   <Trash2 size={18} />
-                  <span>{deleting ? 'Đang xóa…' : 'Xóa'}</span>
+                  <span>{deleting ? t('composer.preview.deleting') : t('composer.action.deleteOne')}</span>
                 </button>
               </div>
             </div>

@@ -51,6 +51,7 @@ import {
 import { UpstreamMeError } from '../services/upstreamMe';
 import { downloadMediaUrl } from '../utils/downloadMedia';
 import ProjectPicker from './ProjectPicker';
+import HomeFeedEmpty from './home/HomeFeedEmpty';
 
 export type MineFilter = 'all' | 'video' | 'image' | 'music' | 'tts' | 'favorite';
 
@@ -563,14 +564,23 @@ export default function HomeMyContent({ filter }: { filter: MineFilter }) {
     };
   }, [previewItem, goStudioReuse]);
 
-  const emptyLabel =
+  const emptyTitle =
     filter === 'favorite'
-      ? 'Chưa có mục yêu thích nào. Bấm ♥ trên sản phẩm để lưu.'
+      ? 'Chưa có mục yêu thích'
       : filter === 'music'
-        ? 'Bạn chưa có bài nhạc nào.'
+        ? 'Chưa có bài nhạc'
         : filter === 'tts'
-          ? 'Bạn chưa có âm thanh nào.'
-          : 'Bạn chưa có nội dung nào.';
+          ? 'Chưa có âm thanh'
+          : filter === 'video'
+            ? 'Chưa có video'
+            : filter === 'image'
+              ? 'Chưa có hình ảnh'
+              : 'Thư viện trống';
+
+  const emptyDescription =
+    filter === 'favorite'
+      ? 'Bấm ♥ trên sản phẩm trong bảng tin để lưu vào đây.'
+      : 'Nội dung bạn tạo sẽ xuất hiện trong thư viện này.';
 
   const playAudioItem = useCallback((item: FeedItem) => {
     const url = feedMediaUrl(item);
@@ -657,7 +667,11 @@ export default function HomeMyContent({ filter }: { filter: MineFilter }) {
       {error && <p className="error feed-status">{error}</p>}
       {loading && <p className="muted feed-status">Đang tải…</p>}
       {!loading && !items.length && !error && (
-        <p className="muted feed-status">{emptyLabel}</p>
+        <HomeFeedEmpty
+          title={emptyTitle}
+          description={emptyDescription}
+          showCreate={filter !== 'favorite'}
+        />
       )}
 
       <div ref={sentinelRef} className="feed-sentinel" />

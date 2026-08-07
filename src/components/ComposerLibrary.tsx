@@ -14,6 +14,8 @@ import {
   type FeedItem,
 } from '../services/feedApi';
 import { formatModelLabel } from '../services/feedLibraryMeta';
+import ComposerGalleryEmpty from './composer/ComposerGalleryEmpty';
+import { useLocale } from '../i18n';
 import type { JobType } from '../services/api';
 
 type Kind = 'image' | 'video' | 'unsupported';
@@ -32,8 +34,17 @@ function tsToDate(value: string | number | undefined): Date | null {
   return new Date(ts);
 }
 
-function dayLabel(d: Date): string {
-  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+function dayLabel(d: Date, today: string, yesterday: string, locale: string): string {
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return today;
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return yesterday;
+  return d.toLocaleDateString(locale === 'en' ? 'en-US' : 'vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 }
 
 interface KeyedItem {
@@ -69,6 +80,7 @@ export default function ComposerLibrary({
     onDelete?: () => void,
   ) => ComposerPreviewHandlers;
 }) {
+  const { t, locale } = useLocale();
   const kind = jobKind(jobType);
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -194,9 +206,12 @@ export default function ComposerLibrary({
 
   const groups = useMemo(() => {
     const map = new Map<string, KeyedItem[]>();
+    const today = t('date.today');
+    const yesterday = t('date.yesterday');
+    const other = t('date.other');
     sortedItems.forEach((item, i) => {
       const d = tsToDate(item.created_time);
-      const label = d ? dayLabel(d) : 'Khác';
+      const label = d ? dayLabel(d, today, yesterday, locale) : other;
       const keyed: KeyedItem = {
         key: `${item.id_base || 'x'}__${item.created_time ?? ''}__${i}`,
         item,
@@ -206,7 +221,7 @@ export default function ComposerLibrary({
       else map.set(label, [keyed]);
     });
     return [...map.entries()];
-  }, [sortedItems]);
+  }, [sortedItems, t, locale]);
 
   const flatIndexByKey = useMemo(() => {
     const map = new Map<string, number>();
@@ -219,7 +234,7 @@ export default function ComposerLibrary({
   const handleDelete = useCallback(
     async (idBase: string) => {
       if (!idBase || deletingId) return;
-      if (!window.confirm('Xóa mục này khỏi thư viện?')) return;
+      if (!window.confirm(t('composer.library.deleteConfirm'))) return;
       setDeletingId(idBase);
       try {
         await deleteFeedPost(idBase);
@@ -239,23 +254,21 @@ export default function ComposerLibrary({
         setDeletingId('');
       }
     },
-    [deletingId, filteredItems, onItemDeleted],
+    [deletingId, filteredItems, onItemDeleted, t],
   );
 
   if (kind === 'unsupported') {
     return (
-      <div className="clib-status">
-        Thư viện hiện hỗ trợ ảnh và video. Hãy chuyển sang tab Ảnh hoặc Video.
-      </div>
+      <div className="clib-status">{t('composer.library.unsupported')}</div>
     );
   }
 
   if (error && items.length === 0) {
     return (
       <div className="clib-status clib-error">
-        <p>Không tải được thư viện: {error}</p>
+        <p>{t('composer.library.loadError')}: {error}</p>
         <button type="button" className="composer-ghost-btn" onClick={() => load('', true)}>
-          Thử lại
+          {t('composer.action.retry')}
         </button>
       </div>
     );
@@ -270,13 +283,13 @@ export default function ComposerLibrary({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Tìm kiếm…"
+            placeholder={t('composer.library.searchPlaceholder')}
           />
           {query && (
             <button
               type="button"
               className="clib-search-clear"
-              aria-label="Xóa tìm kiếm"
+              aria-label={t('composer.aria.clearSearch')}
               onClick={() => setQuery('')}
             >
               <X size={14} />
@@ -287,9 +300,9 @@ export default function ComposerLibrary({
           className="clib-filter"
           value={modelFilter}
           onChange={(e) => setModelFilter(e.target.value)}
-          aria-label="Lọc model"
+          aria-label={t('composer.library.filterModel')}
         >
-          <option value="">Tất cả Model</option>
+          <option value="">{t('composer.library.allModels')}</option>
           {models.map((m) => (
             <option key={m} value={m}>
               {formatModelLabel(m)}
@@ -300,9 +313,9 @@ export default function ComposerLibrary({
           className="clib-filter"
           value={ratioFilter}
           onChange={(e) => setRatioFilter(e.target.value)}
-          aria-label="Lọc tỷ lệ"
+          aria-label={t('composer.library.filterRatio')}
         >
-          <option value="">Tất cả tỷ lệ</option>
+          <option value="">{t('composer.library.allRatios')}</option>
           {ratios.map((r) => (
             <option key={r} value={r}>
               {r}
@@ -315,20 +328,20 @@ export default function ComposerLibrary({
             className={sortDir === 'desc' ? 'active' : ''}
             onClick={() => setSortDir('desc')}
           >
-            Mới
+            {t('composer.sort.new')}
           </button>
           <button
             type="button"
             className={sortDir === 'asc' ? 'active' : ''}
             onClick={() => setSortDir('asc')}
           >
-            Cũ
+            {t('composer.sort.old')}
           </button>
         </div>
         <button
           type="button"
           className="clib-refresh"
-          aria-label="Làm mới"
+          aria-label={t('composer.aria.refresh')}
           disabled={loading}
           onClick={() => load('', true)}
         >
@@ -338,16 +351,31 @@ export default function ComposerLibrary({
 
       {loading && items.length === 0 && (
         <div className="clib-status">
-          <Loader2 size={18} className="clib-spin" /> Đang tải thư viện…
+          <Loader2 size={18} className="clib-spin" /> {t('composer.library.loading')}
         </div>
       )}
 
       {!loading && filteredItems.length === 0 && (
-        <div className="clib-status">
-          {query || modelFilter || ratioFilter
-            ? 'Không tìm thấy mục nào khớp.'
-            : 'Chưa có tệp nào trong thư viện.'}
-        </div>
+        <ComposerGalleryEmpty
+          title={
+            query || modelFilter || ratioFilter
+              ? t('composer.gallery.emptyFiltered')
+              : t('composer.library.emptyTitle')
+          }
+          description={
+            query || modelFilter || ratioFilter
+              ? undefined
+              : t(
+                  kind === 'video'
+                    ? 'composer.library.emptyHintVideo'
+                    : kind === 'image'
+                      ? 'composer.library.emptyHintImage'
+                      : 'composer.library.emptyHint',
+                )
+          }
+          showFocus={!(query || modelFilter || ratioFilter)}
+          focusLabel={t('composer.gallery.focusPanel')}
+        />
       )}
 
       {groups.map(([label, list]) => (
@@ -380,7 +408,7 @@ export default function ComposerLibrary({
 
       {loading && items.length > 0 && (
         <div className="clib-status">
-          <Loader2 size={16} className="clib-spin" /> Đang tải thêm…
+          <Loader2 size={16} className="clib-spin" /> {t('composer.library.loadingMore')}
         </div>
       )}
       <div ref={sentinelRef} className="clib-sentinel" />

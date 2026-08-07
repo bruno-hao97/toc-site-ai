@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import HomeFeedEmpty from './home/HomeFeedEmpty';
 import { useNavigate } from 'react-router-dom';
 import ComposerLibraryPreviewModal, {
   type ComposerPreviewHandlers,
@@ -23,7 +24,9 @@ function hasVisual(item: FeedItem): boolean {
   return Boolean(feedThumb(item) || feedMediaUrl(item));
 }
 
-export default function HomeFeed() {
+export type HomeFeedVariant = 'feed' | 'recommended';
+
+export default function HomeFeed({ variant = 'feed' }: { variant?: HomeFeedVariant }) {
   const navigate = useNavigate();
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,6 +52,30 @@ export default function HomeFeed() {
     setLoading(true);
     setError('');
     try {
+      const fresh: FeedItem[] = [];
+      const ingest = (list: FeedItem[]) => {
+        for (const it of list) {
+          if (!it.id_base || seenRef.current.has(it.id_base)) continue;
+          if (!hasVisual(it)) continue;
+          seenRef.current.add(it.id_base);
+          fresh.push(it);
+        }
+      };
+
+      if (variant === 'recommended') {
+        const pub = await fetchPublicVideos({
+          type: 'public_home',
+          limit: 30,
+          afterId: publicAfterRef.current,
+        });
+        ingest(pub.items);
+        const noPubProgress = !pub.nextAfterId || pub.nextAfterId === publicAfterRef.current;
+        publicAfterRef.current = pub.nextAfterId;
+        if (fresh.length) setItems((prev) => [...prev, ...fresh]);
+        if (!pub.items.length || noPubProgress) setDone(true);
+        return;
+      }
+
       // Newsfeed (ảnh + video) + bổ sung public library nếu newsfeed thiếu ảnh.
       const [page, pub] = await Promise.all([
         fetchNewsfeed({
@@ -64,16 +91,6 @@ export default function HomeFeed() {
               afterId: publicAfterRef.current,
             }).catch(() => null),
       ]);
-
-      const fresh: FeedItem[] = [];
-      const ingest = (list: FeedItem[]) => {
-        for (const it of list) {
-          if (!it.id_base || seenRef.current.has(it.id_base)) continue;
-          if (!hasVisual(it)) continue;
-          seenRef.current.add(it.id_base);
-          fresh.push(it);
-        }
-      };
 
       ingest(page.items);
       if (pub) {
@@ -103,7 +120,7 @@ export default function HomeFeed() {
     } finally {
       setLoading(false);
     }
-  }, [loading, done]);
+  }, [loading, done, variant]);
 
   useEffect(() => {
     void loadMore();
@@ -173,7 +190,18 @@ export default function HomeFeed() {
       {error && <p className="error feed-status">{error}</p>}
       {loading && <p className="muted feed-status">Đang tải…</p>}
       {!loading && !items.length && !error && (
-        <p className="muted feed-status">Chưa có nội dung.</p>
+        <HomeFeedEmpty
+          title={
+            variant === 'recommended'
+              ? 'Chưa có gợi ý cho bạn'
+              : 'Bảng tin đang trống'
+          }
+          description={
+            variant === 'recommended'
+              ? 'Thử lại sau hoặc khám phá bảng tin chính.'
+              : 'Tạo video hoặc ảnh đầu tiên — hiển thị ngay tại đây.'
+          }
+        />
       )}
 
       <div ref={sentinelRef} className="feed-sentinel" />

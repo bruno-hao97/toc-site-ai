@@ -1,87 +1,60 @@
-import { motion, useInView } from 'framer-motion';
-import { useRef } from 'react';
-import { Plug, Shield, Zap } from 'lucide-react';
+import { Plug, Zap } from 'lucide-react';
+import LandingShot from './LandingShot';
 
 export default function FeaturesSection() {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: '-80px' });
-
   return (
-    <section id="features" className="features-section">
-      <div className="container">
-        <div className="features-heading">
-          <h2>
-            Mọi thứ bạn cần
-            <br />
-            <span>để xây dựng ứng dụng AI thế hệ mới.</span>
-          </h2>
+    <section id="features" className="split-section">
+      <div className="container split-row">
+        <div className="split-copy">
+          <h2>Mọi thứ bạn cần để xây dựng ứng dụng AI</h2>
+          <p className="split-lead">
+            Một giao diện chuẩn hóa cho text, hình ảnh và âm thanh — không cần quản lý từng tài khoản API riêng.
+          </p>
+          <div className="feature-stack">
+            <div className="feature-block">
+              <h3>
+                <Plug size={16} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 6 }} />
+                Cổng API thống nhất
+              </h3>
+              <p>
+                Truy cập các mô hình văn bản, hình ảnh và âm thanh qua một endpoint duy nhất, cùng định dạng phản hồi.
+              </p>
+            </div>
+            <div className="feature-block">
+              <h3>
+                <Zap size={16} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 6 }} />
+                Độ trễ thấp
+              </h3>
+              <p>
+                Định tuyến yêu cầu tới hạ tầng gần bạn — phù hợp workload realtime và batch.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <motion.div
-          ref={ref}
-          initial={{ opacity: 0, y: 20 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.5 }}
-          className="features-grid"
-        >
-          <div className="feature-card">
-            <div className="feature-icon icon-purple">
-              <Plug size={20} />
-            </div>
-            <h3>Cổng API Thống nhất</h3>
-            <p>
-              Ngừng quản lý từng tài khoản API riêng lẻ. Truy cập các mô hình văn bản,
-              hình ảnh và âm thanh thông qua một giao diện chuẩn hóa duy nhất.
-            </p>
-            <div className="code-block">
-              <div className="code-dots">
-                <span className="dot-r" />
-                <span className="dot-y" />
-                <span className="dot-g" />
-              </div>
-              <div>
-                <span className="code-keyword">const</span>{' '}
-                <span className="code-var">response</span> ={' '}
-                <span className="code-keyword">await</span> ai.
-                <span className="code-fn">generate</span>
-                {'({'}
-              </div>
-              <div>
-                &nbsp;&nbsp;<span className="code-var">model</span>:{' '}
-                <span className="code-string">&quot;gemini-2.5-pro&quot;</span>,
-              </div>
-              <div>
-                &nbsp;&nbsp;<span className="code-var">prompt</span>:{' '}
-                <span className="code-string">&quot;...&quot;</span>
-              </div>
-              <div>{'}'});</div>
-              <div className="code-comment">{'// returns: { content, usage, cost }'}</div>
-            </div>
-          </div>
-
-          <div className="features-right">
-            <div className="feature-card">
-              <div className="feature-icon icon-blue">
-                <Zap size={20} />
-              </div>
-              <h3>Độ trễ thấp nhất</h3>
-              <p>
-                Mạng lưới điểm của chúng tôi định tuyến yêu cầu đến datacenter gần
-                GPU nhất, giảm độ trễ càng thấp càng tốt cho mọi workload.
-              </p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon icon-green">
-                <Shield size={20} />
-              </div>
-              <h3>Bảo mật Doanh nghiệp</h3>
-              <p>
-                Tuân thủ SOC 2 Type II. Dữ liệu của bạn được mã hóa lúc truyền đi và
-                lúc lưu trữ. Chúng tôi không bao giờ gửi dữ liệu của bạn.
-              </p>
-            </div>
-          </div>
-        </motion.div>
+        <div className="split-proof features-proof">
+          <LandingShot
+            slot="features"
+            alt="Xóa nền và xử lý ảnh — demo placeholder"
+            sizes="(min-width: 960px) 42vw, 100vw"
+            className="landing-shot-tall"
+          />
+          <figure className="code-panel">
+            <figcaption className="code-panel-label">api example</figcaption>
+            <pre>
+              <code>
+                <span className="tok-kw">const</span> <span className="tok-fn">response</span> ={' '}
+                <span className="tok-kw">await</span> ai.generate({'{'}
+                {'\n'}
+                {'  '}model: <span className="tok-str">&quot;gemini-2.5-pro&quot;</span>,{'\n'}
+                {'  '}prompt: <span className="tok-str">&quot;…&quot;</span>{'\n'}
+                {'}'});
+                {'\n'}
+                <span className="tok-cm">// returns: content, usage, cost</span>
+              </code>
+            </pre>
+          </figure>
+        </div>
       </div>
     </section>
   );

@@ -12,6 +12,8 @@ import {
   X,
 } from 'lucide-react';
 import ComposerSelectCircle from './ComposerSelectCircle';
+import ComposerGalleryEmpty from './composer/ComposerGalleryEmpty';
+import { useLocale } from '../i18n';
 import {
   deleteFeedPost,
   feedDisplayJobId,
@@ -95,12 +97,12 @@ function tsToDate(value: string | number | undefined): Date | null {
   return new Date(ts);
 }
 
-function dayLabel(d: Date): string {
+function dayLabel(d: Date, today: string, yesterday: string): string {
   const now = new Date();
-  if (d.toDateString() === now.toDateString()) return 'Hôm nay';
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return 'Hôm qua';
+  if (d.toDateString() === now.toDateString()) return today;
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return yesterday;
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
@@ -151,6 +153,7 @@ export default function ComposerHistory({
   onToggleSelect?: (id: string) => void;
   onClearSelection?: () => void;
 }) {
+  const { t } = useLocale();
   const kind = jobKind(jobType);
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -257,9 +260,11 @@ export default function ComposerHistory({
 
   const groups = useMemo((): HistoryGroup[] => {
     const map = new Map<string, HistoryGroup>();
+    const today = t('date.today');
+    const yesterday = t('date.yesterday');
     sortedItems.forEach((item, i) => {
       const d = tsToDate(item.created_time);
-      const label = d ? dayLabel(d) : 'Khác';
+      const label = d ? dayLabel(d, today, yesterday) : t('date.other');
       const keyed: KeyedItem = {
         key: `${item.id_base || 'x'}__${item.created_time ?? ''}__${i}`,
         item,
@@ -276,7 +281,7 @@ export default function ComposerHistory({
       }
     });
     return [...map.values()];
-  }, [sortedItems]);
+  }, [sortedItems, t]);
 
   const displayCount = filteredItems.length;
 
@@ -315,7 +320,7 @@ export default function ComposerHistory({
 
   const handleDelete = useCallback(async (idBase: string) => {
     if (!idBase || deletingId) return;
-    if (!window.confirm('Xóa mục này khỏi lịch sử?')) return;
+    if (!window.confirm(t('composer.history.deleteConfirm'))) return;
     setDeletingId(idBase);
     try {
       await deleteFeedPost(idBase);
@@ -333,51 +338,33 @@ export default function ComposerHistory({
     } finally {
       setDeletingId('');
     }
-  }, [deletingId, onItemDeleted]);
+  }, [deletingId, onItemDeleted, t]);
 
   if (kind === 'unsupported') {
     return (
-      <div className="chist-status">
-        Lịch sử hiện hỗ trợ ảnh và video. Hãy chuyển sang tab Ảnh hoặc Video.
-      </div>
+      <div className="chist-status">{t('composer.history.unsupported')}</div>
     );
   }
 
-  if (error) {
+  if (error && items.length === 0 && activePending.length === 0) {
     return (
       <div className="chist-status chist-error">
-        <p>Không tải được lịch sử: {error}</p>
+        <p>{t('composer.history.loadError')}: {error}</p>
         <button type="button" className="composer-ghost-btn" onClick={() => load('', true)}>
-          Thử lại
+          {t('composer.action.retry')}
         </button>
       </div>
     );
-  }
-
-  if (!loading && items.length === 0 && activePending.length === 0) {
-    return <div className="chist-status">Chưa có lịch sử tạo.</div>;
   }
 
   const showLocalPendingSection = activePending.length > 0;
+  const isFilteredEmpty =
+    !loading && items.length > 0 && filteredItems.length === 0 && Boolean(query.trim());
+  const isFullyEmpty =
+    !loading && items.length === 0 && activePending.length === 0;
 
   return (
     <div className="chist-wrap">
-      <header className="chist-page-head">
-        <div className="chist-page-title">
-          <Clock size={16} />
-          <span>Lịch sử ({displayCount})</span>
-        </div>
-        <button
-          type="button"
-          className="chist-refresh-btn"
-          aria-label="Làm mới lịch sử"
-          disabled={loading}
-          onClick={() => load('', true)}
-        >
-          <RefreshCw size={15} className={loading ? 'chist-spin' : ''} />
-        </button>
-      </header>
-
       <div className="chist-toolbar">
         <div className="chist-search">
           <Search size={15} />
@@ -385,13 +372,13 @@ export default function ComposerHistory({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Tìm trong lịch sử…"
+            placeholder={t('composer.history.searchPlaceholder')}
           />
           {query && (
             <button
               type="button"
               className="chist-search-clear"
-              aria-label="Xóa tìm kiếm"
+              aria-label={t('composer.aria.clearSearch')}
               onClick={() => setQuery('')}
             >
               <X size={14} />
@@ -404,14 +391,14 @@ export default function ComposerHistory({
             className={sortDir === 'desc' ? 'active' : ''}
             onClick={() => setSortDir('desc')}
           >
-            Mới
+            {t('composer.sort.new')}
           </button>
           <button
             type="button"
             className={sortDir === 'asc' ? 'active' : ''}
             onClick={() => setSortDir('asc')}
           >
-            Cũ
+            {t('composer.sort.old')}
           </button>
         </div>
         <button
@@ -420,26 +407,58 @@ export default function ComposerHistory({
           onClick={toggleSelectMode}
         >
           <CheckSquare size={15} />
-          Chọn
+          {t('composer.history.select')}
           {selectMode && selectedIds && selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+        </button>
+        <button
+          type="button"
+          className="chist-refresh"
+          aria-label={t('composer.aria.refreshHistory')}
+          disabled={loading}
+          onClick={() => load('', true)}
+        >
+          <RefreshCw size={15} className={loading ? 'chist-spin' : ''} />
         </button>
       </div>
 
-      {groups.length === 0 && !showLocalPendingSection && (
+      {loading && items.length === 0 && !showLocalPendingSection && (
         <div className="chist-status">
-          {query ? 'Không tìm thấy mục nào khớp.' : 'Chưa có lịch sử tạo.'}
+          <Loader2 size={18} className="chist-spin" /> {t('composer.history.loading')}
         </div>
+      )}
+
+      {isFullyEmpty && (
+        <ComposerGalleryEmpty
+          title={t('composer.history.emptyTitle')}
+          description={t(
+            jobType === 'video' || jobType === 'avatar-lipsync'
+              ? 'composer.history.emptyHintVideo'
+              : jobType === 'image'
+                ? 'composer.history.emptyHintImage'
+                : 'composer.history.emptyHint',
+          )}
+          focusLabel={t('composer.gallery.focusPanel')}
+        />
+      )}
+
+      {isFilteredEmpty && (
+        <ComposerGalleryEmpty
+          title={t('composer.gallery.emptyFiltered')}
+          showFocus={false}
+        />
       )}
 
       {showLocalPendingSection && (
         <section className="chist-group">
           <header className="chist-group-head">
-            <span className="chist-group-label">Hôm nay</span>
-            <span className="chist-count">{activePending.length} đang tạo</span>
+            <span className="chist-group-label">{t('date.today')}</span>
+            <span className="chist-count">
+              {t('composer.history.processingCount', { count: activePending.length })}
+            </span>
           </header>
           <div className="chist-grid">
             {activePending.map((p) => {
-              const name = (p.prompt || '(Không có mô tả)').trim();
+              const name = (p.prompt || t('composer.noDescription')).trim();
               return (
                 <div key={p.id} className="chist-block-cell">
                   <div className="chist-block chist-block-pending">
@@ -447,7 +466,7 @@ export default function ComposerHistory({
                       <span className="chist-name" title={name}>
                         {name}
                       </span>
-                      <Loader2 size={16} className="chist-pending-spin" aria-label="Đang tạo" />
+                      <Loader2 size={16} className="chist-pending-spin" aria-label={t('composer.history.processing')} />
                     </div>
                     <div className="chist-pending-bar" role="progressbar" aria-valuenow={p.progress ?? 12}>
                       <div
@@ -470,7 +489,7 @@ export default function ComposerHistory({
             {group.relative && (
               <span className="chist-group-relative">{group.relative}</span>
             )}
-            <span className="chist-count">{group.items.length} mục</span>
+            <span className="chist-count">({group.items.length})</span>
           </header>
           <div className="chist-grid">
             {group.items.map(({ key, item }) => {
@@ -478,7 +497,7 @@ export default function ComposerHistory({
               const { ok, fail } = blockCounts(item);
               const processing = isFeedItemProcessing(item);
               const d = tsToDate(item.created_time);
-              const name = (item.title || item.prompt || '(Không có mô tả)').trim();
+              const name = (item.title || item.prompt || t('composer.noDescription')).trim();
               const displayId = feedDisplayJobId(item);
               const urls = open ? blockUrls(item) : [];
               const allUrls = blockUrls(item);
@@ -493,22 +512,34 @@ export default function ComposerHistory({
                     />
                   )}
                   {!selectMode && !processing && item.id_base && (
-                    <button
-                      type="button"
-                      className="chist-delete-btn"
-                      aria-label="Xóa"
-                      disabled={deletingId === item.id_base}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleDelete(item.id_base);
-                      }}
-                    >
-                      {deletingId === item.id_base ? (
-                        <Loader2 size={14} className="chist-pending-spin" />
-                      ) : (
-                        <Trash2 size={15} />
-                      )}
-                    </button>
+                    <div className="chist-block-actions">
+                      <ProjectPicker
+                        snapshot={{
+                          itemId: item.id_base,
+                          type: projectType(jobType),
+                          prompt: name,
+                          thumbnailUrl: blockThumb,
+                          downloadUrl: allUrls[0] || blockThumb,
+                          createdTime: item.created_time,
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="chist-delete-btn"
+                        aria-label={t('composer.aria.delete')}
+                        disabled={deletingId === item.id_base}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleDelete(item.id_base);
+                        }}
+                      >
+                        {deletingId === item.id_base ? (
+                          <Loader2 size={14} className="chist-pending-spin" />
+                        ) : (
+                          <Trash2 size={15} />
+                        )}
+                      </button>
+                    </div>
                   )}
                   <button
                     type="button"
@@ -520,7 +551,7 @@ export default function ComposerHistory({
                         {name}
                       </span>
                       {processing ? (
-                        <Loader2 size={16} className="chist-pending-spin" aria-label="Đang tạo" />
+                        <Loader2 size={16} className="chist-pending-spin" aria-label={t('composer.history.processing')} />
                       ) : (
                         <ChevronDown size={15} className={`chist-caret${open ? ' open' : ''}`} />
                       )}
@@ -548,7 +579,7 @@ export default function ComposerHistory({
                     </div>
                     <div className="chist-foot">
                       {processing ? (
-                        <span className="chist-processing-label">Đang tạo…</span>
+                        <span className="chist-processing-label">{t('composer.history.processing')}</span>
                       ) : (
                         <>
                           <span className="chist-ok">
@@ -564,18 +595,6 @@ export default function ComposerHistory({
                       {displayId && <span className="chist-id">ID: {displayId}</span>}
                     </div>
                   </button>
-                  <div className="chist-block-actions">
-                    <ProjectPicker
-                      snapshot={{
-                        itemId: item.id_base,
-                        type: projectType(jobType),
-                        prompt: name,
-                        thumbnailUrl: blockThumb,
-                        downloadUrl: allUrls[0] || blockThumb,
-                        createdTime: item.created_time,
-                      }}
-                    />
-                  </div>
                   </div>
                   {open && (
                     <div className="chist-images" style={{ ['--chist-thumb' as string]: `${zoom}px` }}>
@@ -592,7 +611,7 @@ export default function ComposerHistory({
                           </a>
                         ))
                       ) : (
-                        <p className="chist-empty">Không có sản phẩm trong mục này.</p>
+                        <p className="chist-block-empty">{t('composer.history.blockEmpty')}</p>
                       )}
                     </div>
                   )}
@@ -603,7 +622,11 @@ export default function ComposerHistory({
         </section>
       ))}
 
-      {loading && <div className="chist-status">Đang tải…</div>}
+      {loading && items.length > 0 && (
+        <div className="chist-status">
+          <Loader2 size={16} className="chist-spin" />
+        </div>
+      )}
       <div ref={sentinelRef} className="chist-sentinel" />
     </div>
   );

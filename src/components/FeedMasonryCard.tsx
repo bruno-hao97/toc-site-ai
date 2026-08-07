@@ -1,5 +1,5 @@
 import { useEffect, useState, type MouseEvent } from 'react';
-import { Heart, MessageCircle, Play, UserPlus } from 'lucide-react';
+import { Heart, Play } from 'lucide-react';
 import {
   feedMediaUrl,
   feedThumb,
@@ -30,7 +30,6 @@ export default function FeedMasonryCard({
   const video = isVideoItem(item);
   const author = item.author?.name || 'Ẩn danh';
   const likes = item.likes_count ?? item.like_count ?? 0;
-  const comments = item.comments_count ?? 0;
   const openable = Boolean(onOpen && (media || thumb));
 
   useEffect(() => {
@@ -71,11 +70,11 @@ export default function FeedMasonryCard({
 
         {video && (
           <span className="feed-masonry-play">
-            <Play size={18} fill="currentColor" />
+            <Play size={16} fill="currentColor" />
           </span>
         )}
 
-        <span className="feed-masonry-type">{video ? 'VIDEO' : 'IMAGE'}</span>
+        <span className="feed-masonry-type">{video ? 'Video' : 'Ảnh'}</span>
 
         {item.duration && Number(item.duration) > 0 && (
           <span className="feed-masonry-duration">{item.duration}s</span>
@@ -89,26 +88,17 @@ export default function FeedMasonryCard({
               <span className="feed-masonry-avatar feed-masonry-avatar-empty" />
             )}
             <span className="feed-masonry-name">{author}</span>
-            <span className="feed-masonry-follow">
-              <UserPlus size={12} /> Follow
-            </span>
           </div>
         </div>
-      </div>
 
-      <div className="feed-masonry-actions">
         <button
           type="button"
-          className={`feed-masonry-icon${fav ? ' fav-on' : ''}`}
+          className={`feed-masonry-fav${fav ? ' fav-on' : ''}`}
           aria-label={fav ? 'Bỏ yêu thích' : 'Yêu thích'}
           onClick={onHeart}
         >
-          <Heart size={15} fill={fav ? 'currentColor' : 'none'} />
-          <span>{fav ? Math.max(likes, 1) : likes}</span>
-        </button>
-        <button type="button" className="feed-masonry-icon" aria-label="Bình luận">
-          <MessageCircle size={15} />
-          <span>{comments}</span>
+          <Heart size={14} fill={fav ? 'currentColor' : 'none'} />
+          {(fav || likes > 0) && <span>{fav ? Math.max(likes, 1) : likes}</span>}
         </button>
       </div>
     </article>

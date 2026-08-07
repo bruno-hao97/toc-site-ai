@@ -1,0 +1,54 @@
+/* Hallmark landing tokens — AGI Center · Terminal · mint anchor */
+:root {
+  --color-paper: oklch(11% 0.026 265);
+  --color-paper-2: oklch(15% 0.022 265);
+  --color-paper-3: oklch(19% 0.02 265);
+  --color-ink: oklch(96% 0.008 265);
+  --color-ink-2: oklch(72% 0.014 265);
+  --color-ink-3: oklch(52% 0.012 265);
+  --color-rule: oklch(28% 0.018 265);
+  --color-accent: oklch(82% 0.21 145);
+  --color-accent-2: oklch(72% 0.16 145);
+  --color-on-accent: oklch(16% 0.04 145);
+  --color-focus: oklch(82% 0.21 145);
+
+  --color-tool-violet: oklch(72% 0.16 285);
+  --color-tool-blue: oklch(72% 0.14 250);
+  --color-tool-teal: oklch(74% 0.12 195);
+  --color-tool-rose: oklch(68% 0.14 15);
+
+  --font-display: 'Syne', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --text-display: clamp(3rem, 6.5vw + 0.75rem, 5.25rem);
+  --text-display-s: clamp(2rem, 3.5vw + 0.75rem, 3rem);
+  --text-2xl: 1.75rem;
+  --text-xl: 1.25rem;
+  --text-lg: 1.0625rem;
+  --text-base: 0.9375rem;
+  --text-sm: 0.8125rem;
+  --text-xs: 0.6875rem;
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
+  --space-2xl: 64px;
+  --space-3xl: 96px;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  --rule-hair: 1px;
+  --page-gutter: 24px;
+  --page-max: 1120px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+  --dur-fast: 150ms;
+  --dur-med: 280ms;
+}

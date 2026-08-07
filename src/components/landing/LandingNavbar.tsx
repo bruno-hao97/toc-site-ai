@@ -11,11 +11,9 @@ export default function LandingNavbar() {
   const appPath = appEntryPath();
 
   return (
-    <nav className="landing-nav">
-      <div className="container">
-        <div className="logo-row">
-          <BrandLogo to="/" />
-        </div>
+    <nav className="landing-nav" aria-label="Chính">
+      <div className="nav-pill">
+        <BrandLogo to="/" />
 
         <div className="nav-links">
           {NAV_LINKS.map((item) => (
@@ -31,12 +29,7 @@ export default function LandingNavbar() {
               <Zap size={12} />
               {credits.toLocaleString('vi-VN')} credits
             </span>
-          ) : (
-            <span className="credits-badge">
-              <Zap size={12} />
-              41 credits
-            </span>
-          )}
+          ) : null}
           {loggedIn && user?.avatar ? (
             <img src={user.avatar} alt="" className="nav-avatar" style={{ objectFit: 'cover', padding: 0 }} />
           ) : loggedIn ? (

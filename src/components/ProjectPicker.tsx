@@ -11,6 +11,7 @@ import {
   type Project,
   type ProjectItemSnapshot,
 } from '../services/projectStore';
+import { useLocale } from '../i18n';
 
 interface PanelPos {
   top: number;
@@ -25,6 +26,7 @@ export default function ProjectPicker({
   snapshot: ProjectItemSnapshot;
   className?: string;
 }) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -131,7 +133,7 @@ export default function ProjectPicker({
         type="button"
         className={`project-pick-btn${current ? ' assigned' : ''}${className ? ` ${className}` : ''}`}
         onClick={handleToggle}
-        title={current ? `Trong dự án: ${current.name}` : 'Thêm vào dự án'}
+        title={current ? t('composer.project.inProject', { name: current.name }) : t('composer.project.add')}
       >
         {current ? (
           <span className="project-pick-dot" style={{ background: current.color }} />
@@ -155,7 +157,7 @@ export default function ProjectPicker({
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Tìm hoặc tạo dự án…"
+                placeholder={t('composer.project.searchPlaceholder')}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && query.trim() && !exactMatch) handleCreate();
                 }}
@@ -176,13 +178,13 @@ export default function ProjectPicker({
                 </button>
               ))}
               {filtered.length === 0 && !query.trim() && (
-                <p className="project-pick-empty">Chưa có dự án nào.</p>
+                <p className="project-pick-empty">{t('composer.project.empty')}</p>
               )}
             </div>
 
             {query.trim() && !exactMatch && (
               <button type="button" className="project-pick-create" onClick={handleCreate}>
-                <Plus size={14} /> Tạo dự án “{query.trim()}”
+                <Plus size={14} /> {t('composer.project.create', { name: query.trim() })}
               </button>
             )}
 
@@ -195,7 +197,7 @@ export default function ProjectPicker({
                   setOpen(false);
                 }}
               >
-                <X size={14} /> Bỏ khỏi “{current.name}”
+                <X size={14} /> {t('composer.project.removeFrom', { name: current.name })}
               </button>
             )}
           </div>,

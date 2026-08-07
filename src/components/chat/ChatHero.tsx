@@ -6,13 +6,13 @@ interface Props {
   model: ChatAiModel;
 }
 
-const HERO_ICONS: { Icon?: LucideIcon; bg: string; rotate: number }[] = [
-  { Icon: Image, bg: '#b6f4ff', rotate: -8 },
-  { Icon: Video, bg: '#ffd3ed', rotate: -4 },
-  { Icon: Palette, bg: '#e8d5ff', rotate: -2 },
-  { Icon: Workflow, bg: '#c7ff44', rotate: 0 },
-  { Icon: CodeXml, bg: '#ffe59e', rotate: 4 },
-  { bg: '#ffffff', rotate: 8 },
+const HERO_ICONS: { Icon?: LucideIcon; rotate: number; empty?: boolean }[] = [
+  { Icon: Image, rotate: -8 },
+  { Icon: Video, rotate: -4 },
+  { Icon: Palette, rotate: -2 },
+  { Icon: Workflow, rotate: 0 },
+  { Icon: CodeXml, rotate: 4 },
+  { rotate: 8, empty: true },
 ];
 
 export default function ChatHero({ model }: Props) {
@@ -22,8 +22,8 @@ export default function ChatHero({ model }: Props) {
         {HERO_ICONS.map((item, i) => (
           <span
             key={i}
-            className="chat-hero-icon"
-            style={{ background: item.bg, transform: `rotate(${item.rotate}deg)` }}
+            className={`chat-hero-icon${item.empty ? ' chat-hero-icon--empty' : ''}`}
+            style={{ transform: `rotate(${item.rotate}deg)` }}
           >
             {item.Icon && <item.Icon size={20} strokeWidth={2} />}
           </span>

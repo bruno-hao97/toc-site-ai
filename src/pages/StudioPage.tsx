@@ -43,6 +43,7 @@ import {
 import StudioGallery, { type SessionItem } from '../components/StudioGallery';
 import ComposerHistory from '../components/ComposerHistory';
 import ComposerLibrary from '../components/ComposerLibrary';
+import ComposerGalleryEmpty from '../components/composer/ComposerGalleryEmpty';
 import ComposerLibraryItem from '../components/ComposerLibraryItem';
 import ComposerLibraryPreviewModal, {
   type ComposerPreviewHandlers,
@@ -439,6 +440,7 @@ function ModelPicker({
   selectionMode?: string;
   selectionResolution?: string;
 }) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<'new' | 'sale'>('new');
@@ -558,8 +560,8 @@ function ModelPicker({
       const m = models.find((x) => modelSlug(x) === multiValues[0]);
       return m?.name || multiValues[0];
     }
-    return `${multiValues.length} model đã chọn`;
-  }, [multi, multiValues, models]);
+    return t('composer.model.multiSelected', { count: multiValues.length });
+  }, [multi, multiValues, models, t]);
 
   return (
     <div className="model-picker" ref={triggerRef}>
@@ -571,12 +573,12 @@ function ModelPicker({
       >
         <span className="model-picker-current">
           {loading
-            ? 'Đang tải…'
+            ? t('composer.model.loading')
             : multi
-              ? multiLabel || '— Chọn model —'
+              ? multiLabel || t('composer.model.select')
               : current
                 ? current.name || modelSlug(current)
-                : '— Chọn model —'}
+                : t('composer.model.select')}
         </span>
         {!multi && triggerPrice && <span className="model-picker-price">{triggerPrice}</span>}
         {multi && multiValues.length > 1 && (
@@ -594,7 +596,7 @@ function ModelPicker({
               <input
                 autoFocus
                 type="text"
-                placeholder="Tìm kiếm…"
+                placeholder={t('composer.model.search')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -607,26 +609,26 @@ function ModelPicker({
                   className={`model-picker-tab ${tab === 'new' ? 'active' : ''}`}
                   onClick={() => setTab('new')}
                 >
-                  Mới
+                  {t('composer.model.tabNew')}
                 </button>
                 <button
                   type="button"
                   className={`model-picker-tab ${tab === 'sale' ? 'active' : ''}`}
                   onClick={() => setTab('sale')}
                 >
-                  Sale
+                  {t('composer.model.tabSale')}
                 </button>
               </div>
             )}
 
             <div className="model-picker-list">
               {totalShown === 0 && (
-                <div className="model-picker-empty">Không có model phù hợp</div>
+                <div className="model-picker-empty">{t('composer.model.empty')}</div>
               )}
 
               {recentModels.length > 0 && (
                 <div className="model-picker-group">
-                  <div className="model-picker-group-head">Gần đây</div>
+                  <div className="model-picker-group-head">{t('composer.model.recent')}</div>
                   {recentModels.map(renderItem)}
                 </div>
               )}
@@ -803,6 +805,8 @@ export default function StudioPage({
   const isMotionView = jobType === 'video' && videoMode === 'motion' && hasMotionModels;
   const isEditView = jobType === 'video' && videoMode === 'edit' && hasEditModels;
   const isImageComposer = jobType === 'image';
+  const isVideoComposer = jobType === 'video';
+  const isMediaComposer = isImageComposer || isVideoComposer;
   const isMusicComposer = jobType === 'music';
   const isTwoTabComposer = isMotionView || isImageComposer;
   const typeLabel = useCallback(
@@ -1023,7 +1027,7 @@ export default function StudioPage({
       try {
         const list = parseModelsList(await client.fetchModels(type));
         setModels(list);
-        if (!list.length) setError(`Không có model ${type}.`);
+        if (!list.length) setError(t('composer.error.noModels', { type: typeLabel(type) }));
       } catch (err) {
         setError(err instanceof GommoApiError ? err.message : String(err));
         setModels([]);
@@ -1031,7 +1035,7 @@ export default function StudioPage({
         setLoadingModels(false);
       }
     },
-    [client],
+    [client, t, typeLabel],
   );
 
   const loadRecentJobs = useCallback(() => {
@@ -1370,11 +1374,11 @@ export default function StudioPage({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (submitting || pendingJobs.some((p) => p.status === 'processing')) {
-      setError('Đang có job xử lý — đợi xong hoặc kiểm tra thư viện / VMedia trước khi tạo thêm.');
+      setError(t('composer.error.jobProcessing'));
       return;
     }
     if (!client || !currentModel || !schema) {
-      setError('Chọn model trước.');
+      setError(t('composer.error.selectModel'));
       return;
     }
 
@@ -1389,11 +1393,11 @@ export default function StudioPage({
       const vidC = refs.filter((u) => urlMediaKind(u) === 'video').length;
       const limits = getReferenceLimits(currentModel, schema, jobType);
       if (imgC > limits.image) {
-        setError(`Quá nhiều ảnh tham chiếu (tối đa ${limits.image}).`);
+        setError(t('composer.error.tooManyRefImages', { max: limits.image }));
         return;
       }
       if (vidC > limits.video) {
-        setError(`Quá nhiều video tham chiếu (tối đa ${limits.video}).`);
+        setError(t('composer.error.tooManyRefVideos', { max: limits.video }));
         return;
       }
     }
@@ -1410,11 +1414,11 @@ export default function StudioPage({
     if (isMotionView) {
       const charUrl = (selections.images || []).find(Boolean) || '';
       if (!charUrl) {
-        setError('Tải ảnh nhân vật trước.');
+        setError(t('composer.error.uploadCharacter'));
         return;
       }
       if (!motionVideoUrl) {
-        setError('Tải video tham chiếu trước.');
+        setError(t('composer.error.uploadRefVideo'));
         return;
       }
 
@@ -1429,7 +1433,7 @@ export default function StudioPage({
           .map((p) => p.trim())
           .filter(Boolean);
         if (motionPrompts.length === 0) {
-          setError(`Nhập ít nhất 1 prompt (mỗi prompt cách nhau bằng ${sep}).`);
+          setError(t('composer.error.needPrompt', { sep }));
           return;
         }
       } else {
@@ -1489,12 +1493,12 @@ export default function StudioPage({
     // Chế độ Edit: sửa video có sẵn theo prompt.
     if (isEditView) {
       if (!editVideoUrl) {
-        setError('Tải video cần sửa trước.');
+        setError(t('composer.error.uploadEditVideo'));
         return;
       }
       const editPrompt = (selections.prompt || '').trim();
       if (!editPrompt) {
-        setError('Nhập mô tả chỉnh sửa.');
+        setError(t('composer.error.enterEditPrompt'));
         return;
       }
 
@@ -1547,7 +1551,7 @@ export default function StudioPage({
           ? true
           : Boolean(basePrompt.trim());
       if (!hasAgentScript) {
-        setError('Chat với Video Agent để có kịch bản / prompt trước khi tạo.');
+        setError(t('composer.error.videoAgentScript'));
         return;
       }
     }
@@ -1557,18 +1561,18 @@ export default function StudioPage({
         pickerModels.some((m) => modelSlug(m) === s),
       );
       if (validSlugs.length === 0) {
-        setError('Chọn ít nhất 1 model.');
+        setError(t('composer.error.selectOneModel'));
         return;
       }
     }
 
     if (multiShotEnabled && schema.fields.multiShots) {
       if (activeShots.length < multiShotConfig.minShots) {
-        setError(`Cần ít nhất ${multiShotConfig.minShots} cảnh (kịch bản).`);
+        setError(t('composer.error.minShots', { min: multiShotConfig.minShots }));
         return;
       }
       if (activeShots.length > multiShotConfig.maxShots) {
-        setError(`Tối đa ${multiShotConfig.maxShots} cảnh.`);
+        setError(t('composer.error.maxShots', { max: multiShotConfig.maxShots }));
         return;
       }
     }
@@ -1584,7 +1588,7 @@ export default function StudioPage({
         .map((p) => p.trim())
         .filter(Boolean);
       if (prompts.length === 0) {
-        setError(`Nhập ít nhất 1 prompt (mỗi prompt cách nhau bằng ${sep}).`);
+        setError(t('composer.error.needPrompt', { sep }));
         return;
       }
     } else {
@@ -1881,8 +1885,16 @@ export default function StudioPage({
   function deleteSelected() {
     if (mainTab === 'folder' || mainTab === 'history') {
       if (!selectedIds.size) return;
-      const label = mainTab === 'folder' ? 'thư viện' : 'lịch sử';
-      if (!window.confirm(`Xóa ${selectedIds.size} mục đã chọn khỏi ${label}?`)) return;
+      const label =
+        mainTab === 'folder'
+          ? t('composer.action.deleteTargetLibrary')
+          : t('composer.action.deleteTargetHistory');
+      if (
+        !window.confirm(
+          t('composer.action.deleteConfirmBatch', { count: selectedIds.size, target: label }),
+        )
+      )
+        return;
       void (async () => {
         setError('');
         try {
@@ -1912,7 +1924,7 @@ export default function StudioPage({
   }
 
   function handleCurrentDelete(entry: HistoryEntry) {
-    if (!window.confirm('Xóa mục này khỏi phiên hiện tại?')) return;
+    if (!window.confirm(t('composer.action.deleteConfirmCurrent'))) return;
     setCurrentDeletingId(entry.id);
     try {
       removeHistoryEntry(entry.id);
@@ -2014,11 +2026,11 @@ export default function StudioPage({
     if (target === 'component') {
       const fileKind = mediaKindFromFile(file);
       if (fileKind === 'video' && !canAddComponentVideo) {
-        setError('Đã đạt giới hạn video tham chiếu.');
+        setError(t('composer.error.refVideoLimit'));
         return;
       }
       if (fileKind === 'image' && !canAddComponentImage) {
-        setError('Đã đạt giới hạn ảnh tham chiếu.');
+        setError(t('composer.error.refImageLimit'));
         return;
       }
     }
@@ -2070,11 +2082,11 @@ export default function StudioPage({
 
     if (target === 'component') {
       if (kind === 'video' && !canAddComponentVideo) {
-        setError('Đã đạt giới hạn video tham chiếu.');
+        setError(t('composer.error.refVideoLimit'));
         return;
       }
       if (kind === 'image' && !canAddComponentImage) {
-        setError('Đã đạt giới hạn ảnh tham chiếu.');
+        setError(t('composer.error.refImageLimit'));
         return;
       }
     }
@@ -2144,7 +2156,7 @@ export default function StudioPage({
   async function generateShotsFromBrief() {
     const source = aiBrief.trim() || selections.prompt?.trim() || '';
     if (!source) {
-      setError('Nhập ý tưởng trước khi sinh kịch bản.');
+      setError(t('composer.error.enterBriefForShots'));
       return;
     }
     setEnhancingPrompt(true);
@@ -2170,7 +2182,7 @@ export default function StudioPage({
   async function generateAiPrompt() {
     const source = aiBrief.trim() || selections.prompt?.trim() || '';
     if (!source) {
-      setError('Nhập ý tưởng ngắn trước.');
+      setError(t('composer.error.enterBriefShort'));
       return;
     }
     setEnhancingPrompt(true);
@@ -2210,7 +2222,7 @@ export default function StudioPage({
   if (layout === 'composer') {
     return (
       <div
-        className={`studio-composer${isMusicComposer ? ' studio-composer--music' : ''}`}
+        className={`studio-composer${isMusicComposer ? ' studio-composer--music' : ''}${isImageComposer ? ' studio-composer--image' : ''}${isVideoComposer ? ' studio-composer--video' : ''}`}
         ref={composerRef}
         style={{ gridTemplateColumns: `${sideWidth}px 6px 1fr` }}
       >
@@ -2239,7 +2251,7 @@ export default function StudioPage({
             }
           }}
         >
-          <div className="composer-side-head">
+          <div className={`composer-side-head${isMediaComposer ? ' composer-side-head--stacked' : ''}`}>
             <button
               type="button"
               className="composer-back"
@@ -2248,18 +2260,38 @@ export default function StudioPage({
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="composer-title">
-              {isMusicComposer ? (
-                <>
-                  <span className="composer-title-icon" aria-hidden>
-                    <Music2 size={15} />
-                  </span>
-                  {t('composer.music.create')}
-                </>
-              ) : (
-                t('composer.create', { type: typeLabel() })
+            <div className="composer-side-head-copy">
+              {isImageComposer && (
+                <span className="composer-kicker">{t('composer.kicker.image')}</span>
               )}
-            </span>
+              {isVideoComposer && (
+                <span className="composer-kicker">{t('composer.kicker.video')}</span>
+              )}
+              <span className="composer-title">
+                {isMusicComposer ? (
+                  <>
+                    <span className="composer-title-icon" aria-hidden>
+                      <Music2 size={15} />
+                    </span>
+                    {t('composer.music.create')}
+                  </>
+                ) : (
+                  <>
+                    {isImageComposer && (
+                      <span className="composer-title-icon" aria-hidden>
+                        <ImageIcon size={15} />
+                      </span>
+                    )}
+                    {isVideoComposer && (
+                      <span className="composer-title-icon" aria-hidden>
+                        <Clapperboard size={15} />
+                      </span>
+                    )}
+                    {t('composer.create', { type: typeLabel() })}
+                  </>
+                )}
+              </span>
+            </div>
           </div>
 
           {(jobType === 'video' && (hasMotionModels || hasEditModels)) && (
@@ -2477,8 +2509,8 @@ export default function StudioPage({
                     onFile={(file) => ingestMediaFile(file, 'motionChar')}
                     onUrl={(url) => ingestMediaUrl(url, 'motionChar')}
                     emptyIcon={<PersonStanding size={18} />}
-                    emptyTitle="Tải ảnh nhân vật"
-                    emptyHint="JPG / PNG, ≥ 1K"
+                    emptyTitle={t('composer.upload.characterImage')}
+                    emptyHint={t('composer.upload.characterHint')}
                   />
                 </div>
 
@@ -2490,8 +2522,8 @@ export default function StudioPage({
                     onFile={(file) => ingestMediaFile(file, 'motionVideo')}
                     onUrl={(url) => ingestMediaUrl(url, 'motionVideo')}
                     emptyIcon={<Video size={18} />}
-                    emptyTitle="Tải video động tác"
-                    emptyHint="≤ 30s / 50MB, 720p"
+                    emptyTitle={t('composer.upload.motionVideo')}
+                    emptyHint={t('composer.upload.motionHint')}
                   />
                 </div>
               </div>
@@ -2517,10 +2549,10 @@ export default function StudioPage({
                 onFile={(file) => ingestMediaFile(file, 'editVideo')}
                 onUrl={(url) => ingestMediaUrl(url, 'editVideo')}
                 emptyIcon={<Film size={18} />}
-                emptyTitle="Tải video nguồn"
-                emptyHint="MP4 / WebM"
+                emptyTitle={t('composer.upload.sourceVideo')}
+                emptyHint={t('composer.upload.sourceHint')}
               />
-              <p className="composer-mp-hint">Mô tả thay đổi bạn muốn (prompt) ở ô bên dưới.</p>
+              <p className="composer-mp-hint">{t('composer.edit.hint')}</p>
             </div>
           )}
 
@@ -2533,14 +2565,14 @@ export default function StudioPage({
                     className={inputView === 'frame' ? 'active' : ''}
                     onClick={() => switchInputMode('frame')}
                   >
-                    Từ Ảnh Frame
+                    {t('composer.input.frame')}
                   </button>
                   <button
                     type="button"
                     className={inputView === 'component' ? 'active' : ''}
                     onClick={() => switchInputMode('component')}
                   >
-                    Từ Thành Phần
+                    {t('composer.input.component')}
                   </button>
                 </div>
               )}
@@ -2555,7 +2587,7 @@ export default function StudioPage({
                       onFile={(file) => ingestMediaFile(file, 'frameStart')}
                       onUrl={(url) => ingestMediaUrl(url, 'frameStart')}
                       emptyIcon={<Plus size={18} />}
-                      emptyTitle="Tự chọn"
+                      emptyTitle={t('composer.upload.custom')}
                     />
                   </div>
 
@@ -2568,7 +2600,7 @@ export default function StudioPage({
                         onFile={(file) => ingestMediaFile(file, 'frameEnd')}
                         onUrl={(url) => ingestMediaUrl(url, 'frameEnd')}
                         emptyIcon={<Plus size={18} />}
-                        emptyTitle="Tự chọn"
+                        emptyTitle={t('composer.upload.custom')}
                       />
                     </div>
                   )}
@@ -2675,7 +2707,7 @@ export default function StudioPage({
               <div className="composer-label-row">
                 <span className="composer-label">{t('composer.tts')}</span>
                 <div className="composer-desc-tools">
-                  <button type="button" aria-label="Xóa" onClick={() => updateSelection('text', '')}>
+                  <button type="button" aria-label={t('composer.aria.delete')} onClick={() => updateSelection('text', '')}>
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -2910,7 +2942,7 @@ export default function StudioPage({
                               <img src={url} alt={`ref ${i + 1}`} />
                               <button
                                 type="button"
-                                aria-label="Xóa ảnh"
+                                aria-label={t('composer.aria.deleteImage')}
                                 onClick={() =>
                                   setMultiRefs((prev) => prev.filter((_, idx) => idx !== i))
                                 }
@@ -3014,7 +3046,7 @@ export default function StudioPage({
                         <button
                           type="button"
                           className="composer-shot-remove"
-                          aria-label="Xóa cảnh"
+                          aria-label={t('composer.aria.deleteShot')}
                           onClick={() => removeShotRow(shot.id)}
                         >
                           <Trash2 size={14} />
@@ -3148,11 +3180,13 @@ export default function StudioPage({
                 </span>
               </span>
               {motionVideoUrl && !motionDurationLoading && motionVideoDuration <= 0 && (
-                <p className="composer-mp-hint">Không đọc được thời lượng video — giá tổng có thể sai.</p>
+                <p className="composer-mp-hint">{t('composer.motion.durationWarning')}</p>
               )}
               {!motionVideoUrl && motionRatePerSec > 0 && (
                 <p className="composer-mp-hint">
-                  Giá model: {motionRatePerSec.toLocaleString('vi-VN')}/s — tải video tham chiếu để tính tổng.
+                  {t('composer.motion.priceHint', {
+                    rate: motionRatePerSec.toLocaleString('vi-VN'),
+                  })}
                 </p>
               )}
             </div>
@@ -3275,7 +3309,7 @@ export default function StudioPage({
                     onClick={downloadSelected}
                   >
                     <Download size={14} />
-                    Download ({selectionCount})
+                    {t('composer.action.download', { count: selectionCount })}
                   </button>
                   <button
                     type="button"
@@ -3283,7 +3317,7 @@ export default function StudioPage({
                     onClick={deleteSelected}
                   >
                     <Trash2 size={14} />
-                    Xóa ({selectionCount})
+                    {t('composer.action.delete', { count: selectionCount })}
                   </button>
                   <button
                     type="button"
@@ -3312,7 +3346,7 @@ export default function StudioPage({
                 mainTab === 'current'
                   ? pendingJobs.map((p) => ({
                       id: p.id,
-                      title: p.prompt || selections.name || 'Đang tạo…',
+                      title: p.prompt || selections.name || t('composer.submitting'),
                       status: p.status === 'failed' ? 'failed' : 'processing',
                       progress: p.progress,
                     }))
@@ -3321,7 +3355,7 @@ export default function StudioPage({
                 mainTab === 'folder' ? composerResults : displayedResults;
               const doneItems: MusicTrackItem[] = source.map((e) => ({
                 id: e.id,
-                title: e.prompt || e.modelName || 'Bản nhạc',
+                title: e.prompt || e.modelName || t('composer.music.defaultTitle'),
                 modelLabel: e.modelName || e.modelSlug,
                 createdAt: e.createdAt,
                 resultUrl: e.resultUrl,
@@ -3334,7 +3368,7 @@ export default function StudioPage({
                   items={items}
                   emptyText={
                     mainTab === 'folder'
-                      ? 'Chưa có bài nào trong thư viện nhạc.'
+                      ? t('composer.music.emptyLibrary')
                       : t('composer.gallery.empty', { type: typeLabel() })
                   }
                   selectedIds={selectedIds}
@@ -3380,20 +3414,26 @@ export default function StudioPage({
               buildPreviewHandlers={buildPreviewHandlers}
             />
           ) : displayedResults.length === 0 && !(mainTab === 'current' && pendingJobs.length > 0) ? (
-            <p className="muted composer-empty">
-              {t('composer.gallery.empty', { type: typeLabel() })}
-            </p>
+            <ComposerGalleryEmpty
+              title={t('composer.gallery.emptyTitle', { type: typeLabel() })}
+              description={
+                jobType === 'video'
+                  ? t('composer.gallery.emptyHintVideo')
+                  : t('composer.gallery.emptyHint')
+              }
+              focusLabel={t('composer.gallery.focusPanel')}
+            />
           ) : (
             <div className={useClibLayout ? 'clib-wrap' : 'composer-results'}>
               {mainTab === 'current' && pendingJobs.length > 0 && (
                 <section className={useClibLayout ? 'clib-group' : 'composer-day-group'}>
                   {useClibLayout ? (
                     <header className="clib-group-head">
-                      <span className="clib-group-label">Đang tạo</span>
+                      <span className="clib-group-label">{t('composer.processing')}</span>
                       <span className="clib-count">({pendingJobs.length})</span>
                     </header>
                   ) : (
-                    <h3 className="composer-day">Đang tạo</h3>
+                    <h3 className="composer-day">{t('composer.processing')}</h3>
                   )}
                   <div
                     className={useClibLayout ? 'clib-grid' : 'composer-grid'}
@@ -3412,14 +3452,14 @@ export default function StudioPage({
                           {p.status === 'processing' ? (
                             <>
                               <span className="pending-spinner-lg" aria-hidden />
-                              <span className="pending-vmedia-label">ĐANG TẠO</span>
+                              <span className="pending-vmedia-label">{t('composer.processingLabel')}</span>
                               <div
                                 className="pending-vmedia-bar"
                                 role="progressbar"
                                 aria-valuenow={p.progress ?? 12}
                                 aria-valuemin={0}
                                 aria-valuemax={100}
-                                aria-label="Tiến độ tạo"
+                                aria-label={t('composer.progressAria')}
                               >
                                 <div
                                   className="pending-vmedia-bar-fill"
@@ -3430,7 +3470,7 @@ export default function StudioPage({
                           ) : (
                             <>
                               <span className="pending-failed-icon-lg">!</span>
-                              <span className="pending-vmedia-label failed">THẤT BẠI</span>
+                              <span className="pending-vmedia-label failed">{t('composer.failedLabel')}</span>
                             </>
                           )}
                         </div>
@@ -3478,7 +3518,7 @@ export default function StudioPage({
                             deleting={currentDeletingId === entry.id}
                             extraMenuItems={[
                               {
-                                label: 'Dùng lại',
+                                label: t('composer.action.reuse'),
                                 icon: <Clipboard size={14} />,
                                 onClick: () => applyReuse(entry),
                               },
@@ -3516,17 +3556,17 @@ export default function StudioPage({
                             </a>
                             <div className="hist-card-overlay">
                               <button type="button" onClick={() => applyReuse(entry)}>
-                                Dùng lại
+                                {t('composer.action.reuse')}
                               </button>
                               <a href={entry.resultUrl} target="_blank" rel="noreferrer" download>
-                                Tải
+                                {t('composer.action.downloadOne')}
                               </a>
                               <button
                                 type="button"
                                 className="danger"
                                 onClick={() => removeHistoryEntry(entry.id)}
                               >
-                                Xóa
+                                {t('composer.action.deleteOne')}
                               </button>
                             </div>
                           </div>
@@ -3597,7 +3637,7 @@ export default function StudioPage({
               <button
                 type="button"
                 className="composer-prompt-modal-backdrop"
-                aria-label="Đóng"
+                aria-label={t('composer.aria.close')}
                 onClick={() => setPromptModalOpen(false)}
               />
               <div className="composer-prompt-modal-panel">
@@ -3667,7 +3707,7 @@ export default function StudioPage({
               Refresh
             </button>
           </div>
-          {loadingModels && <p className="muted">Đang tải…</p>}
+          {loadingModels && <p className="muted">{t('composer.model.loading')}</p>}
           <ul className="model-list">
             {models.map((m) => {
               const slug = modelSlug(m);
@@ -3690,7 +3730,7 @@ export default function StudioPage({
         <section className="panel">
           <h2>Tạo job</h2>
           {!schema ? (
-            <p className="muted">Chọn model.</p>
+            <p className="muted">{t('composer.selectModelHint')}</p>
           ) : (
             <form onSubmit={handleSubmit} className="form">
               {schema.fields.prompt && !schema.fields.musicName && (
@@ -3740,7 +3780,7 @@ export default function StudioPage({
                     checked={Boolean(selections.instrumental)}
                     onChange={(e) => updateSelection('instrumental', e.target.checked)}
                   />
-                  <span className="label" style={{ margin: 0 }}>Không lời (instrumental)</span>
+                  <span className="label" style={{ margin: 0 }}>{t('composer.musicInstrumental')}</span>
                 </label>
               )}
               {schema.fields.musicName && !selections.instrumental && (
@@ -3859,7 +3899,9 @@ export default function StudioPage({
 
           {processingJobs.length > 0 && (
             <p className="progress muted" style={{ marginTop: '0.75rem' }}>
-              Đang xử lý: {processingJobs.map((j) => j.model_id).join(', ')}
+              {t('composer.processingJobs', {
+                models: processingJobs.map((j) => j.model_id).join(', '),
+              })}
             </p>
           )}
 

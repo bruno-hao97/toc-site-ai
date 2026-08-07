@@ -50,7 +50,7 @@ interface QuickMenuItem {
 }
 
 const QUICK_MENU: QuickMenuItem[] = [
-  { id: 'chat', label: 'Novix Chat', icon: Bot, action: 'open-chat', fixedCount: 1 },
+  { id: 'chat', label: 'Chat', icon: Bot, action: 'open-chat', fixedCount: 1 },
   { id: 'script', label: 'Tạo kịch bản', icon: FileText, href: '/video', fixedCount: 1 },
   { id: 'video', label: 'Tạo video', icon: Clapperboard, jobType: 'video' },
   { id: 'image', label: 'Tạo ảnh', icon: ImageIcon, jobType: 'image' },
@@ -354,7 +354,10 @@ export default function HomeQuickCreateBar() {
 
   const menuCount = (item: QuickMenuItem): number | null => {
     if (item.fixedCount != null) return item.fixedCount;
-    if (item.jobType) return typeCounts[item.jobType] ?? null;
+    if (item.jobType) {
+      const n = typeCounts[item.jobType];
+      return n != null && n > 0 ? n : null;
+    }
     return null;
   };
 
@@ -375,7 +378,10 @@ export default function HomeQuickCreateBar() {
   };
 
   return (
-    <div className={`qc-bar${expanded ? ' expanded' : ''}`}>
+    <div
+      className={`qc-bar${expanded ? ' expanded' : ''}`}
+      aria-label="Tạo nhanh ảnh, video, giọng nói"
+    >
       {result && (
         <div className="qc-result">
           <button type="button" className="qc-result-close" onClick={() => setResult(null)}>

@@ -7,6 +7,7 @@ import FeedPostCard from './FeedPostCard';
 import type { FeedItem } from '../services/feedApi';
 import { feedIsAudioItem } from '../services/feedApi';
 import { loadFavoriteItems } from '../services/feedFavoritesStore';
+import HomeFeedEmpty from './home/HomeFeedEmpty';
 import {
   canOpenFeedPreview,
   feedPreviewKind,
@@ -80,9 +81,11 @@ export default function HomeFavoritesFeed() {
       )}
 
       {!items.length && (
-        <p className="muted feed-status">
-          Chưa có mục yêu thích. Bấm ♥ trên Bảng tin hoặc thư viện để lưu vào đây.
-        </p>
+        <HomeFeedEmpty
+          title="Chưa có mục yêu thích"
+          description="Bấm ♥ trên bảng tin hoặc thư viện để lưu vào đây."
+          showCreate={false}
+        />
       )}
     </div>
   );

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
-import { Coins, Globe, Menu, X } from 'lucide-react';
+import { ChevronDown, Coins, Globe, Menu, X, Zap } from 'lucide-react';
 import {
   ensureValidPlatformSession,
   handlePlatformAuthFailure,
@@ -44,17 +44,22 @@ import AccountTransactionsPage from './pages/account/AccountTransactionsPage';
 import { useLocale } from './i18n';
 import type { TranslationKey } from './i18n';
 
-const MAIN_NAV: { to: string; labelKey: TranslationKey }[] = [
+const PRIMARY_NAV: { to: string; labelKey: TranslationKey }[] = [
   { to: '/home', labelKey: 'nav.home' },
   { to: '/chat', labelKey: 'nav.chat' },
   { to: '/explore', labelKey: 'nav.explore' },
-  { to: '/projects', labelKey: 'nav.projects' },
   { to: '/image', labelKey: 'nav.image' },
   { to: '/video', labelKey: 'nav.video' },
-  { to: '/audio', labelKey: 'nav.audio' },
-  { to: '/music', labelKey: 'nav.music' },
   { to: '/workflow', labelKey: 'nav.workflow' },
 ];
+
+const MORE_NAV: { to: string; labelKey: TranslationKey }[] = [
+  { to: '/projects', labelKey: 'nav.projects' },
+  { to: '/music', labelKey: 'nav.music' },
+  { to: '/audio', labelKey: 'nav.audio' },
+];
+
+const ALL_NAV = [...PRIMARY_NAV, ...MORE_NAV];
 
 const STUDIO_NAV: Record<string, JobType> = {
   '/image': 'image',
@@ -76,14 +81,29 @@ function AppHeader() {
     refresh,
   } = useDisplayCredits();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [moreNavOpen, setMoreNavOpen] = useState(false);
+  const moreNavRef = useRef<HTMLDivElement>(null);
   const loggedIn = isLoggedIn();
   const isAdmin = isAdminUser();
   const location = useLocation();
   const showDualWallets = isAdmin && isAdminVmedia;
+  const moreNavActive = MORE_NAV.some((item) => location.pathname === item.to);
 
   useEffect(() => {
     setMobileNavOpen(false);
+    setMoreNavOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!moreNavOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (moreNavRef.current && !moreNavRef.current.contains(e.target as Node)) {
+        setMoreNavOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [moreNavOpen]);
 
   function refreshCredits() {
     void refresh().catch((err) => {
@@ -106,85 +126,127 @@ function AppHeader() {
   return (
     <header className="app-header">
       <div className="app-header-inner">
-        {loggedIn && (
-          <button
-            type="button"
-            className="nav-toggle"
-            aria-label={t('header.openMenu')}
-            aria-expanded={mobileNavOpen}
-            onClick={() => setMobileNavOpen((v) => !v)}
-          >
-            {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-        )}
-        <BrandLogo to="/" />
-        {loggedIn ? (
-          <>
-            <nav className={`nav-main ${mobileNavOpen ? 'open' : ''}`}>
-              {MAIN_NAV.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) => `nav-main-link ${isActive ? 'active' : ''}`}
+        <div className="app-header-pill">
+          {loggedIn && (
+            <button
+              type="button"
+              className="nav-toggle"
+              aria-label={t('header.openMenu')}
+              aria-expanded={mobileNavOpen}
+              onClick={() => setMobileNavOpen((v) => !v)}
+            >
+              {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          )}
+          <BrandLogo to={loggedIn ? '/home' : '/'} />
+          {loggedIn ? (
+            <>
+              <nav className="nav-main nav-main--pill" aria-label={t('header.openMenu')}>
+                {PRIMARY_NAV.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={({ isActive }) => `nav-main-link ${isActive ? 'active' : ''}`}
+                  >
+                    {t(item.labelKey)}
+                  </NavLink>
+                ))}
+                <div className="nav-more" ref={moreNavRef}>
+                  <button
+                    type="button"
+                    className={`nav-main-link nav-more-trigger${moreNavActive ? ' active' : ''}`}
+                    aria-expanded={moreNavOpen}
+                    onClick={() => setMoreNavOpen((v) => !v)}
+                  >
+                    Thêm
+                    <ChevronDown size={14} className={moreNavOpen ? 'nav-more-chevron open' : 'nav-more-chevron'} />
+                  </button>
+                  {moreNavOpen && (
+                    <div className="nav-more-menu" role="menu">
+                      {MORE_NAV.map((item) => (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          role="menuitem"
+                          className={({ isActive }) =>
+                            `nav-more-item${isActive ? ' active' : ''}`
+                          }
+                          onClick={() => setMoreNavOpen(false)}
+                        >
+                          {t(item.labelKey)}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </nav>
+              <div className="header-meta">
+                <button
+                  type="button"
+                  className="lang-pill"
+                  aria-label={t('header.switchLang')}
+                  onClick={toggleLocale}
                 >
-                  {t(item.labelKey)}
-                </NavLink>
-              ))}
-            </nav>
-            {mobileNavOpen && (
-              <div
-                className="nav-backdrop"
-                onClick={() => setMobileNavOpen(false)}
-                aria-hidden="true"
-              />
-            )}
-            <div className="header-meta">
-              <button
-                type="button"
-                className="lang-pill"
-                aria-label={t('header.switchLang')}
-                onClick={toggleLocale}
-              >
-                <Globe size={14} /> {locale === 'vi' ? 'VI' : 'EN'}
-              </button>
-              <Link to="/pricing" className="price-pill">
-                <Coins size={15} /> {t('header.pricing')}
-              </Link>
-              {showDualWallets ? (
-                <div className="header-balance header-balance--dual">
-                  <div className="header-balance-row">
-                    <span className="header-balance-label">Nội bộ</span>
-                    <span className="header-credit-pill header-credit-pill--platform">
-                      {platformCredits.toLocaleString('vi-VN')}
-                    </span>
+                  <Globe size={14} /> {locale === 'vi' ? 'VI' : 'EN'}
+                </button>
+                <Link to="/pricing" className="price-pill">
+                  <Coins size={15} /> {t('header.pricing')}
+                </Link>
+                {showDualWallets ? (
+                  <div className="header-balance header-balance--dual">
+                    <div className="header-balance-row">
+                      <span className="header-balance-label">Nội bộ</span>
+                      <span className="header-credit-pill header-credit-pill--platform">
+                        {platformCredits.toLocaleString('vi-VN')}
+                      </span>
+                    </div>
+                    <div className="header-balance-row">
+                      <span className="header-balance-label">Pro.agi.vn</span>
+                      <span className="header-credit-pill">
+                        {displayCredits.toLocaleString('vi-VN')}
+                      </span>
+                    </div>
                   </div>
-                  <div className="header-balance-row">
-                    <span className="header-balance-label">Pro.agi.vn</span>
-                    <span className="header-credit-pill">
-                      {displayCredits.toLocaleString('vi-VN')}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div className="header-balance">
-                  <span className="header-balance-label">{t('header.balance')}</span>
-                  <span className="header-credit-pill">
+                ) : (
+                  <Link to="/wallet" className="header-credits-badge">
+                    <Zap size={12} />
                     {displayCredits.toLocaleString('vi-VN')}
-                  </span>
-                </div>
-              )}
-              <UserMenuDropdown
-                credits={displayCredits}
-                platformCredits={platformCredits}
-                isAdmin={showDualWallets}
-                onCreditsRefresh={refreshCredits}
-              />
-            </div>
-          </>
-        ) : (
-          <nav className="nav">
-            <Link to="/login">{t('header.login')}</Link>
+                  </Link>
+                )}
+                <UserMenuDropdown
+                  credits={displayCredits}
+                  platformCredits={platformCredits}
+                  isAdmin={showDualWallets}
+                  onCreditsRefresh={refreshCredits}
+                />
+              </div>
+            </>
+          ) : (
+            <nav className="nav nav--guest">
+              <Link to="/login">{t('header.login')}</Link>
+            </nav>
+          )}
+        </div>
+        {loggedIn && (
+          <nav className={`nav-main nav-main--drawer ${mobileNavOpen ? 'open' : ''}`} aria-label="Menu di động">
+            {ALL_NAV.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => `nav-main-link ${isActive ? 'active' : ''}`}
+                onClick={() => setMobileNavOpen(false)}
+              >
+                {t(item.labelKey)}
+              </NavLink>
+            ))}
           </nav>
+        )}
+        {loggedIn && mobileNavOpen && (
+          <div
+            className="nav-backdrop"
+            onClick={() => setMobileNavOpen(false)}
+            aria-hidden="true"
+          />
         )}
       </div>
     </header>
