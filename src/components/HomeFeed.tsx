@@ -13,26 +13,86 @@ import {
   fetchPublicVideos,
   type FeedItem,
 } from '../services/feedApi';
+import { isFavorite, loadFavoriteItems } from '../services/feedFavoritesStore';
 import { UpstreamMeError } from '../services/upstreamMe';
 import {
   canOpenFeedPreview,
   feedPreviewKind,
   navigateFeedItemReuse,
 } from '../utils/feedItemReuse';
+import type { CommunityMediaFilter } from './home/HomeCommunityFilters';
 
 function hasVisual(item: FeedItem): boolean {
   return Boolean(feedThumb(item) || feedMediaUrl(item));
 }
 
+function feedItemMediaKind(item: FeedItem): 'video' | 'image' {
+  const t = (item.type || '').toLowerCase();
+  if (t === 'image' || t === 'image-upscale' || t === 'remove-bg') return 'image';
+  if (t === 'video' || t === 'avatar-lipsync') return 'video';
+  const media = feedMediaUrl(item) || '';
+  return /\.(mp4|webm|mov|m4v)(\?|$)/i.test(media) ? 'video' : 'image';
+}
+
+function isMusicItem(item: FeedItem): boolean {
+  return (item.type || '').toLowerCase() === 'music';
+}
+
+function isTtsItem(item: FeedItem): boolean {
+  const t = (item.type || '').toLowerCase();
+  if (t === 'music') return false;
+  if (t === 'tts' || t.includes('voice') || t.includes('speech')) return true;
+  return false;
+}
+
+function buildFavoriteFeedItems(items: FeedItem[]): FeedItem[] {
+  const out: FeedItem[] = [];
+  const seen = new Set<string>();
+
+  for (const item of loadFavoriteItems()) {
+    if (!item.id_base || seen.has(item.id_base)) continue;
+    if (!hasVisual(item)) continue;
+    seen.add(item.id_base);
+    out.push(item);
+  }
+
+  for (const item of items) {
+    if (!item.id_base || seen.has(item.id_base)) continue;
+    if (!isFavorite(item.id_base) || !hasVisual(item)) continue;
+    seen.add(item.id_base);
+    out.push(item);
+  }
+
+  return out;
+}
+
+function matchesMediaFilter(item: FeedItem, filter: CommunityMediaFilter): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'favorite') return isFavorite(item.id_base);
+  if (filter === 'music') return isMusicItem(item);
+  if (filter === 'tts') return isTtsItem(item);
+  if (filter === 'video' || filter === 'image') {
+    return feedItemMediaKind(item) === filter;
+  }
+  return true;
+}
+
 export type HomeFeedVariant = 'feed' | 'recommended';
 
-export default function HomeFeed({ variant = 'feed' }: { variant?: HomeFeedVariant }) {
+export default function HomeFeed({
+  variant = 'feed',
+  mediaFilter = 'all',
+}: {
+  variant?: HomeFeedVariant;
+  mediaFilter?: CommunityMediaFilter;
+}) {
   const navigate = useNavigate();
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [favTick, setFavTick] = useState(0);
 
   const afterVideoRef = useRef('');
   const afterImageRef = useRef('');
@@ -128,6 +188,12 @@ export default function HomeFeed({ variant = 'feed' }: { variant?: HomeFeedVaria
   }, []);
 
   useEffect(() => {
+    const onFav = () => setFavTick((n) => n + 1);
+    document.addEventListener('favorites:updated', onFav);
+    return () => document.removeEventListener('favorites:updated', onFav);
+  }, []);
+
+  useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
@@ -140,7 +206,17 @@ export default function HomeFeed({ variant = 'feed' }: { variant?: HomeFeedVaria
     return () => observer.disconnect();
   }, [loadMore]);
 
-  const visualItems = useMemo(() => items.filter(canOpenFeedPreview), [items]);
+  const filteredItems = useMemo(() => {
+    if (mediaFilter === 'favorite') {
+      return buildFavoriteFeedItems(items);
+    }
+    return items.filter((item) => matchesMediaFilter(item, mediaFilter));
+  }, [items, mediaFilter, favTick]);
+
+  const visualItems = useMemo(
+    () => filteredItems.filter(canOpenFeedPreview),
+    [filteredItems],
+  );
   const previewItem = previewIndex != null ? visualItems[previewIndex] : null;
   const previewKindValue = previewItem ? feedPreviewKind(previewItem) : 'video';
 
@@ -166,7 +242,7 @@ export default function HomeFeed({ variant = 'feed' }: { variant?: HomeFeedVaria
   return (
     <div className="home-feed">
       <div className="home-masonry home-masonry--feed">
-        {items.map((item) => (
+        {filteredItems.map((item) => (
           <FeedMasonryCard
             key={item.id_base}
             item={item}
@@ -189,6 +265,18 @@ export default function HomeFeed({ variant = 'feed' }: { variant?: HomeFeedVaria
 
       {error && <p className="error feed-status">{error}</p>}
       {loading && <p className="muted feed-status">Đang tải…</p>}
+      {!loading && !filteredItems.length && !error && items.length > 0 && (
+        <HomeFeedEmpty
+          title="Không có tác phẩm loại này"
+          description={
+            mediaFilter === 'favorite'
+              ? 'Nhấn tim trên ảnh hoặc video để lưu yêu thích.'
+              : mediaFilter === 'music' || mediaFilter === 'tts'
+                ? 'Cuộn thêm hoặc thử bộ lọc Tất cả.'
+                : 'Thử bộ lọc Tất cả hoặc loại khác.'
+          }
+        />
+      )}
       {!loading && !items.length && !error && (
         <HomeFeedEmpty
           title={

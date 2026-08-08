@@ -79,6 +79,8 @@ function typeShortLabel(type: JobType): string {
   }
 }
 
+const HERO_COLLAPSED_PLACEHOLDER = 'Nhập mô tả để tạo ảnh hoặc video…';
+
 function promptPlaceholder(type: JobType): string {
   switch (type) {
     case 'video':
@@ -149,9 +151,15 @@ function MiniDropdown({ icon, options, value, onChange }: MiniDropdownProps) {
   );
 }
 
-export default function HomeQuickCreateBar() {
+interface HomeQuickCreateBarProps {
+  /** `hero` embeds in Home hero; `dock` is the fixed bottom bar (legacy). */
+  variant?: 'hero' | 'dock';
+}
+
+export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreateBarProps) {
   const navigate = useNavigate();
-  const [type, setType] = useState<JobType>('video');
+  const isHero = variant === 'hero';
+  const [type, setType] = useState<JobType>(isHero ? 'image' : 'video');
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
   const [typeCounts, setTypeCounts] = useState<Partial<Record<JobType, number>>>({});
   const [expanded, setExpanded] = useState(false);
@@ -173,6 +181,8 @@ export default function HomeQuickCreateBar() {
 
   const typeRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const promptRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const currentModel = useMemo(
@@ -247,11 +257,38 @@ export default function HomeQuickCreateBar() {
     return () => document.removeEventListener('mousedown', onDoc);
   }, []);
 
-  // Báo cho Quick Chat FAB lùi lên khi dock hiển thị.
   useEffect(() => {
+    if (!isHero || !expanded) return;
+
+    const canCollapse = () => !prompt.trim() && refs.length === 0 && !result;
+
+    const onDoc = (e: MouseEvent) => {
+      if (barRef.current?.contains(e.target as Node)) return;
+      if (typeMenuOpen || modelMenuOpen) return;
+      if (canCollapse()) setExpanded(false);
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setTypeMenuOpen(false);
+      setModelMenuOpen(false);
+      if (canCollapse()) setExpanded(false);
+    };
+
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [isHero, expanded, prompt, refs.length, result, typeMenuOpen, modelMenuOpen]);
+
+  // Báo cho Quick Chat FAB lùi lên khi dock cố định hiển thị.
+  useEffect(() => {
+    if (isHero) return;
     document.body.classList.add('qc-dock-active');
     return () => document.body.classList.remove('qc-dock-active');
-  }, []);
+  }, [isHero]);
 
   const update = <K extends keyof JobSelections>(key: K, value: JobSelections[K]) =>
     setSelections((s) => ({ ...s, [key]: value }));
@@ -326,6 +363,7 @@ export default function HomeQuickCreateBar() {
       setProgress('');
       setProviderBusy(false);
       notifyCreditsUpdated();
+      if (isHero) setExpanded(true);
     } catch (err) {
       if (isJobAcceptedPendingError(err)) {
         setError('');
@@ -337,6 +375,7 @@ export default function HomeQuickCreateBar() {
       } else {
         setError(err instanceof Error ? err.message : String(err));
         setProgress('');
+        if (isHero) setExpanded(true);
       }
     } finally {
       setSubmitting(false);
@@ -377,131 +416,192 @@ export default function HomeQuickCreateBar() {
     }
   };
 
+  const heroCollapsed = isHero && !expanded;
+  const promptPlaceholderText =
+    heroCollapsed ? HERO_COLLAPSED_PLACEHOLDER : promptPlaceholder(type);
+
+  const openHeroBar = () => {
+    setExpanded(true);
+    window.requestAnimationFrame(() => promptRef.current?.focus());
+  };
+
   return (
     <div
-      className={`qc-bar${expanded ? ' expanded' : ''}`}
+      ref={barRef}
+      className={`qc-bar${isHero ? ' qc-bar--hero' : ''}${expanded ? ' expanded' : ''}`}
       aria-label="Tạo nhanh ảnh, video, giọng nói"
+      onClick={heroCollapsed ? openHeroBar : undefined}
     >
-      {result && (
-        <div className="qc-result">
-          <button type="button" className="qc-result-close" onClick={() => setResult(null)}>
-            <X size={14} />
-          </button>
-          {result.type === 'video' ? (
-            <video src={result.url} controls className="qc-result-media" />
-          ) : result.type === 'image' ? (
-            <img src={result.url} alt="kết quả" className="qc-result-media" />
-          ) : (
-            <audio src={result.url} controls className="qc-result-audio" />
+      <div className="qc-hero-prompt-shell">
+        <div className="qc-prompt-row">
+          {!isHero && (
+            <button
+              type="button"
+              className="qc-expand-toggle"
+              onClick={() => setExpanded((v) => !v)}
+              title={expanded ? 'Thu gọn' : 'Mở rộng'}
+            >
+              {expanded ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+            </button>
           )}
-          <a href={result.url} target="_blank" rel="noreferrer" className="qc-result-link">
-            Mở kết quả
-          </a>
-        </div>
-      )}
-
-      {showStoryboard && (
-        <div className="qc-storyboard">
-          <div className="qc-sb-group">
-            <span className="qc-sb-title">
-              ĐA PHƯƠNG TIỆN ({refs.length}/{MAX_MEDIA})
+          {isHero && (
+            <span className="qc-prompt-icon" aria-hidden>
+              <Sparkles size={18} strokeWidth={1.75} />
             </span>
-            <div className="qc-sb-frames">
-              {refs.map((url, i) => (
-                <div key={i} className="qc-sb-frame qc-sb-media">
-                  {urlMediaKind(url) === 'video' ? (
-                    <video src={url} muted loop playsInline />
-                  ) : (
-                    <img src={url} alt={`media ${i + 1}`} />
-                  )}
-                  <button
-                    type="button"
-                    className="qc-sb-remove"
-                    onClick={() => setRefs((prev) => prev.filter((_, idx) => idx !== i))}
-                  >
-                    <X size={11} />
-                  </button>
-                </div>
-              ))}
-              {refs.length < MAX_MEDIA && (
-                <ComposerMediaPickButton
-                  kind={mediaPickKind}
-                  className="qc-sb-frame qc-sb-add"
-                  title="Thêm media"
-                  onFile={ingestMediaFile}
-                  onUrl={ingestMediaUrl}
-                >
-                  <Plus size={16} />
-                  <span>ADD</span>
-                </ComposerMediaPickButton>
-              )}
-            </div>
-          </div>
+          )}
+          <textarea
+            ref={promptRef}
+            className="qc-prompt"
+            rows={isHero ? (expanded ? 2 : 1) : expanded ? 2 : 1}
+            placeholder={promptPlaceholderText}
+            value={prompt}
+            readOnly={heroCollapsed}
+            onChange={(e) => setPrompt(e.target.value)}
+            onFocus={() => {
+              if (heroCollapsed) openHeroBar();
+              else setExpanded(true);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && expanded) {
+                e.preventDefault();
+                void submit();
+              }
+            }}
+          />
         </div>
-      )}
-
-      <div className="qc-prompt-row">
-        <button
-          type="button"
-          className="qc-expand-toggle"
-          onClick={() => setExpanded((v) => !v)}
-          title={expanded ? 'Thu gọn' : 'Mở rộng'}
-        >
-          {expanded ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-        </button>
-        <textarea
-          className="qc-prompt"
-          rows={expanded ? 2 : 1}
-          placeholder={promptPlaceholder(type)}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onFocus={() => setExpanded(true)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              void submit();
-            }
-          }}
-        />
       </div>
 
-      {error && <div className="qc-error">{error}</div>}
-      {info && !error && <div className="qc-info">{info}</div>}
+      <div
+        className={`qc-hero-expand${expanded ? ' qc-hero-expand--open' : ''}`}
+        aria-hidden={isHero && !expanded}
+      >
+        {result && (
+          <div className="qc-result">
+            <button type="button" className="qc-result-close" onClick={() => setResult(null)}>
+              <X size={14} />
+            </button>
+            {result.type === 'video' ? (
+              <video src={result.url} controls className="qc-result-media" />
+            ) : result.type === 'image' ? (
+              <img src={result.url} alt="kết quả" className="qc-result-media" />
+            ) : (
+              <audio src={result.url} controls className="qc-result-audio" />
+            )}
+            <a href={result.url} target="_blank" rel="noreferrer" className="qc-result-link">
+              Mở kết quả
+            </a>
+          </div>
+        )}
 
-      <div className="qc-toolbar">
-        <div className="qc-type" ref={typeRef}>
-          <button
-            type="button"
-            className="qc-type-trigger"
-            onClick={() => setTypeMenuOpen((v) => !v)}
-          >
-            <span className="qc-dot" /> {typeShortLabel(type)}
-            <ChevronUp size={12} />
-          </button>
-          {typeMenuOpen && (
-            <div className="qc-type-menu" role="menu">
-              {QUICK_MENU.map((item) => {
-                const Icon = item.icon;
-                const count = menuCount(item);
-                const active = item.jobType === type;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="menuitem"
-                    className={`qc-type-item${active ? ' active' : ''}`}
-                    onClick={() => onMenuSelect(item)}
+        {showStoryboard && (
+          <div className="qc-storyboard">
+            <div className="qc-sb-group">
+              <span className="qc-sb-title">
+                ĐA PHƯƠNG TIỆN ({refs.length}/{MAX_MEDIA})
+              </span>
+              <div className="qc-sb-frames">
+                {refs.map((url, i) => (
+                  <div key={i} className="qc-sb-frame qc-sb-media">
+                    {urlMediaKind(url) === 'video' ? (
+                      <video src={url} muted loop playsInline />
+                    ) : (
+                      <img src={url} alt={`media ${i + 1}`} />
+                    )}
+                    <button
+                      type="button"
+                      className="qc-sb-remove"
+                      onClick={() => setRefs((prev) => prev.filter((_, idx) => idx !== i))}
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
+                ))}
+                {refs.length < MAX_MEDIA && (
+                  <ComposerMediaPickButton
+                    kind={mediaPickKind}
+                    className="qc-sb-frame qc-sb-add"
+                    title="Thêm media"
+                    onFile={ingestMediaFile}
+                    onUrl={ingestMediaUrl}
                   >
-                    <span className="qc-type-accent" aria-hidden />
-                    <Icon size={16} className="qc-type-icon" />
-                    <span className="qc-type-label">{item.label}</span>
-                    {count != null && <span className="qc-type-count">{count}</span>}
-                  </button>
-                );
-              })}
+                    <Plus size={16} />
+                    <span>ADD</span>
+                  </ComposerMediaPickButton>
+                )}
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {error && <div className="qc-error">{error}</div>}
+        {info && !error && <div className="qc-info">{info}</div>}
+
+        <div className="qc-toolbar">
+        {isHero ? (
+          <div className="qc-hero-tabs" role="tablist" aria-label="Loại nội dung">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={type === 'image'}
+              className={`qc-hero-tab${type === 'image' ? ' active' : ''}`}
+              onClick={() => {
+                setType('image');
+                setResult(null);
+              }}
+            >
+              <ImageIcon size={14} strokeWidth={1.75} aria-hidden />
+              <span>Ảnh</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={type === 'video'}
+              className={`qc-hero-tab${type === 'video' ? ' active' : ''}`}
+              onClick={() => {
+                setType('video');
+                setResult(null);
+              }}
+            >
+              <Clapperboard size={14} strokeWidth={1.75} aria-hidden />
+              <span>Video</span>
+            </button>
+          </div>
+        ) : (
+          <div className="qc-type" ref={typeRef}>
+            <button
+              type="button"
+              className="qc-type-trigger"
+              onClick={() => setTypeMenuOpen((v) => !v)}
+            >
+              <span className="qc-dot" /> {typeShortLabel(type)}
+              <ChevronUp size={12} />
+            </button>
+            {typeMenuOpen && (
+              <div className="qc-type-menu" role="menu">
+                {QUICK_MENU.map((item) => {
+                  const Icon = item.icon;
+                  const count = menuCount(item);
+                  const active = item.jobType === type;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="menuitem"
+                      className={`qc-type-item${active ? ' active' : ''}`}
+                      onClick={() => onMenuSelect(item)}
+                    >
+                      <span className="qc-type-accent" aria-hidden />
+                      <Icon size={16} className="qc-type-icon" />
+                      <span className="qc-type-label">{item.label}</span>
+                      {count != null && <span className="qc-type-count">{count}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="qc-model" ref={modelRef}>
           <button
@@ -587,16 +687,41 @@ export default function HomeQuickCreateBar() {
         <div className="qc-toolbar-right">
           {cost > 0 && <span className="qc-cost">{cost.toLocaleString('vi-VN')}</span>}
           {progress && <span className="qc-progress">{progress}</span>}
-          <button
-            type="button"
-            className="qc-send"
-            onClick={() => void submit()}
-            disabled={submitting || providerBusy || loadingModels}
-            title="Tạo"
-          >
-            {submitting || providerBusy ? <Loader2 size={16} className="qc-spin" /> : <SendHorizontal size={16} />}
-          </button>
+          {isHero ? (
+            <button
+              type="button"
+              className="qc-generate-btn"
+              onClick={() => void submit()}
+              disabled={
+                submitting ||
+                providerBusy ||
+                loadingModels ||
+                (!prompt.trim() && refs.length === 0)
+              }
+            >
+              {submitting || providerBusy ? (
+                <Loader2 size={16} className="qc-spin" />
+              ) : (
+                'Tạo'
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="qc-send"
+              onClick={() => void submit()}
+              disabled={submitting || providerBusy || loadingModels}
+              title="Tạo"
+            >
+              {submitting || providerBusy ? (
+                <Loader2 size={16} className="qc-spin" />
+              ) : (
+                <SendHorizontal size={16} />
+              )}
+            </button>
+          )}
         </div>
+      </div>
       </div>
     </div>
   );

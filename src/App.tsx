@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link, NavLink, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
-import { ChevronDown, Coins, Globe, Menu, X, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { Coins, Globe, Menu, X, Zap } from 'lucide-react';
 import {
   ensureValidPlatformSession,
   handlePlatformAuthFailure,
@@ -12,6 +12,7 @@ import { useCreditsUpdated } from './hooks/useCreditsUpdated';
 import { useDisplayCredits } from './hooks/useDisplayCredits';
 import type { JobType } from './services/api';
 import BrandLogo from './components/BrandLogo';
+import AppSidebar from './components/AppSidebar';
 import SessionExpiredHost from './components/SessionExpiredHost';
 import AdminRoute from './components/AdminRoute';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -19,6 +20,7 @@ import QuickChatWidget from './components/QuickChatWidget';
 import UserMenuDropdown from './components/user/UserMenuDropdown';
 import LandingPage from './pages/LandingPage';
 import HomePage from './pages/HomePage';
+import HomeLibraryPage from './pages/HomeLibraryPage';
 import ExplorePage from './pages/ExplorePage';
 import ProjectsPage from './pages/ProjectsPage';
 import WorkflowPage from './pages/WorkflowPage';
@@ -42,24 +44,6 @@ import AccountSubscriptionPage from './pages/account/AccountSubscriptionPage';
 import AccountTransferPage from './pages/account/AccountTransferPage';
 import AccountTransactionsPage from './pages/account/AccountTransactionsPage';
 import { useLocale } from './i18n';
-import type { TranslationKey } from './i18n';
-
-const PRIMARY_NAV: { to: string; labelKey: TranslationKey }[] = [
-  { to: '/home', labelKey: 'nav.home' },
-  { to: '/chat', labelKey: 'nav.chat' },
-  { to: '/explore', labelKey: 'nav.explore' },
-  { to: '/image', labelKey: 'nav.image' },
-  { to: '/video', labelKey: 'nav.video' },
-  { to: '/workflow', labelKey: 'nav.workflow' },
-];
-
-const MORE_NAV: { to: string; labelKey: TranslationKey }[] = [
-  { to: '/projects', labelKey: 'nav.projects' },
-  { to: '/music', labelKey: 'nav.music' },
-  { to: '/audio', labelKey: 'nav.audio' },
-];
-
-const ALL_NAV = [...PRIMARY_NAV, ...MORE_NAV];
 
 const STUDIO_NAV: Record<string, JobType> = {
   '/image': 'image',
@@ -72,7 +56,13 @@ function StudioHistoryRedirect() {
   return <Navigate to={type ? `/studio-history/${type}` : '/studio-history'} replace />;
 }
 
-function AppHeader() {
+interface AppHeaderProps {
+  slim?: boolean;
+  mobileNavOpen: boolean;
+  onMobileNavToggle: () => void;
+}
+
+function AppHeader({ slim = false, mobileNavOpen, onMobileNavToggle }: AppHeaderProps) {
   const { t, locale, toggleLocale } = useLocale();
   const {
     credits: displayCredits,
@@ -80,30 +70,9 @@ function AppHeader() {
     isAdminVmedia,
     refresh,
   } = useDisplayCredits();
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [moreNavOpen, setMoreNavOpen] = useState(false);
-  const moreNavRef = useRef<HTMLDivElement>(null);
   const loggedIn = isLoggedIn();
   const isAdmin = isAdminUser();
-  const location = useLocation();
   const showDualWallets = isAdmin && isAdminVmedia;
-  const moreNavActive = MORE_NAV.some((item) => location.pathname === item.to);
-
-  useEffect(() => {
-    setMobileNavOpen(false);
-    setMoreNavOpen(false);
-  }, [location.pathname]);
-
-  useEffect(() => {
-    if (!moreNavOpen) return;
-    const onDoc = (e: MouseEvent) => {
-      if (moreNavRef.current && !moreNavRef.current.contains(e.target as Node)) {
-        setMoreNavOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [moreNavOpen]);
 
   function refreshCredits() {
     void refresh().catch((err) => {
@@ -124,130 +93,72 @@ function AppHeader() {
   });
 
   return (
-    <header className="app-header">
+    <header className={`app-header${slim ? ' app-header--slim' : ''}`}>
       <div className="app-header-inner">
         <div className="app-header-pill">
-          {loggedIn && (
+          {loggedIn && slim && (
             <button
               type="button"
-              className="nav-toggle"
+              className="nav-toggle app-header-menu-btn"
               aria-label={t('header.openMenu')}
               aria-expanded={mobileNavOpen}
-              onClick={() => setMobileNavOpen((v) => !v)}
+              onClick={onMobileNavToggle}
             >
               {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           )}
-          <BrandLogo to={loggedIn ? '/home' : '/'} />
+          {!slim && <BrandLogo to={loggedIn ? '/home' : '/'} />}
           {loggedIn ? (
-            <>
-              <nav className="nav-main nav-main--pill" aria-label={t('header.openMenu')}>
-                {PRIMARY_NAV.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={({ isActive }) => `nav-main-link ${isActive ? 'active' : ''}`}
-                  >
-                    {t(item.labelKey)}
-                  </NavLink>
-                ))}
-                <div className="nav-more" ref={moreNavRef}>
+            <div className="header-meta">
+              {!slim && (
+                <>
                   <button
                     type="button"
-                    className={`nav-main-link nav-more-trigger${moreNavActive ? ' active' : ''}`}
-                    aria-expanded={moreNavOpen}
-                    onClick={() => setMoreNavOpen((v) => !v)}
+                    className="lang-pill"
+                    aria-label={t('header.switchLang')}
+                    onClick={toggleLocale}
                   >
-                    Thêm
-                    <ChevronDown size={14} className={moreNavOpen ? 'nav-more-chevron open' : 'nav-more-chevron'} />
+                    <Globe size={14} /> {locale === 'vi' ? 'VI' : 'EN'}
                   </button>
-                  {moreNavOpen && (
-                    <div className="nav-more-menu" role="menu">
-                      {MORE_NAV.map((item) => (
-                        <NavLink
-                          key={item.to}
-                          to={item.to}
-                          role="menuitem"
-                          className={({ isActive }) =>
-                            `nav-more-item${isActive ? ' active' : ''}`
-                          }
-                          onClick={() => setMoreNavOpen(false)}
-                        >
-                          {t(item.labelKey)}
-                        </NavLink>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </nav>
-              <div className="header-meta">
-                <button
-                  type="button"
-                  className="lang-pill"
-                  aria-label={t('header.switchLang')}
-                  onClick={toggleLocale}
-                >
-                  <Globe size={14} /> {locale === 'vi' ? 'VI' : 'EN'}
-                </button>
-                <Link to="/pricing" className="price-pill">
-                  <Coins size={15} /> {t('header.pricing')}
-                </Link>
-                {showDualWallets ? (
-                  <div className="header-balance header-balance--dual">
-                    <div className="header-balance-row">
-                      <span className="header-balance-label">Nội bộ</span>
-                      <span className="header-credit-pill header-credit-pill--platform">
-                        {platformCredits.toLocaleString('vi-VN')}
-                      </span>
-                    </div>
-                    <div className="header-balance-row">
-                      <span className="header-balance-label">Pro.agi.vn</span>
-                      <span className="header-credit-pill">
-                        {displayCredits.toLocaleString('vi-VN')}
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <Link to="/wallet" className="header-credits-badge">
-                    <Zap size={12} />
-                    {displayCredits.toLocaleString('vi-VN')}
+                  <Link to="/pricing" className="price-pill">
+                    <Coins size={15} /> {t('header.pricing')}
                   </Link>
-                )}
-                <UserMenuDropdown
-                  credits={displayCredits}
-                  platformCredits={platformCredits}
-                  isAdmin={showDualWallets}
-                  onCreditsRefresh={refreshCredits}
-                />
-              </div>
-            </>
+                </>
+              )}
+              {showDualWallets ? (
+                <div className="header-balance header-balance--dual">
+                  <div className="header-balance-row">
+                    <span className="header-balance-label">Nội bộ</span>
+                    <span className="header-credit-pill header-credit-pill--platform">
+                      {platformCredits.toLocaleString('vi-VN')}
+                    </span>
+                  </div>
+                  <div className="header-balance-row">
+                    <span className="header-balance-label">Pro.agi.vn</span>
+                    <span className="header-credit-pill">
+                      {displayCredits.toLocaleString('vi-VN')}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <Link to="/wallet" className="header-credits-badge">
+                  <Zap size={12} />
+                  {displayCredits.toLocaleString('vi-VN')}
+                </Link>
+              )}
+              <UserMenuDropdown
+                credits={displayCredits}
+                platformCredits={platformCredits}
+                isAdmin={showDualWallets}
+                onCreditsRefresh={refreshCredits}
+              />
+            </div>
           ) : (
             <nav className="nav nav--guest">
               <Link to="/login">{t('header.login')}</Link>
             </nav>
           )}
         </div>
-        {loggedIn && (
-          <nav className={`nav-main nav-main--drawer ${mobileNavOpen ? 'open' : ''}`} aria-label="Menu di động">
-            {ALL_NAV.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) => `nav-main-link ${isActive ? 'active' : ''}`}
-                onClick={() => setMobileNavOpen(false)}
-              >
-                {t(item.labelKey)}
-              </NavLink>
-            ))}
-          </nav>
-        )}
-        {loggedIn && mobileNavOpen && (
-          <div
-            className="nav-backdrop"
-            onClick={() => setMobileNavOpen(false)}
-            aria-hidden="true"
-          />
-        )}
       </div>
     </header>
   );
@@ -256,80 +167,105 @@ function AppHeader() {
 function AppShell() {
   const location = useLocation();
   const loggedIn = isLoggedIn();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     if (!loggedIn) return;
     void ensureValidPlatformSession();
   }, [loggedIn]);
 
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
   const BARE_PAGES = ['/', '/login', '/register'];
   const isBarePage = BARE_PAGES.includes(location.pathname);
   const isWorkflow = location.pathname === '/workflow';
   const isChat = location.pathname === '/chat';
+  const isHomeRoute =
+    location.pathname === '/home' || location.pathname.startsWith('/home/');
   const isFullBleed =
     location.pathname in STUDIO_NAV ||
     location.pathname === '/audio' ||
     isWorkflow ||
     isChat;
   const hideHeader = isBarePage || isWorkflow || isChat;
-  // Chat sidebar theo ngữ cảnh route (Image/Video/Audio/Music/Home…).
-  // /workflow dùng Moon Agent riêng (canvas); /chat có trang riêng — không chồng Quick Chat.
-  const showQuickChat = isLoggedIn() && !isBarePage && !isWorkflow && !isChat;
+  const showAppSidebar = loggedIn && !isBarePage && !isWorkflow && !isChat;
+  const showQuickChat = loggedIn && !isBarePage && !isWorkflow && !isChat;
 
   return (
-    <div className={isBarePage ? '' : 'app'}>
-      {!hideHeader && <AppHeader />}
-      <main
-        className={isBarePage ? '' : `app-main ${isFullBleed ? 'app-main-full' : ''} ${isWorkflow ? 'app-main-workflow' : ''} ${isChat ? 'app-main-chat' : ''}`}
-      >
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={isLoggedIn() ? <Navigate to="/home" /> : <LoginPage />} />
-          <Route path="/register" element={isLoggedIn() ? <Navigate to="/home" /> : <RegisterPage />} />
-          <Route element={<ProtectedRoute />}>
-            <Route path="/home" element={<HomePage />} />
-            <Route path="/chat" element={<ChatPage />} />
-            <Route path="/explore" element={<ExplorePage />} />
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/workflow" element={<WorkflowPage />} />
-            <Route path="/audio" element={<AudioPage />} />
-            {Object.entries(STUDIO_NAV).map(([path, type]) => (
-              <Route
-                key={path}
-                path={path}
-                element={
-                  <StudioPage key={path} initialType={type} lockType layout="composer" />
-                }
-              />
-            ))}
-            <Route path="/app" element={<Navigate to="/image" replace />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/playground" element={<ApiPlaygroundPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/settings/tokens" element={<Navigate to="/settings" replace />} />
-            <Route path="/usage-history" element={<UsageHistoryPage />} />
-            <Route path="/usage-history/:type" element={<UsageHistoryPage />} />
-            <Route path="/studio-history" element={<StudioHistoryPage />} />
-            <Route path="/studio-history/:type" element={<StudioHistoryPage />} />
-            <Route path="/history" element={<Navigate to="/studio-history" replace />} />
-            <Route path="/history/:type" element={<StudioHistoryRedirect />} />
-            <Route path="/account" element={<AccountLayout />}>
-              <Route index element={<AccountSettingsPage />} />
-              <Route path="promo" element={<AccountPromoPage />} />
-              <Route path="subscription" element={<AccountSubscriptionPage />} />
-              <Route element={<AdminRoute />}>
-                <Route path="transfer" element={<AccountTransferPage />} />
+    <div className={`app${showAppSidebar ? ' app--shell' : ''}`}>
+      {showAppSidebar && (
+        <AppSidebar
+          mobileOpen={mobileNavOpen}
+          onMobileClose={() => setMobileNavOpen(false)}
+        />
+      )}
+      <div className="app-body">
+        {!hideHeader && (
+          <AppHeader
+            slim={showAppSidebar}
+            mobileNavOpen={mobileNavOpen}
+            onMobileNavToggle={() => setMobileNavOpen((v) => !v)}
+          />
+        )}
+        <main
+          className={
+            isBarePage
+              ? ''
+              : `app-main${isFullBleed ? ' app-main-full' : ''}${isHomeRoute ? ' app-main-home' : ''}${isWorkflow ? ' app-main-workflow' : ''}${isChat ? ' app-main-chat' : ''}`
+          }
+        >
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={isLoggedIn() ? <Navigate to="/home" /> : <LoginPage />} />
+            <Route path="/register" element={isLoggedIn() ? <Navigate to="/home" /> : <RegisterPage />} />
+            <Route element={<ProtectedRoute />}>
+              <Route path="/home" element={<HomePage />} />
+              <Route path="/home/library" element={<HomeLibraryPage />} />
+              <Route path="/chat" element={<ChatPage />} />
+              <Route path="/explore" element={<ExplorePage />} />
+              <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/workflow" element={<WorkflowPage />} />
+              <Route path="/audio" element={<AudioPage />} />
+              {Object.entries(STUDIO_NAV).map(([path, type]) => (
+                <Route
+                  key={path}
+                  path={path}
+                  element={
+                    <StudioPage key={path} initialType={type} lockType layout="composer" />
+                  }
+                />
+              ))}
+              <Route path="/app" element={<Navigate to="/image" replace />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/playground" element={<ApiPlaygroundPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings/tokens" element={<Navigate to="/settings" replace />} />
+              <Route path="/usage-history" element={<UsageHistoryPage />} />
+              <Route path="/usage-history/:type" element={<UsageHistoryPage />} />
+              <Route path="/studio-history" element={<StudioHistoryPage />} />
+              <Route path="/studio-history/:type" element={<StudioHistoryPage />} />
+              <Route path="/history" element={<Navigate to="/studio-history" replace />} />
+              <Route path="/history/:type" element={<StudioHistoryRedirect />} />
+              <Route path="/account" element={<AccountLayout />}>
+                <Route index element={<AccountSettingsPage />} />
+                <Route path="promo" element={<AccountPromoPage />} />
+                <Route path="subscription" element={<AccountSubscriptionPage />} />
+                <Route element={<AdminRoute />}>
+                  <Route path="transfer" element={<AccountTransferPage />} />
+                </Route>
+                <Route path="topup" element={<Navigate to="/pricing" replace />} />
+                <Route path="transactions" element={<AccountTransactionsPage />} />
               </Route>
-              <Route path="topup" element={<Navigate to="/pricing" replace />} />
-              <Route path="transactions" element={<AccountTransactionsPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/wallet" element={<WalletPage />} />
+              <Route path="/pricing" element={<PricingPage />} />
             </Route>
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/wallet" element={<WalletPage />} />
-            <Route path="/pricing" element={<PricingPage />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </main>
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </main>
+      </div>
       {showQuickChat && <QuickChatWidget />}
     </div>
   );
