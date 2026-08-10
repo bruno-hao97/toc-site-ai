@@ -44,6 +44,21 @@ function stripRuntime(nodes: Node[]): Node[] {
   });
 }
 
+export function graphFingerprint(nodes: Node[], edges: Edge[]): string {
+  const edgeLite = edges.map((e) => ({
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    sourceHandle: e.sourceHandle ?? null,
+    targetHandle: e.targetHandle ?? null,
+  }));
+  return JSON.stringify({ nodes: stripRuntime(nodes), edges: edgeLite });
+}
+
+export function buildSavedFingerprints(tabs: WorkflowTab[]): Record<string, string> {
+  return Object.fromEntries(tabs.map((t) => [t.id, graphFingerprint(t.nodes, t.edges)]));
+}
+
 export function makeTab(
   name: string,
   graph: { nodes: Node[]; edges: Edge[] },

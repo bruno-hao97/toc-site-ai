@@ -29,6 +29,8 @@ import ChatMarketplaceStrip from '../components/chat/ChatMarketplaceStrip';
 import ChatCompose from '../components/chat/ChatCompose';
 import ChatMessageList from '../components/chat/ChatMessageList';
 import { MOONIX_TEMPLATE_PROMPT_KEY } from '../services/moonixContentApi';
+import { buildReplyPromptText, buildReplyRef, messagePromptText } from '../services/chatReply';
+import type { ChatMessageReplyRef } from '../services/chatSessionsLocal';
 
 const chatCtx = resolveQuickChatContext('/chat');
 
@@ -61,7 +63,7 @@ function turnFromMessage(m: ChatMessage): ChatTurn {
       : [];
   return {
     role: m.role === 'assistant' ? 'model' : 'user',
-    text: m.content,
+    text: messagePromptText(m),
     attachments,
   };
 }
@@ -75,6 +77,7 @@ export default function ChatPage() {
   const [sessionId, setSessionId] = useState(() => newSessionId());
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [attachment, setAttachment] = useState<PendingAttachment | null>(null);
   const [thinking, setThinking] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -142,6 +145,10 @@ export default function ChatPage() {
     });
   }, []);
 
+  const clearReply = useCallback(() => {
+    setReplyTo(null);
+  }, []);
+
   const newChat = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -150,10 +157,11 @@ export default function ChatPage() {
     setView('landing');
     setMessages([]);
     setInput('');
+    clearReply();
     clearAttachment();
     setSessionId(newSessionId());
     setSidebarOpen(false);
-  }, [clearAttachment]);
+  }, [clearAttachment, clearReply]);
 
   const selectSession = useCallback(
     (sid: string) => {
@@ -166,10 +174,11 @@ export default function ChatPage() {
       setSessionId(data.sessionId);
       setMessages(data.messages);
       setInput('');
+      clearReply();
       clearAttachment();
       setView(data.messages.length > 0 ? 'thread' : 'landing');
     },
-    [clearAttachment],
+    [clearAttachment, clearReply],
   );
 
   const onDeleteSession = useCallback(
@@ -184,11 +193,12 @@ export default function ChatPage() {
         setView('landing');
         setMessages([]);
         setInput('');
+        clearReply();
         clearAttachment();
         setSessionId(newSessionId());
       }
     },
-    [sessionId, clearAttachment],
+    [sessionId, clearAttachment, clearReply],
   );
 
   const onPickFile = (file: File | null) => {
@@ -207,9 +217,121 @@ export default function ChatPage() {
     });
   };
 
-  const patchAssistant = (id: string, content: string) => {
-    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, content } : m)));
+  const patchAssistant = (id: string, patch: Partial<ChatMessage>) => {
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
   };
+
+  const onReply = useCallback((message: ChatMessage) => {
+    setReplyTo(message);
+  }, []);
+
+  const runAssistantTurn = useCallback(
+    async (params: {
+      gen: number;
+      priorMessages: ChatMessage[];
+      userMsg: ChatMessage;
+      assistantId: string;
+      history: ChatTurn[];
+      firstTurn: boolean;
+      promptText: string;
+      turnAttachments: ChatAttachment[];
+      startedAt: number;
+    }) => {
+      const {
+        gen,
+        priorMessages,
+        userMsg,
+        assistantId,
+        history,
+        firstTurn,
+        promptText,
+        turnAttachments,
+        startedAt,
+      } = params;
+      const chatModel = resolveChatAiModel(modelId);
+      const ac = new AbortController();
+      abortRef.current = ac;
+      let acc = '';
+
+      try {
+        await askGommo(promptText || 'Mô tả ảnh này giúp tôi.', {
+          history,
+          firstTurn,
+          sessionId,
+          attachments: turnAttachments,
+          signal: ac.signal,
+          config: {
+            model: chatModel.model,
+            server: chatModel.server,
+            systemPrompt: chatCtx.systemPrompt,
+          },
+          onDelta: (chunk) => {
+            acc += chunk;
+            patchAssistant(assistantId, { content: resolveChatAssistantContent(acc) });
+          },
+        });
+
+        const assistantContent = resolveChatAssistantContent(acc);
+        if (sendGenRef.current !== gen || !mountedRef.current) return;
+        const elapsedSec = Math.max(1, Math.ceil((Date.now() - startedAt) / 1000));
+        const finalMessages: ChatMessage[] = [
+          ...priorMessages,
+          userMsg,
+          {
+            id: assistantId,
+            role: 'assistant',
+            content: assistantContent,
+            meta: { elapsedSec },
+          },
+        ];
+        setMessages(finalMessages);
+        persistSession(sessionId, finalMessages);
+      } catch (err) {
+        if (sendGenRef.current !== gen || !mountedRef.current) return;
+        const elapsedSec = Math.max(1, Math.ceil((Date.now() - startedAt) / 1000));
+        if (isAbortError(err)) {
+          const stoppedMsg = userStoppedRef.current
+            ? '(Đã dừng.)'
+            : '⚠️ Kết nối bị gián đoạn. Vui lòng gửi lại tin nhắn.';
+          const partial = acc.trim();
+          setMessages((prev) => {
+            const streamed = prev.find((m) => m.id === assistantId)?.content.trim() || partial;
+            const finalMessages = prev.map((m) => {
+              if (m.id === userMsg.id) return userMsg;
+              if (m.id === assistantId) {
+                return {
+                  ...m,
+                  content: streamed || stoppedMsg,
+                  meta: { elapsedSec },
+                };
+              }
+              return m;
+            });
+            if (streamed) persistSession(sessionId, finalMessages);
+            return finalMessages;
+          });
+        } else {
+          const msg = err instanceof Error ? err.message : String(err);
+          const errContent = `⚠️ Lỗi: ${msg}`;
+          const finalMessages: ChatMessage[] = [
+            ...priorMessages,
+            userMsg,
+            { id: assistantId, role: 'assistant', content: errContent, meta: { elapsedSec } },
+          ];
+          setMessages(finalMessages);
+          persistSession(sessionId, finalMessages);
+        }
+      } finally {
+        if (sendGenRef.current !== gen) return;
+        if (abortRef.current === ac) abortRef.current = null;
+        if (mountedRef.current) {
+          setUploading(false);
+          setThinking(false);
+        }
+      }
+    },
+    [modelId, persistSession, sessionId],
+  );
 
   const onSelectModel = (id: string) => {
     setModelId(id);
@@ -239,10 +361,54 @@ export default function ChatPage() {
     abortRef.current?.abort();
   }, []);
 
+  const regenerateAssistant = useCallback(
+    async (assistantMsg: ChatMessage) => {
+      if (thinking || uploading) return;
+      const idx = messages.findIndex((m) => m.id === assistantMsg.id);
+      if (idx < 1) return;
+      const userMsg = messages[idx - 1];
+      if (userMsg?.role !== 'user') return;
+
+      if (!isGommoChatConfigured()) {
+        window.alert('Bạn cần đăng nhập để dùng Chat AI.');
+        return;
+      }
+
+      abortRef.current?.abort();
+      userStoppedRef.current = false;
+      const gen = ++sendGenRef.current;
+      const priorMessages = messages.slice(0, idx - 1);
+      const assistantId = newId();
+      const history: ChatTurn[] = priorMessages.map(turnFromMessage);
+      const turnAttachments: ChatAttachment[] =
+        userMsg.imageUrl && /^https?:\/\//i.test(userMsg.imageUrl)
+          ? [{ type: 'image', url: userMsg.imageUrl }]
+          : [];
+
+      setMessages([...priorMessages, userMsg, { id: assistantId, role: 'assistant', content: '' }]);
+      setView('thread');
+      setThinking(true);
+
+      await runAssistantTurn({
+        gen,
+        priorMessages,
+        userMsg,
+        assistantId,
+        history,
+        firstTurn: priorMessages.length === 0,
+        promptText: userMsg.content,
+        turnAttachments,
+        startedAt: Date.now(),
+      });
+    },
+    [messages, runAssistantTurn, thinking, uploading],
+  );
+
   const send = async (overrideText?: string) => {
-    const text = (overrideText ?? input).trim();
+    const displayText = (overrideText ?? input).trim();
     const pending = attachment;
-    if ((!text && !pending) || thinking || uploading) return;
+    const activeReply = replyTo;
+    if ((!displayText && !pending) || thinking || uploading) return;
 
     if (!isGommoChatConfigured()) {
       window.alert('Bạn cần đăng nhập để dùng Chat AI.');
@@ -253,24 +419,34 @@ export default function ChatPage() {
     userStoppedRef.current = false;
     const gen = ++sendGenRef.current;
 
+    let replyRef: ChatMessageReplyRef | undefined;
+    let promptText = displayText || 'Mô tả ảnh này giúp tôi.';
+
+    if (activeReply) {
+      replyRef = buildReplyRef(activeReply, selectedModel.name, modelId);
+      promptText = buildReplyPromptText(displayText, replyRef);
+    }
+
     setInput('');
+    setReplyTo(null);
 
     const assistantId = newId();
     const userMsgId = newId();
     const priorMessages = messages;
     const history: ChatTurn[] = priorMessages.map(turnFromMessage);
     const firstTurn = priorMessages.length === 0;
-    const chatModel = resolveChatAiModel(modelId);
 
     // Preview local trước; sau upload sẽ thay bằng CDN URL.
     const previewUrl = pending?.previewUrl;
+    let imageUrl = previewUrl;
     const nextMessages: ChatMessage[] = [
       ...priorMessages,
       {
         id: userMsgId,
         role: 'user',
-        content: text,
+        content: displayText,
         imageUrl: previewUrl,
+        replyTo: replyRef,
       },
       { id: assistantId, role: 'assistant', content: '' },
     ];
@@ -279,12 +455,8 @@ export default function ChatPage() {
     setView('thread');
     setThinking(true);
 
-    const ac = new AbortController();
-    abortRef.current = ac;
-
-    let imageUrl = previewUrl;
+    const startedAt = Date.now();
     let turnAttachments: ChatAttachment[] = [];
-    let acc = '';
 
     try {
       if (pending) {
@@ -309,67 +481,29 @@ export default function ChatPage() {
         }
       }
 
-      await askGommo(text || 'Mô tả ảnh này giúp tôi.', {
+      const userMsg: ChatMessage = {
+        id: userMsgId,
+        role: 'user',
+        content: displayText,
+        imageUrl,
+        replyTo: replyRef,
+      };
+
+      await runAssistantTurn({
+        gen,
+        priorMessages,
+        userMsg,
+        assistantId,
         history,
         firstTurn,
-        sessionId,
-        attachments: turnAttachments,
-        signal: ac.signal,
-        config: {
-          model: chatModel.model,
-          server: chatModel.server,
-          systemPrompt: chatCtx.systemPrompt,
-        },
-        onDelta: (chunk) => {
-          acc += chunk;
-          patchAssistant(assistantId, resolveChatAssistantContent(acc));
-        },
+        promptText,
+        turnAttachments,
+        startedAt,
       });
-
-      const assistantContent = resolveChatAssistantContent(acc);
+    } catch {
       if (sendGenRef.current !== gen || !mountedRef.current) return;
-      const finalMessages: ChatMessage[] = [
-        ...priorMessages,
-        { id: userMsgId, role: 'user', content: text, imageUrl },
-        { id: assistantId, role: 'assistant', content: assistantContent },
-      ];
-      setMessages(finalMessages);
-      persistSession(sessionId, finalMessages);
-    } catch (err) {
-      if (sendGenRef.current !== gen || !mountedRef.current) return;
-      if (isAbortError(err)) {
-        const stoppedMsg = userStoppedRef.current
-          ? '(Đã dừng.)'
-          : '⚠️ Kết nối bị gián đoạn. Vui lòng gửi lại tin nhắn.';
-        const partial = acc.trim();
-        setMessages((prev) => {
-          const streamed = prev.find((m) => m.id === assistantId)?.content.trim() || partial;
-          const finalMessages = prev.map((m) => {
-            if (m.id === userMsgId) return { ...m, imageUrl };
-            if (m.id === assistantId) return { ...m, content: streamed || stoppedMsg };
-            return m;
-          });
-          if (streamed) persistSession(sessionId, finalMessages);
-          return finalMessages;
-        });
-      } else {
-        const msg = err instanceof Error ? err.message : String(err);
-        const errContent = `⚠️ Lỗi: ${msg}`;
-        const finalMessages: ChatMessage[] = [
-          ...priorMessages,
-          { id: userMsgId, role: 'user', content: text, imageUrl },
-          { id: assistantId, role: 'assistant', content: errContent },
-        ];
-        setMessages(finalMessages);
-        persistSession(sessionId, finalMessages);
-      }
-    } finally {
-      if (sendGenRef.current !== gen) return;
-      if (abortRef.current === ac) abortRef.current = null;
-      if (mountedRef.current) {
-        setUploading(false);
-        setThinking(false);
-      }
+      setUploading(false);
+      setThinking(false);
     }
   };
 
@@ -405,11 +539,15 @@ export default function ChatPage() {
                 thinking={thinking}
                 uploading={uploading}
                 attachment={attachment ? { url: attachment.previewUrl, name: attachment.name } : null}
+                replyTo={replyTo}
+                agentName={selectedModel.name}
+                agentId={modelId}
                 onInputChange={setInput}
                 onSend={() => void send()}
                 onStop={stop}
                 onPickFile={onPickFile}
                 onClearAttachment={clearAttachment}
+                onClearReply={clearReply}
                 onPill={onPill}
                 fileRef={fileRef}
               />
@@ -419,7 +557,13 @@ export default function ChatPage() {
           </div>
         ) : (
           <div className="chat-thread">
-            <ChatMessageList messages={messages} thinking={thinking || uploading} listRef={listRef} />
+            <ChatMessageList
+              messages={messages}
+              thinking={thinking || uploading}
+              listRef={listRef}
+              onReply={onReply}
+              onRegenerate={(msg) => void regenerateAssistant(msg)}
+            />
             <div className="chat-thread-compose-wrap">
               <ChatCompose
                 compact
@@ -427,11 +571,15 @@ export default function ChatPage() {
                 thinking={thinking}
                 uploading={uploading}
                 attachment={attachment ? { url: attachment.previewUrl, name: attachment.name } : null}
+                replyTo={replyTo}
+                agentName={selectedModel.name}
+                agentId={modelId}
                 onInputChange={setInput}
                 onSend={() => void send()}
                 onStop={stop}
                 onPickFile={onPickFile}
                 onClearAttachment={clearAttachment}
+                onClearReply={clearReply}
                 onPill={onPill}
                 fileRef={fileRef}
               />

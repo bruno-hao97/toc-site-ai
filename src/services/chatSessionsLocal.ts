@@ -1,10 +1,25 @@
 import { authUserKey } from './authStore';
 
+export interface ChatMessageMeta {
+  elapsedSec?: number;
+  creditsUsed?: number;
+}
+
+export interface ChatMessageReplyRef {
+  messageId: string;
+  role: 'user' | 'assistant';
+  excerpt: string;
+  agentName?: string;
+  agentId?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   imageUrl?: string;
+  replyTo?: ChatMessageReplyRef;
+  meta?: ChatMessageMeta;
 }
 
 export interface ChatSessionSummary {

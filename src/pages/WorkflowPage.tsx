@@ -81,6 +81,8 @@ import { clearWorkflow, saveWorkflow } from '../services/workflowStore';
 import WorkflowLibrary from '../components/WorkflowLibrary';
 import WorkflowTopBar from '../components/WorkflowTopBar';
 import WorkflowAgentPanel from '../components/workflow/WorkflowAgentPanel';
+import WorkflowCanvasEmpty from '../components/workflow/WorkflowCanvasEmpty';
+import WorkflowNewModal from '../components/workflow/WorkflowNewModal';
 import WorkflowMediaInputModal from '../components/workflow/WorkflowMediaInputModal';
 import {
   loadTemplates,
@@ -89,11 +91,19 @@ import {
   type SavedTemplate,
 } from '../services/workflowLibraryStore';
 import {
+  buildSavedFingerprints,
+  graphFingerprint,
   loadTabsState,
   makeTab,
   saveTabsState,
   type WorkflowTab,
 } from '../services/workflowTabsStore';
+import {
+  blankGraph,
+  getStarterGraph,
+  isWorkflowCanvasEmpty,
+  type WorkflowStarterId,
+} from '../services/workflowStarters';
 import ProjectPicker from '../components/ProjectPicker';
 import ComposerLibraryPreviewModal, {
   type ComposerPreviewHandlers,
@@ -1821,24 +1831,6 @@ function Palette({
   );
 }
 
-function defaultGraph(): { nodes: WFNode[]; edges: Edge[] } {
-  return {
-    nodes: [
-      { id: 'start-1', type: 'start', position: { x: 20, y: 140 }, data: {} },
-      { id: 'text-1', type: 'text', position: { x: 250, y: 100 }, data: { prompt: '' } },
-      { id: 'image-1', type: 'image', position: { x: 540, y: 80 }, data: {} },
-      { id: 'output-1', type: 'output', position: { x: 850, y: 100 }, data: {} },
-      { id: 'end-1', type: 'end', position: { x: 1140, y: 150 }, data: {} },
-    ],
-    edges: [
-      { id: 'e0', source: 'start-1', target: 'text-1', type: 'wf' },
-      { id: 'e1', source: 'text-1', target: 'image-1', type: 'wf' },
-      { id: 'e2', source: 'image-1', target: 'output-1', type: 'wf' },
-      { id: 'e3', source: 'output-1', target: 'end-1', type: 'wf' },
-    ],
-  };
-}
-
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
@@ -2021,60 +2013,8 @@ function BottomBar({ running, error, onRun, onStop, onAutoLayout }: BottomBarPro
   );
 }
 
-interface NewWorkflowModalProps {
-  open: boolean;
-  onCreate: (name: string) => void;
-  onClose: () => void;
-}
-
-function NewWorkflowModal({ open, onCreate, onClose }: NewWorkflowModalProps) {
-  const [name, setName] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (open) {
-      setName('');
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
-  }, [open]);
-
-  if (!open) return null;
-
-  const canCreate = name.trim().length > 0;
-  const submit = () => {
-    if (canCreate) onCreate(name);
-  };
-
-  return (
-    <div className="wf-new-overlay" onClick={onClose}>
-      <div className="wf-new-modal" onClick={(e) => e.stopPropagation()}>
-        <h3 className="wf-new-title">Quy trình mới</h3>
-        <input
-          ref={inputRef}
-          className="wf-new-input"
-          placeholder="Tên quy trình..."
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') submit();
-            if (e.key === 'Escape') onClose();
-          }}
-        />
-        <div className="wf-new-actions">
-          <button type="button" className="wf-new-cancel" onClick={onClose}>
-            Quay lại
-          </button>
-          <button type="button" className="wf-new-create" onClick={submit} disabled={!canCreate}>
-            Tạo
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function Flow() {
-  const initialState = useMemo(() => loadTabsState(defaultGraph()), []);
+  const initialState = useMemo(() => loadTabsState(blankGraph()), []);
   const initialTab =
     initialState.tabs.find((t) => t.id === initialState.activeId) ?? initialState.tabs[0];
 
@@ -2087,6 +2027,9 @@ function Flow() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [savedFingerprints, setSavedFingerprints] = useState<Record<string, string>>(() =>
+    buildSavedFingerprints(initialState.tabs),
+  );
   const [libOpen, setLibOpen] = useState(false);
   const [libCount, setLibCount] = useState(() => loadTemplates().length);
   const [paletteOpen, setPaletteOpen] = useState(true);
@@ -2146,6 +2089,48 @@ function Flow() {
 
   useEffect(() => onLibraryUpdated(() => setLibCount(loadTemplates().length)), []);
 
+  const dirtyTabIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const t of tabs) {
+      const fp =
+        t.id === activeId
+          ? graphFingerprint(nodes, edges)
+          : graphFingerprint(t.nodes, t.edges);
+      if (fp !== (savedFingerprints[t.id] ?? '')) ids.add(t.id);
+    }
+    return ids;
+  }, [tabs, activeId, nodes, edges, savedFingerprints]);
+
+  const canvasEmpty = useMemo(
+    () => isWorkflowCanvasEmpty(nodes, edges),
+    [nodes, edges],
+  );
+
+  const applyGraphToActive = useCallback(
+    (graph: { nodes: WFNode[]; edges: Edge[] }, opts?: { fit?: boolean }) => {
+      const patched = ensureImageSlots(graph.nodes) as WFNode[];
+      setNodes(patched);
+      setEdges(graph.edges);
+      const now = new Date().toISOString();
+      const updated = tabs.map((t) =>
+        t.id === activeId ? { ...t, nodes: patched, edges: graph.edges, updatedAt: now } : t,
+      );
+      setTabs(updated);
+      saveTabsState({ tabs: updated, activeId });
+      if (opts?.fit !== false) {
+        setTimeout(() => fitView({ duration: 300, padding: 0.2 }), 60);
+      }
+    },
+    [tabs, activeId, setNodes, setEdges, fitView],
+  );
+
+  const applyStarter = useCallback(
+    (starterId: WorkflowStarterId) => {
+      applyGraphToActive(getStarterGraph(starterId) as { nodes: WFNode[]; edges: Edge[] });
+    },
+    [applyGraphToActive],
+  );
+
   const handleAutoLayout = () => {
     const pos = autoLayout(nodes, edges);
     setNodes((nds) => nds.map((n) => (pos[n.id] ? { ...n, position: pos[n.id] } : n)));
@@ -2191,24 +2176,41 @@ function Flow() {
     saveTabsState({ tabs: updated, activeId: id });
   };
 
-  const newTab = (name: string) => {
+  const newTab = (name: string, starterId: WorkflowStarterId = 'blank') => {
     const trimmed = name.trim();
     if (!trimmed) return;
     const updated = commitActive();
-    const g = defaultGraph();
+    const g = getStarterGraph(starterId) as { nodes: WFNode[]; edges: Edge[] };
     const tpl = saveTemplate(trimmed, g);
     const tab = makeTab(tpl.name, g, tpl.id);
     const next = [...updated, tab];
     setTabs(next);
     setActiveId(tab.id);
-    setNodes(g.nodes);
+    setNodes(ensureImageSlots(g.nodes) as WFNode[]);
     setEdges(g.edges);
     saveTabsState({ tabs: next, activeId: tab.id });
+    setSavedFingerprints((prev) => ({
+      ...prev,
+      [tab.id]: graphFingerprint(g.nodes, g.edges),
+    }));
     setNewOpen(false);
+    setTimeout(() => fitView({ duration: 300, padding: 0.2 }), 60);
   };
 
   const closeTab = (id: string) => {
     if (tabs.length <= 1) return;
+    const tab = tabs.find((t) => t.id === id);
+    const fp =
+      id === activeId
+        ? graphFingerprint(nodes, edges)
+        : graphFingerprint(tab?.nodes ?? [], tab?.edges ?? []);
+    const isDirty = fp !== (savedFingerprints[id] ?? '');
+    if (isDirty && tab) {
+      const ok = window.confirm(
+        `Tab "${tab.name}" có thay đổi chưa lưu.\n\nĐóng tab và bỏ các thay đổi đó?`,
+      );
+      if (!ok) return;
+    }
     const idx = tabs.findIndex((t) => t.id === id);
     const updated = commitActive().filter((t) => t.id !== id);
     let nextActive = activeId;
@@ -2221,6 +2223,19 @@ function Flow() {
     }
     setTabs(updated);
     saveTabsState({ tabs: updated, activeId: nextActive });
+    setSavedFingerprints((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  const renameTab = (id: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const updated = commitActive().map((t) => (t.id === id ? { ...t, name: trimmed } : t));
+    setTabs(updated);
+    saveTabsState({ tabs: updated, activeId });
   };
 
   const togglePin = (id: string) => {
@@ -2399,6 +2414,10 @@ function Flow() {
     const updated = commitActive();
     setTabs(updated);
     saveTabsState({ tabs: updated, activeId });
+    setSavedFingerprints((prev) => ({
+      ...prev,
+      [activeId]: graphFingerprint(nodes, edges),
+    }));
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   };
@@ -2414,20 +2433,17 @@ function Flow() {
     setEdges(t.edges);
     saveWorkflow(patched, t.edges);
     saveTabsState({ tabs: next, activeId: tab.id });
+    setSavedFingerprints((prev) => ({
+      ...prev,
+      [tab.id]: graphFingerprint(patched, t.edges),
+    }));
   };
 
   const handleClear = () => {
     if (!window.confirm('Xóa toàn bộ sơ đồ trong tab này?')) return;
     clearWorkflow();
-    const g = defaultGraph();
-    setNodes(g.nodes);
-    setEdges(g.edges);
-    const now = new Date().toISOString();
-    const updated = tabs.map((t) =>
-      t.id === activeId ? { ...t, nodes: g.nodes, edges: g.edges, updatedAt: now } : t,
-    );
-    setTabs(updated);
-    saveTabsState({ tabs: updated, activeId });
+    const g = blankGraph() as { nodes: WFNode[]; edges: Edge[] };
+    applyGraphToActive(g);
   };
 
   const stop = () => {
@@ -3266,9 +3282,11 @@ function Flow() {
           tabs={tabs}
           activeId={activeId}
           libraryCount={libCount}
+          dirtyTabIds={dirtyTabIds}
           onSelect={selectTab}
           onClose={closeTab}
           onNew={() => setNewOpen(true)}
+          onRename={renameTab}
           onTogglePin={togglePin}
           onOpenLibrary={() => setLibOpen(true)}
           saved={saved}
@@ -3279,6 +3297,12 @@ function Flow() {
         <Palette onAdd={addNode} open={paletteOpen} onToggle={() => setPaletteOpen(false)} />
 
         <div className="wf-canvas" onDragOver={onDragOver} onDrop={onDrop}>
+          {canvasEmpty && !running && (
+            <WorkflowCanvasEmpty
+              onApplyStarter={applyStarter}
+              onOpenLibrary={() => setLibOpen(true)}
+            />
+          )}
           {!paletteOpen && (
             <button
               type="button"
@@ -3348,7 +3372,7 @@ function Flow() {
         onClose={() => setLibOpen(false)}
       />
 
-      <NewWorkflowModal open={newOpen} onCreate={newTab} onClose={() => setNewOpen(false)} />
+      <WorkflowNewModal open={newOpen} onCreate={newTab} onClose={() => setNewOpen(false)} />
 
       {mediaModal && (
         <WorkflowMediaInputModal

@@ -1,8 +1,15 @@
 export const CHAT_SUGGESTIONS = [
-  'Viết kịch bản chatbot chăm sóc khách hàng 24/7 cho shop thời trang online.',
-  'Tạo moodboard visual cho thương hiệu lifestyle cao cấp, tone ấm, minimal.',
-  'Đề xuất hashtag và trend cho TikTok Shop bán mỹ phẩm organic.',
-  'Tạo storyboard video giới thiệu app mobile fintech, 4 cảnh, 30 giây.',
+  'Viết kịch bản quảng cáo ngắn cho TikTok/Reels…',
+  'Viết press release ra mắt sản phẩm mới…',
+  'Viết kịch bản livestream bán hàng 15 phút…',
+  'Gợi ý ý tưởng video marketing cho sản phẩm mới…',
+] as const;
+
+export const CHAT_COMPOSE_PLACEHOLDERS = [
+  'Bạn muốn hỏi, tạo app, hay xây dựng ý tưởng gì hôm nay?',
+  'Viết kịch bản quảng cáo ngắn cho TikTok/Reels…',
+  'Viết press release ra mắt sản phẩm mới…',
+  'Gợi ý ý tưởng video marketing cho sản phẩm mới…',
 ] as const;
 
 export type ChatPillAction =

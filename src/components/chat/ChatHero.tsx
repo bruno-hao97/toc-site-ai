@@ -12,7 +12,6 @@ const HERO_ICONS: { Icon?: LucideIcon; rotate: number; empty?: boolean }[] = [
   { Icon: Palette, rotate: -2 },
   { Icon: Workflow, rotate: 0 },
   { Icon: CodeXml, rotate: 4 },
-  { rotate: 8, empty: true },
 ];
 
 export default function ChatHero({ model }: Props) {
