@@ -17,7 +17,7 @@
   --color-tool-teal: oklch(74% 0.12 195);
   --color-tool-rose: oklch(68% 0.14 15);
 
-  --font-display: 'Syne', system-ui, sans-serif;
+  --font-display: 'Plus Jakarta Sans', 'IBM Plex Sans', system-ui, sans-serif;
   --font-body: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
