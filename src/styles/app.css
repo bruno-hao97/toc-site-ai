@@ -87,6 +87,20 @@ code {
   flex-direction: column;
 }
 
+/* Guest /pricing & /explore — landing pill nav replaces sidebar */
+.app--guest-landing .guest-landing-nav-host {
+  min-height: 0;
+  background: none;
+}
+
+.app--guest-landing .guest-landing-nav-host::before {
+  display: none;
+}
+
+.app--guest-landing .app-main {
+  padding-top: calc(var(--space-md, 1rem) + 56px);
+}
+
 /* ===== App sidebar (Leonardo-style floating rail) ===== */
 .app--shell {
   --app-sidebar-inset: 12px;
@@ -3290,6 +3304,10 @@ a.user-pill:hover { color: var(--text); }
   max-width: none;
   margin: 0;
   width: 100%;
+}
+
+.home-explore--community {
+  padding: 0.5rem clamp(12px, 1.25vw, 20px) 2rem;
 }
 
 /* ===== Home Leonardo hero ===== */

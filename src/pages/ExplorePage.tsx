@@ -1,15 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, MessageCircle, Play, Share2, Wand2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import ComposerLibraryPreviewModal, {
+  type ComposerPreviewHandlers,
+} from '../components/ComposerLibraryPreviewModal';
+import FeedMasonryCard from '../components/FeedMasonryCard';
+import HomeFeedEmpty from '../components/home/HomeFeedEmpty';
 import {
   feedMediaUrl,
-  feedModelLabel,
-  feedSourceCount,
   feedThumb,
   fetchPublicVideos,
-  formatFeedTime,
   type FeedItem,
 } from '../services/feedApi';
 import { UpstreamMeError } from '../services/upstreamMe';
+import {
+  canOpenFeedPreview,
+  feedPreviewKind,
+  navigateFeedItemReuse,
+} from '../utils/feedItemReuse';
 
 type MediaFilter = 'all' | 'video' | 'image';
 
@@ -19,67 +26,31 @@ const FILTERS: { id: MediaFilter; label: string }[] = [
   { id: 'image', label: 'Hình ảnh' },
 ];
 
-function ExploreCard({ item }: { item: FeedItem }) {
-  const thumb = feedThumb(item);
-  const media = feedMediaUrl(item);
-  const isVideo = item.type !== 'image';
-  const sources = feedSourceCount(item);
-  const model = feedModelLabel(item);
+function hasVisual(item: FeedItem): boolean {
+  return Boolean(feedThumb(item) || feedMediaUrl(item));
+}
 
-  return (
-    <article className="feed-card">
-      <header className="feed-card-head">
-        {item.author?.avatar ? (
-          <img className="feed-avatar" src={item.author.avatar} alt="" loading="lazy" />
-        ) : (
-          <span className="feed-avatar feed-avatar-empty" />
-        )}
-        <span className="feed-author">{item.author?.name || 'Ẩn danh'}</span>
-        {item.resolution && <span className="feed-res">{item.resolution}</span>}
-      </header>
+function feedItemMediaKind(item: FeedItem): 'video' | 'image' {
+  const t = (item.type || '').toLowerCase();
+  if (t === 'image' || t === 'image-upscale' || t === 'remove-bg') return 'image';
+  if (t === 'video' || t === 'avatar-lipsync') return 'video';
+  const media = feedMediaUrl(item) || '';
+  return /\.(mp4|webm|mov|m4v)(\?|$)/i.test(media) ? 'video' : 'image';
+}
 
-      <a className="feed-media" href={media || thumb || '#'} target="_blank" rel="noreferrer">
-        {thumb ? (
-          <img src={thumb} alt="" loading="lazy" />
-        ) : (
-          <span className="feed-media-empty">Đang xử lý…</span>
-        )}
-        {isVideo && (
-          <span className="feed-play">
-            <Play size={20} fill="currentColor" />
-          </span>
-        )}
-        {model && <span className="feed-model-badge">{model}</span>}
-        {sources > 1 && <span className="feed-count">{sources}</span>}
-        {item.duration && Number(item.duration) > 0 && (
-          <span className="feed-duration">{item.duration}s</span>
-        )}
-      </a>
-
-      <div className="feed-card-meta">
-        <span className="feed-time">{formatFeedTime(item.created_time)}</span>
-      </div>
-
-      <footer className="feed-card-foot">
-        <div className="feed-stats">
-          <span><Heart size={14} /> {item.likes_count ?? item.like_count ?? 0}</span>
-          <span><MessageCircle size={14} /> {item.comments_count ?? 0}</span>
-          <span><Share2 size={14} /></span>
-        </div>
-        <button type="button" className="feed-remix">
-          <Wand2 size={13} /> {isVideo ? 'Edit video' : 'Remix'}
-        </button>
-      </footer>
-    </article>
-  );
+function matchesFilter(item: FeedItem, filter: MediaFilter): boolean {
+  if (filter === 'all') return true;
+  return feedItemMediaKind(item) === filter;
 }
 
 export default function ExplorePage() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<FeedItem[]>([]);
   const [filter, setFilter] = useState<MediaFilter>('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const afterIdRef = useRef('');
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -98,7 +69,7 @@ export default function ExplorePage() {
 
       const fresh = page.items.filter((it) => {
         if (!it.id_base || seenRef.current.has(it.id_base)) return false;
-        if (!feedThumb(it)) return false;
+        if (!hasVisual(it)) return false;
         seenRef.current.add(it.id_base);
         return true;
       });
@@ -129,20 +100,45 @@ export default function ExplorePage() {
       (entries) => {
         if (entries[0]?.isIntersecting) void loadMore();
       },
-      { rootMargin: '600px' },
+      { rootMargin: '400px' },
     );
     observer.observe(el);
     return () => observer.disconnect();
   }, [loadMore]);
 
-  const visible = useMemo(() => {
-    if (filter === 'all') return items;
-    if (filter === 'image') return items.filter((it) => it.type === 'image');
-    return items.filter((it) => it.type !== 'image');
-  }, [items, filter]);
+  const filteredItems = useMemo(
+    () => items.filter((item) => matchesFilter(item, filter)),
+    [items, filter],
+  );
+
+  const visualItems = useMemo(
+    () => filteredItems.filter(canOpenFeedPreview),
+    [filteredItems],
+  );
+  const previewItem = previewIndex != null ? visualItems[previewIndex] : null;
+  const previewKindValue = previewItem ? feedPreviewKind(previewItem) : 'video';
+
+  const openItem = useCallback(
+    (item: FeedItem) => {
+      const idx = visualItems.findIndex((it) => it.id_base === item.id_base);
+      if (idx >= 0) setPreviewIndex(idx);
+    },
+    [visualItems],
+  );
+
+  const previewHandlers = useMemo((): ComposerPreviewHandlers => {
+    if (!previewItem) return {};
+    const close = () => setPreviewIndex(null);
+    const reuse = () => navigateFeedItemReuse(navigate, previewItem, close);
+    return {
+      onRegenerate: reuse,
+      onReuse: reuse,
+      onEdit: feedPreviewKind(previewItem) === 'video' ? reuse : undefined,
+    };
+  }, [previewItem, navigate]);
 
   return (
-    <div className="home-explore">
+    <div className="home-explore home-explore--community">
       <div className="home-tabs explore-tabs">
         {FILTERS.map((f) => (
           <button
@@ -157,16 +153,44 @@ export default function ExplorePage() {
       </div>
 
       <div className="home-feed">
-        <div className="home-masonry">
-          {visible.map((item) => (
-            <ExploreCard key={item.id_base} item={item} />
+        <div className="home-masonry home-masonry--feed">
+          {filteredItems.map((item) => (
+            <FeedMasonryCard
+              key={item.id_base}
+              item={item}
+              hoverPreview
+              onOpen={() => openItem(item)}
+            />
           ))}
         </div>
 
+        {previewIndex != null && visualItems.length > 0 && (
+          <ComposerLibraryPreviewModal
+            items={visualItems}
+            index={Math.min(previewIndex, visualItems.length - 1)}
+            kind={previewKindValue}
+            layout="home"
+            onClose={() => setPreviewIndex(null)}
+            onNavigate={setPreviewIndex}
+            handlers={previewHandlers}
+          />
+        )}
+
         {error && <p className="error feed-status">{error}</p>}
         {loading && <p className="muted feed-status">Đang tải…</p>}
-        {!loading && !visible.length && !error && (
-          <p className="muted feed-status">Chưa có nội dung.</p>
+        {!loading && !filteredItems.length && !error && items.length > 0 && (
+          <HomeFeedEmpty
+            title="Không có tác phẩm loại này"
+            description="Thử bộ lọc Tất cả hoặc loại khác."
+            showCreate={false}
+          />
+        )}
+        {!loading && !items.length && !error && (
+          <HomeFeedEmpty
+            title="Chưa có nội dung"
+            description="Quay lại sau để khám phá tác phẩm từ cộng đồng."
+            showCreate={false}
+          />
         )}
 
         <div ref={sentinelRef} className="feed-sentinel" />

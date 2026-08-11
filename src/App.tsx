@@ -18,6 +18,7 @@ import SessionExpiredHost from './components/SessionExpiredHost';
 import AdminRoute from './components/AdminRoute';
 import ProtectedRoute from './components/ProtectedRoute';
 import QuickChatWidget from './components/QuickChatWidget';
+import GuestLandingNav from './components/GuestLandingNav';
 import UserMenuDropdown from './components/user/UserMenuDropdown';
 import LandingPage from './pages/LandingPage';
 import HomePage from './pages/HomePage';
@@ -50,10 +51,12 @@ import AccountTransferPage from './pages/account/AccountTransferPage';
 import AccountTransactionsPage from './pages/account/AccountTransactionsPage';
 import { useLocale } from './i18n';
 
-const GUEST_SHELL_ROUTES = ['/pricing', '/explore'] as const;
+const GUEST_LANDING_NAV_ROUTES = ['/pricing', '/explore'] as const;
 
-function isGuestShellRoute(pathname: string): boolean {
-  return GUEST_SHELL_ROUTES.includes(pathname as (typeof GUEST_SHELL_ROUTES)[number]);
+function isGuestLandingNavRoute(pathname: string): boolean {
+  return GUEST_LANDING_NAV_ROUTES.includes(
+    pathname as (typeof GUEST_LANDING_NAV_ROUTES)[number],
+  );
 }
 
 const STUDIO_NAV: Record<string, JobType> = {
@@ -216,15 +219,18 @@ function AppShell() {
     location.pathname === '/audio' ||
     isWorkflow ||
     isChat;
-  const hideHeader = isBarePage || isWorkflow || isChat;
-  const showAppShell =
-    !isBarePage && !isWorkflow && !isChat && (loggedIn || isGuestShellRoute(location.pathname));
+  const guestLandingNav = !loggedIn && isGuestLandingNavRoute(location.pathname);
+  const hideHeader = isBarePage || isWorkflow || isChat || guestLandingNav;
+  const showAppShell = !isBarePage && !isWorkflow && !isChat && loggedIn;
   const showAppSidebar = showAppShell;
   const showQuickChat = loggedIn && showAppShell;
 
   return (
-    <div className={`app${showAppSidebar ? ' app--shell' : ''}`}>
+    <div
+      className={`app${showAppSidebar ? ' app--shell' : ''}${guestLandingNav ? ' app--guest-landing' : ''}`}
+    >
       <ScrollToTop />
+      {guestLandingNav && <GuestLandingNav />}
       {showAppSidebar && (
         <AppSidebar
           mobileOpen={mobileNavOpen}

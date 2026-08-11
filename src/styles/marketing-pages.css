@@ -46,7 +46,7 @@
 }
 
 .models-hero {
-  padding: 0 0 var(--space-md, 1rem);
+  padding-bottom: var(--space-md, 1rem);
 }
 
 .models-hero .marketing-kicker {
