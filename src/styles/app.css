@@ -727,9 +727,9 @@ textarea { resize: vertical; min-height: 4rem; }
 }
 
 .auth-head-icon-purple {
-  color: #fff;
-  background: linear-gradient(135deg, #c026d3, #7c3aed);
-  box-shadow: 0 10px 30px rgba(192, 38, 211, 0.35);
+  color: #06302b;
+  background: linear-gradient(135deg, #53eb67, #3cd74d);
+  box-shadow: 0 10px 30px rgba(83, 235, 103, 0.35);
 }
 
 @media (max-width: 640px) {
@@ -786,7 +786,7 @@ textarea { resize: vertical; min-height: 4rem; }
   margin-bottom: 0.9rem;
   color: #06302b;
   background: linear-gradient(135deg, #53eb67, #3cd74d);
-  box-shadow: 0 10px 30px rgba(45, 212, 191, 0.35);
+  box-shadow: 0 10px 30px rgba(83, 235, 103, 0.35);
 }
 
 .auth-head h1 {
@@ -844,7 +844,8 @@ textarea { resize: vertical; min-height: 4rem; }
 }
 
 .auth-method-icon.purple {
-  background: linear-gradient(135deg, #3cd74d, #3cd74d);
+  background: linear-gradient(135deg, #53eb67, #3cd74d);
+  color: #06302b;
 }
 
 .auth-method-text {
@@ -988,13 +989,15 @@ textarea { resize: vertical; min-height: 4rem; }
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: #06222b;
+  color: var(--on-brand, #04140a);
   cursor: pointer;
-  background: linear-gradient(135deg, #38f0d0, #2f93f7);
+  background: linear-gradient(135deg, var(--brand, #53eb67), var(--brand-hover, #3cd74d));
+  box-shadow: 0 8px 24px rgba(83, 235, 103, 0.28);
 }
 
 .auth-submit:hover:not(:disabled) {
-  filter: brightness(1.06);
+  background: linear-gradient(135deg, var(--brand-hover, #3cd74d), #22c55e);
+  filter: brightness(1.04);
 }
 
 .auth-submit:disabled {
