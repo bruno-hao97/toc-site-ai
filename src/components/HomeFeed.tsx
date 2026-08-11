@@ -246,6 +246,7 @@ export default function HomeFeed({
           <FeedMasonryCard
             key={item.id_base}
             item={item}
+            hoverPreview
             onOpen={() => openItem(item)}
           />
         ))}

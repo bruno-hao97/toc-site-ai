@@ -84,7 +84,7 @@ export default function LoginPage() {
 
   return (
     <div className="page auth-page auth-login">
-      <div className="auth-card auth-card-79">
+      <div className="auth-card auth-card-79 auth-card-glass">
         <button type="button" className="auth-close" onClick={() => navigate(-1)} aria-label="Đóng">
           <X size={18} />
         </button>

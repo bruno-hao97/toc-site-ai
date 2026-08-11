@@ -1,18 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  AlertCircle,
-  Copy,
-  Download,
-  ExternalLink,
-  Heart,
-  Layers,
-  Mic,
-  MoreVertical,
-  Music,
-  Play,
-  Share2,
-} from 'lucide-react';
+import FeedMasonryCard from './FeedMasonryCard';
 import ComposerLibraryPreviewModal, {
   type ComposerPreviewHandlers,
 } from './ComposerLibraryPreviewModal';
@@ -23,12 +11,9 @@ import { studioRouteForType } from '../constants/studioTypes';
 import type { JobType } from '../services/api';
 import {
   deleteFeedPost,
-  feedDisplayQty,
   feedIsAudioItem,
   feedIsDisplayable,
-  feedIsFailed,
   feedMediaUrl,
-  feedPosterUrl,
   feedThumb,
   fetchMyAudio,
   fetchMyImages,
@@ -38,19 +23,9 @@ import {
   type MinePage,
 } from '../services/feedApi';
 import {
-  feedCreatedShortLabel,
-  feedModelDisplay,
-  feedRefThumb,
-  feedResolutionLabel,
-} from '../services/feedLibraryMeta';
-import {
-  isFavorite,
   loadFavorites,
-  toggleFavorite,
 } from '../services/feedFavoritesStore';
 import { UpstreamMeError } from '../services/upstreamMe';
-import { downloadMediaUrl } from '../utils/downloadMedia';
-import ProjectPicker from './ProjectPicker';
 import HomeFeedEmpty from './home/HomeFeedEmpty';
 
 export type MineFilter = 'all' | 'video' | 'image' | 'music' | 'tts' | 'favorite';
@@ -65,11 +40,6 @@ function previewKind(item: FeedItem): 'image' | 'video' {
   return item.type === 'image' ? 'image' : 'video';
 }
 
-function canOpenPreview(item: FeedItem): boolean {
-  if (feedIsAudioItem(item)) return Boolean(feedMediaUrl(item));
-  return Boolean(feedMediaUrl(item) || feedThumb(item));
-}
-
 function itemJobType(item: FeedItem): JobType {
   const t = (item.type || '').toLowerCase();
   if (t === 'music') return 'music';
@@ -77,275 +47,6 @@ function itemJobType(item: FeedItem): JobType {
   if (t === 'image') return 'image';
   if (t === 'avatar-lipsync') return 'avatar-lipsync';
   return 'video';
-}
-
-function audioBadge(item: FeedItem): string {
-  const t = (item.type || '').toLowerCase();
-  if (t === 'music') return 'AI MUSIC';
-  return 'AI AUDIO';
-}
-
-function MineCard({
-  item,
-  favorited,
-  onOpen,
-  onToggleFavorite,
-}: {
-  item: FeedItem;
-  favorited: boolean;
-  onOpen: () => void;
-  onToggleFavorite: () => void;
-}) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const thumb = feedThumb(item);
-  const poster = feedPosterUrl(item);
-  const media = feedMediaUrl(item);
-  const isAudio = feedIsAudioItem(item);
-  const isVideo = !isAudio && item.type !== 'image';
-  const model = feedModelDisplay(item);
-  const prompt = (item.prompt || item.title || '').trim();
-  const qty = feedDisplayQty(item);
-  const failed = feedIsFailed(item);
-  const refThumb = feedRefThumb(item);
-  const resolution = feedResolutionLabel(item);
-  const shortDate = feedCreatedShortLabel(item);
-  const duration =
-    item.duration && Number(item.duration) > 0 ? `${item.duration}s` : '';
-
-  const snapshot = {
-    itemId: item.id_base,
-    type: item.type,
-    prompt: item.prompt || item.title,
-    thumbnailUrl: poster || thumb || undefined,
-    downloadUrl: media || undefined,
-    createdTime: item.created_time,
-  };
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onDoc = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [menuOpen]);
-
-  const copyPrompt = async () => {
-    if (!prompt) return;
-    try {
-      await navigator.clipboard.writeText(prompt);
-    } catch {
-      // ignore
-    }
-    setMenuOpen(false);
-  };
-
-  const shareMedia = async () => {
-    const url = media || thumb;
-    if (!url) return;
-    if (navigator.share) {
-      try {
-        await navigator.share({ url, title: model || 'Pro.agi.vn' });
-        return;
-      } catch {
-        // fall through
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      // ignore
-    }
-  };
-
-  const dateDuration =
-    shortDate && duration ? `${shortDate} - ${duration}` : shortDate || duration;
-  const metaRest = [resolution, dateDuration].filter(Boolean).join(' ');
-
-  return (
-    <article className="feed-card feed-card-mine">
-      <div
-        className={`mine-tile${failed ? ' mine-tile-failed' : ''}${canOpenPreview(item) ? ' mine-tile-openable' : ''}${isAudio ? ' mine-tile-audio' : ''}`}
-        role={canOpenPreview(item) ? 'button' : undefined}
-        tabIndex={canOpenPreview(item) ? 0 : undefined}
-        onClick={() => {
-          if (canOpenPreview(item)) onOpen();
-        }}
-        onKeyDown={(e) => {
-          if (canOpenPreview(item) && (e.key === 'Enter' || e.key === ' ')) {
-            e.preventDefault();
-            onOpen();
-          }
-        }}
-      >
-        {failed && !thumb && !media ? (
-          <span className="mine-tile-failed-state">
-            <AlertCircle size={28} />
-            <strong>GENERATION FAILED</strong>
-          </span>
-        ) : isAudio ? (
-          thumb ? (
-            <>
-              <img className="mine-tile-media" src={thumb} alt="" loading="lazy" />
-              <span className="mine-tile-audio-badge mine-tile-audio-badge--overlay">
-                {audioBadge(item)}
-              </span>
-              {duration && <span className="mine-tile-audio-duration">{duration}</span>}
-            </>
-          ) : (
-            <span className="mine-tile-audio-visual">
-              {(item.type || '').toLowerCase() === 'music' ? (
-                <Music size={36} />
-              ) : (
-                <Mic size={36} />
-              )}
-              <span className="mine-tile-audio-badge">{audioBadge(item)}</span>
-              {duration && <span className="mine-tile-audio-duration">{duration}</span>}
-            </span>
-          )
-        ) : thumb ? (
-          poster || !isVideo ? (
-            <img className="mine-tile-media" src={poster || thumb} alt="" loading="lazy" />
-          ) : (
-            <video
-              className="mine-tile-media"
-              src={`${thumb}#t=0.001`}
-              muted
-              playsInline
-              preload="metadata"
-            />
-          )
-        ) : (
-          <span className="mine-tile-empty">Đang xử lý…</span>
-        )}
-
-        {(isVideo || isAudio) && !failed && (thumb || media) && (
-          <span className="mine-tile-play">
-            <Play size={22} fill="currentColor" />
-          </span>
-        )}
-
-        <div className="mine-tile-hover">
-          <div className="mine-tile-top">
-            <div className="mine-tile-menu-wrap" ref={menuRef}>
-              <button
-                type="button"
-                className="mine-tile-icon-btn"
-                aria-label="Tùy chọn"
-                aria-expanded={menuOpen}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpen((v) => !v);
-                }}
-              >
-                <MoreVertical size={16} />
-              </button>
-              {menuOpen && (
-                <div className="mine-tile-menu">
-                  {prompt && (
-                    <button type="button" onClick={() => void copyPrompt()}>
-                      <Copy size={14} /> Sao chép prompt
-                    </button>
-                  )}
-                  {(media || thumb) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        window.open(media || thumb || '', '_blank', 'noreferrer');
-                        setMenuOpen(false);
-                      }}
-                    >
-                      <ExternalLink size={14} /> Mở tab mới
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="mine-tile-top-right">
-              <button
-                type="button"
-                className={`mine-tile-icon-btn${favorited ? ' mine-tile-fav-on' : ''}`}
-                aria-label={favorited ? 'Bỏ yêu thích' : 'Yêu thích'}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavorite();
-                }}
-              >
-                <Heart size={15} fill={favorited ? 'currentColor' : 'none'} />
-              </button>
-              <ProjectPicker snapshot={snapshot} className="mine-tile-project-picker" />
-              <span className="mine-tile-qty" title="Số lượng">
-                <Layers size={12} />
-                {qty}
-              </span>
-              {refThumb && (
-                <img className="mine-tile-ref" src={refThumb} alt="" loading="lazy" />
-              )}
-            </div>
-          </div>
-
-          <div className="mine-tile-body">
-            {prompt && (
-              <div className="mine-tile-prompt-row">
-                <p className="mine-tile-prompt">{prompt}</p>
-                <button
-                  type="button"
-                  className="mine-tile-icon-btn mine-tile-copy"
-                  aria-label="Sao chép prompt"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void copyPrompt();
-                  }}
-                >
-                  <Copy size={14} />
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="mine-tile-foot">
-            {(model || metaRest) && (
-              <div className="mine-tile-meta-pill">
-                {model && <span className="mine-tile-model-name">{model}</span>}
-                {metaRest && <span className="mine-tile-meta-rest">{metaRest}</span>}
-              </div>
-            )}
-            <div className="mine-tile-actions">
-              <button
-                type="button"
-                className="mine-tile-icon-btn"
-                aria-label="Chia sẻ"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void shareMedia();
-                }}
-              >
-                <Share2 size={15} />
-              </button>
-              {(media || thumb) && (
-                <button
-                  type="button"
-                  className="mine-tile-icon-btn"
-                  aria-label="Tải xuống"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void downloadMediaUrl(media || thumb || '');
-                  }}
-                >
-                  <Download size={15} />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </article>
-  );
 }
 
 type SourceKey = 'video' | 'image' | 'music' | 'tts';
@@ -618,17 +319,14 @@ export default function HomeMyContent({ filter }: { filter: MineFilter }) {
         onDelete={deleteLibraryItem}
       />
     ) : (
-      <div className="home-masonry">
+      <div className="home-masonry home-masonry--library">
         {items.map((item) => (
-          <MineCard
+          <FeedMasonryCard
             key={item.id_base}
             item={item}
-            favorited={isFavorite(item.id_base)}
+            hoverPreview={item.type !== 'image'}
             onOpen={() => openItem(item)}
-            onToggleFavorite={() => {
-              toggleFavorite(item.id_base, item);
-              setFavTick((n) => n + 1);
-            }}
+            onFavoriteChange={() => setFavTick((n) => n + 1)}
           />
         ))}
       </div>

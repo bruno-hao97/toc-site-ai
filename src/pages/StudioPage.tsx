@@ -44,7 +44,7 @@ import StudioGallery, { type SessionItem } from '../components/StudioGallery';
 import ComposerHistory from '../components/ComposerHistory';
 import ComposerLibrary from '../components/ComposerLibrary';
 import ComposerGalleryEmpty from '../components/composer/ComposerGalleryEmpty';
-import ComposerLibraryItem from '../components/ComposerLibraryItem';
+import LibraryMasonryCard from '../components/LibraryMasonryCard';
 import ComposerLibraryPreviewModal, {
   type ComposerPreviewHandlers,
 } from '../components/ComposerLibraryPreviewModal';
@@ -3436,12 +3436,8 @@ export default function StudioPage({
                     <h3 className="composer-day">{t('composer.processing')}</h3>
                   )}
                   <div
-                    className={useClibLayout ? 'clib-grid' : 'composer-grid'}
-                    style={
-                      useClibLayout
-                        ? { ['--clib-thumb' as string]: `${zoom}px` }
-                        : { ['--thumb' as string]: `${zoom}px` }
-                    }
+                    className={useClibLayout ? 'home-masonry home-masonry--library' : 'composer-grid'}
+                    style={useClibLayout ? undefined : { ['--thumb' as string]: `${zoom}px` }}
                   >
                     {pendingJobs.map((p) => (
                       <article
@@ -3495,34 +3491,23 @@ export default function StudioPage({
                     <h3 className="composer-day">{day}</h3>
                   )}
                   <div
-                    className={useClibLayout ? 'clib-grid' : 'composer-grid'}
-                    style={
-                      useClibLayout
-                        ? { ['--clib-thumb' as string]: `${zoom}px` }
-                        : { ['--thumb' as string]: `${zoom}px` }
-                    }
+                    className={useClibLayout ? 'home-masonry home-masonry--library' : 'composer-grid'}
+                    style={useClibLayout ? undefined : { ['--thumb' as string]: `${zoom}px` }}
                   >
                     {entries.map((entry) => {
                       if (useClibLayout && isClibHistoryEntry(entry, jobType)) {
                         const feedItem = historyEntryToFeedItem(entry);
                         const flatIndex = currentPreviewIndexById.get(entry.id) ?? 0;
+                        const mediaKind = historyComposerMediaKind(jobType);
                         return (
-                          <ComposerLibraryItem
+                          <LibraryMasonryCard
                             key={entry.id}
                             item={feedItem}
-                            kind={historyComposerMediaKind(jobType)}
+                            kind={mediaKind}
                             selected={selectedIds.has(entry.id)}
+                            hoverPreview={mediaKind === 'video'}
                             onToggleSelect={() => toggleSelect(entry.id)}
-                            onPreview={() => setCurrentPreviewIndex(flatIndex)}
-                            onDelete={() => handleCurrentDelete(entry)}
-                            deleting={currentDeletingId === entry.id}
-                            extraMenuItems={[
-                              {
-                                label: t('composer.action.reuse'),
-                                icon: <Clipboard size={14} />,
-                                onClick: () => applyReuse(entry),
-                              },
-                            ]}
+                            onOpen={() => setCurrentPreviewIndex(flatIndex)}
                           />
                         );
                       }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, RefreshCw, Search, X } from 'lucide-react';
-import ComposerLibraryItem from './ComposerLibraryItem';
+import LibraryMasonryCard from './LibraryMasonryCard';
 import ComposerLibraryPreviewModal, {
   type ComposerPreviewHandlers,
 } from './ComposerLibraryPreviewModal';
@@ -54,7 +54,7 @@ interface KeyedItem {
 
 export default function ComposerLibrary({
   jobType,
-  zoom,
+  zoom: _zoom,
   refreshKey = 0,
   onCountChange,
   selectedIds,
@@ -384,21 +384,20 @@ export default function ComposerLibrary({
             <span className="clib-group-label">{label}</span>
             <span className="clib-count">({list.length})</span>
           </header>
-          <div className="clib-grid" style={{ ['--clib-thumb' as string]: `${zoom}px` }}>
+          <div className="home-masonry home-masonry--library">
             {list.map(({ key, item }) => {
               const itemId = item.id_base || key;
               const selected = selectedIds?.has(itemId) ?? false;
               const flatIndex = flatIndexByKey.get(item.id_base) ?? 0;
               return (
-                <ComposerLibraryItem
+                <LibraryMasonryCard
                   key={key}
                   item={item}
                   kind={kind}
                   selected={selected}
+                  hoverPreview={kind === 'video'}
                   onToggleSelect={onToggleSelect ? () => onToggleSelect(itemId) : undefined}
-                  onPreview={() => setPreviewIndex(flatIndex)}
-                  onDelete={() => void handleDelete(item.id_base)}
-                  deleting={deletingId === item.id_base}
+                  onOpen={() => setPreviewIndex(flatIndex)}
                 />
               );
             })}

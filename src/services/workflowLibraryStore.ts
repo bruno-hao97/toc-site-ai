@@ -27,12 +27,12 @@ export interface TemplateGraph {
 }
 
 export const WORKFLOW_GROUP_COLORS = [
-  '#2dd4bf',
-  '#a78bfa',
+  '#53eb67',
+  '#3cd74d',
   '#fbbf24',
   '#f87171',
   '#34d399',
-  '#60a5fa',
+  '#22c55e',
   '#f472b6',
   '#fb923c',
 ];

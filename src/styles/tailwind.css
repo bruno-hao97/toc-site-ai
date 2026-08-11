@@ -21,7 +21,7 @@
     inset: -1px;
     border-radius: inherit;
     padding: 1px;
-    background: linear-gradient(135deg, #53eb67, #22d3ee);
+    background: linear-gradient(135deg, #53eb67, #3cd74d);
     -webkit-mask:
       linear-gradient(#fff 0 0) content-box,
       linear-gradient(#fff 0 0);

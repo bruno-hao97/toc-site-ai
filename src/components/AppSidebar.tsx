@@ -30,7 +30,7 @@ function SidebarLink({
       className={({ isActive }) => `app-sidebar-link${isActive ? ' active' : ''}`}
       onClick={onNavigate}
     >
-      <Icon size={20} strokeWidth={1.75} aria-hidden />
+      <Icon size={22} strokeWidth={1.75} aria-hidden />
       <span className="app-sidebar-label">{label}</span>
     </NavLink>
   );
@@ -50,50 +50,52 @@ export default function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProp
         />
       )}
       <aside
-        className={`app-sidebar${mobileOpen ? ' app-sidebar--open' : ''}`}
+        className={`app-sidebar-shell${mobileOpen ? ' app-sidebar-shell--open' : ''}`}
         aria-label="Điều hướng chính"
       >
-        <div className="app-sidebar-top">
-          <BrandLogo to="/home" />
-        </div>
+        <div className="app-sidebar">
+          <div className="app-sidebar-top">
+            <BrandLogo to="/home" />
+          </div>
 
-        <nav className="app-sidebar-nav">
-          {PRIMARY_NAV.map((item) => (
-            <SidebarLink
-              key={item.to}
-              to={item.to}
-              label={t(item.labelKey)}
-              icon={item.icon}
-              end={item.end}
-              onNavigate={onMobileClose}
-            />
-          ))}
-          <div className="app-sidebar-divider" aria-hidden />
-          {MORE_NAV.map((item) => (
-            <SidebarLink
-              key={item.to}
-              to={item.to}
-              label={t(item.labelKey)}
-              icon={item.icon}
-              onNavigate={onMobileClose}
-            />
-          ))}
-        </nav>
+          <nav className="app-sidebar-nav">
+            {PRIMARY_NAV.map((item) => (
+              <SidebarLink
+                key={item.to}
+                to={item.to}
+                label={t(item.labelKey)}
+                icon={item.icon}
+                end={item.end}
+                onNavigate={onMobileClose}
+              />
+            ))}
+            <div className="app-sidebar-divider" aria-hidden />
+            {MORE_NAV.map((item) => (
+              <SidebarLink
+                key={item.to}
+                to={item.to}
+                label={t(item.labelKey)}
+                icon={item.icon}
+                onNavigate={onMobileClose}
+              />
+            ))}
+          </nav>
 
-        <div className="app-sidebar-footer">
-          <button
-            type="button"
-            className="app-sidebar-footer-btn"
-            aria-label={t('header.switchLang')}
-            onClick={toggleLocale}
-          >
-            <Globe size={16} strokeWidth={1.75} aria-hidden />
-            <span>{locale === 'vi' ? 'VI' : 'EN'}</span>
-          </button>
-          <Link to="/pricing" className="app-sidebar-upgrade" onClick={onMobileClose}>
-            <Coins size={15} strokeWidth={1.75} aria-hidden />
-            <span>{t('header.pricing')}</span>
-          </Link>
+          <div className="app-sidebar-footer">
+            <button
+              type="button"
+              className="app-sidebar-footer-btn"
+              aria-label={t('header.switchLang')}
+              onClick={toggleLocale}
+            >
+              <Globe size={16} strokeWidth={1.75} aria-hidden />
+              <span>{locale === 'vi' ? 'VI' : 'EN'}</span>
+            </button>
+            <Link to="/pricing" className="app-sidebar-upgrade" onClick={onMobileClose}>
+              <Coins size={15} strokeWidth={1.75} aria-hidden />
+              <span>{t('header.pricing')}</span>
+            </Link>
+          </div>
         </div>
       </aside>
     </>

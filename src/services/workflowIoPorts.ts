@@ -2,23 +2,23 @@ import type { WfPortDef } from './workflowAiGenPorts';
 
 export const TEXT_PORTS = {
   in: [
-    { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
-    { id: 'text-in', label: 'Văn bản', color: '#60a5fa' },
+    { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
+    { id: 'text-in', label: 'Văn bản', color: '#53eb67' },
   ],
   out: [
     { id: 'done', label: 'Xong', color: '#e5e7eb' },
-    { id: 'text-out', label: 'Văn bản', color: '#60a5fa' },
+    { id: 'text-out', label: 'Văn bản', color: '#53eb67' },
   ],
 } as const satisfies { in: WfPortDef[]; out: WfPortDef[] };
 
 export const OUTPUT_PORTS = {
   in: [
-    { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
+    { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
     { id: 'data', label: 'Dữ liệu', color: '#94a3b8' },
     { id: 'image', label: 'Ảnh', color: '#c084fc' },
-    { id: 'video', label: 'Video', color: '#60a5fa' },
+    { id: 'video', label: 'Video', color: '#53eb67' },
     { id: 'audio', label: 'Âm thanh', color: '#34d399' },
-    { id: 'text', label: 'Văn bản', color: '#60a5fa' },
+    { id: 'text', label: 'Văn bản', color: '#53eb67' },
     { id: 'note', label: 'Ghi chú', color: '#fbbf24' },
   ],
   out: [
@@ -29,18 +29,18 @@ export const OUTPUT_PORTS = {
 
 export const RENDER_PORTS = {
   in: [
-    { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
-    { id: 'video', label: 'Video', color: '#60a5fa' },
+    { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
+    { id: 'video', label: 'Video', color: '#53eb67' },
   ],
   out: [
     { id: 'done', label: 'Xong', color: '#e5e7eb' },
-    { id: 'video', label: 'Video', color: '#60a5fa' },
+    { id: 'video', label: 'Video', color: '#53eb67' },
   ],
 } as const satisfies { in: WfPortDef[]; out: WfPortDef[] };
 
 export const UPSCALE_IMAGE_PORTS = {
   in: [
-    { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
+    { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
     { id: 'image', label: 'Ảnh', color: '#c084fc' },
   ],
   out: [
@@ -51,25 +51,25 @@ export const UPSCALE_IMAGE_PORTS = {
 
 export const LIPSYNC_PORTS = {
   in: [
-    { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
+    { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
     { id: 'image', label: 'Ảnh', color: '#c084fc' },
     { id: 'audio', label: 'Âm thanh', color: '#34d399' },
-    { id: 'text', label: 'Văn bản', color: '#60a5fa' },
+    { id: 'text', label: 'Văn bản', color: '#53eb67' },
   ],
   out: [
     { id: 'done', label: 'Xong', color: '#e5e7eb' },
-    { id: 'media-out', label: 'URL Video', color: '#60a5fa' },
+    { id: 'media-out', label: 'URL Video', color: '#53eb67' },
   ],
 } as const satisfies { in: WfPortDef[]; out: WfPortDef[] };
 
 export const MERGE_PORTS = {
   in: [
-    { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
+    { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
     { id: 'data', label: 'Dữ liệu', color: '#94a3b8' },
     { id: 'image', label: 'Ảnh', color: '#c084fc' },
-    { id: 'video', label: 'Video', color: '#60a5fa' },
+    { id: 'video', label: 'Video', color: '#53eb67' },
     { id: 'audio', label: 'Âm thanh', color: '#34d399' },
-    { id: 'text', label: 'Văn bản', color: '#60a5fa' },
+    { id: 'text', label: 'Văn bản', color: '#53eb67' },
   ],
   out: [
     { id: 'done', label: 'Xong', color: '#e5e7eb' },
@@ -80,35 +80,35 @@ export const MERGE_PORTS = {
 
 export const EXTRACT_MEDIA_PORTS = {
   in: [
-    { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
-    { id: 'media-in', label: 'Media vào', color: '#60a5fa' },
+    { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
+    { id: 'media-in', label: 'Media vào', color: '#53eb67' },
   ],
   out: [
     { id: 'done', label: 'Xong', color: '#e5e7eb' },
-    { id: 'media-out', label: 'Media', color: '#60a5fa' },
+    { id: 'media-out', label: 'Media', color: '#53eb67' },
     { id: 'first-frame', label: 'Frame đầu', color: '#c084fc' },
     { id: 'image', label: 'Ảnh', color: '#c084fc' },
-    { id: 'video', label: 'Video', color: '#60a5fa' },
+    { id: 'video', label: 'Video', color: '#53eb67' },
     { id: 'audio', label: 'Âm thanh', color: '#34d399' },
   ],
 } as const satisfies { in: WfPortDef[]; out: WfPortDef[] };
 
 export const AGENT_PORTS = {
   in: [
-    { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
-    { id: 'text-in', label: 'Văn bản', color: '#60a5fa' },
+    { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
+    { id: 'text-in', label: 'Văn bản', color: '#53eb67' },
   ],
   out: [
     { id: 'done', label: 'Xong', color: '#e5e7eb' },
-    { id: 'text-out', label: 'Văn bản', color: '#60a5fa' },
+    { id: 'text-out', label: 'Văn bản', color: '#53eb67' },
   ],
 } as const satisfies { in: WfPortDef[]; out: WfPortDef[] };
 
 const MEDIA_PROCESS_IN = [
-  { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
+  { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
   { id: 'image', label: 'Ảnh', color: '#c084fc' },
-  { id: 'video', label: 'Video', color: '#60a5fa' },
-  { id: 'text', label: 'Văn bản', color: '#60a5fa' },
+  { id: 'video', label: 'Video', color: '#53eb67' },
+  { id: 'text', label: 'Văn bản', color: '#53eb67' },
 ] as const satisfies WfPortDef[];
 
 const MEDIA_PROCESS_OUT = [
@@ -118,7 +118,7 @@ const MEDIA_PROCESS_OUT = [
 
 export const REMOVE_BG_PORTS = {
   in: [
-    { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
+    { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
     { id: 'image', label: 'Ảnh', color: '#c084fc' },
   ],
   out: MEDIA_PROCESS_OUT,
@@ -126,12 +126,12 @@ export const REMOVE_BG_PORTS = {
 
 export const UPSCALE_VIDEO_PORTS = {
   in: [
-    { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
-    { id: 'video', label: 'Video', color: '#60a5fa' },
+    { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
+    { id: 'video', label: 'Video', color: '#53eb67' },
   ],
   out: [
     { id: 'done', label: 'Xong', color: '#e5e7eb' },
-    { id: 'media-out', label: 'URL Video', color: '#60a5fa' },
+    { id: 'media-out', label: 'URL Video', color: '#53eb67' },
   ],
 } as const satisfies { in: WfPortDef[]; out: WfPortDef[] };
 
@@ -139,52 +139,52 @@ export const VFX_PORTS = {
   in: MEDIA_PROCESS_IN,
   out: [
     { id: 'done', label: 'Xong', color: '#e5e7eb' },
-    { id: 'media-out', label: 'URL Video', color: '#60a5fa' },
+    { id: 'media-out', label: 'URL Video', color: '#53eb67' },
   ],
 } as const satisfies { in: WfPortDef[]; out: WfPortDef[] };
 
 export const SUBTITLE_PORTS = {
   in: [
-    { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
-    { id: 'video', label: 'Video', color: '#60a5fa' },
-    { id: 'text', label: 'Phụ đề', color: '#60a5fa' },
+    { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
+    { id: 'video', label: 'Video', color: '#53eb67' },
+    { id: 'text', label: 'Phụ đề', color: '#53eb67' },
     { id: 'audio', label: 'Âm thanh', color: '#34d399' },
   ],
   out: [
     { id: 'done', label: 'Xong', color: '#e5e7eb' },
-    { id: 'media-out', label: 'URL Video', color: '#60a5fa' },
+    { id: 'media-out', label: 'URL Video', color: '#53eb67' },
   ],
 } as const satisfies { in: WfPortDef[]; out: WfPortDef[] };
 
 export const CUT_VIDEO_PORTS = {
   in: [
-    { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
-    { id: 'video', label: 'Video', color: '#60a5fa' },
+    { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
+    { id: 'video', label: 'Video', color: '#53eb67' },
   ],
   out: [
     { id: 'done', label: 'Xong', color: '#e5e7eb' },
-    { id: 'media-out', label: 'URL Video', color: '#60a5fa' },
+    { id: 'media-out', label: 'URL Video', color: '#53eb67' },
   ],
 } as const satisfies { in: WfPortDef[]; out: WfPortDef[] };
 
 export const KOLS_PORTS = {
-  in: [{ id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' }],
+  in: [{ id: 'trigger', label: 'Kích hoạt', color: '#53eb67' }],
   out: [
     { id: 'done', label: 'Xong', color: '#e5e7eb' },
     { id: 'image', label: 'Ảnh KOL', color: '#c084fc' },
-    { id: 'text-out', label: 'Tên KOL', color: '#60a5fa' },
+    { id: 'text-out', label: 'Tên KOL', color: '#53eb67' },
   ],
 } as const satisfies { in: WfPortDef[]; out: WfPortDef[] };
 
 export const DATA_TABLE_PORTS = {
   in: [
-    { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
+    { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
     { id: 'data', label: 'Dữ liệu', color: '#94a3b8' },
-    { id: 'text', label: 'Văn bản', color: '#60a5fa' },
+    { id: 'text', label: 'Văn bản', color: '#53eb67' },
   ],
   out: [
     { id: 'done', label: 'Xong', color: '#e5e7eb' },
-    { id: 'text-out', label: 'JSON', color: '#60a5fa' },
+    { id: 'text-out', label: 'JSON', color: '#53eb67' },
     { id: 'out', label: 'Hàng đầu', color: '#34d399' },
   ],
 } as const satisfies { in: WfPortDef[]; out: WfPortDef[] };

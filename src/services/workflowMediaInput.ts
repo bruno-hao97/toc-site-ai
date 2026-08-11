@@ -164,7 +164,7 @@ export async function extractVideoFirstFrame(videoUrl: string): Promise<string> 
 export const MEDIA_INPUT_PORTS = {
   image: {
     in: [
-      { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
+      { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
       { id: 'media-in', label: 'Ảnh vào', color: '#c084fc' },
       { id: 'merge', label: 'Gộp ảnh', color: '#c084fc' },
     ],
@@ -176,13 +176,13 @@ export const MEDIA_INPUT_PORTS = {
   },
   video: {
     in: [
-      { id: 'trigger', label: 'Kích hoạt', color: '#22d3ee' },
-      { id: 'media-in', label: 'Video vào', color: '#60a5fa' },
-      { id: 'merge', label: 'Gộp video', color: '#60a5fa' },
+      { id: 'trigger', label: 'Kích hoạt', color: '#53eb67' },
+      { id: 'media-in', label: 'Video vào', color: '#53eb67' },
+      { id: 'merge', label: 'Gộp video', color: '#53eb67' },
     ],
     out: [
       { id: 'done', label: 'Xong', color: '#e5e7eb' },
-      { id: 'media-out', label: 'Video', color: '#60a5fa' },
+      { id: 'media-out', label: 'Video', color: '#53eb67' },
       { id: 'first-frame', label: 'Frame đầu tiên', color: '#c084fc' },
     ],
   },

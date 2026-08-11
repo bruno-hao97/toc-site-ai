@@ -789,6 +789,8 @@ function isVideoMediaUrl(url: string): boolean {
   return /\.(mp4|webm|mov|m4v|m3u8|avi)(\?|$)/i.test(base) || base.includes('/video/');
 }
 
+export { isVideoMediaUrl };
+
 export function isAudioMediaUrl(url: string): boolean {
   const base = url.split('?')[0].split('#')[0].toLowerCase();
   return /\.(mp3|wav|ogg|m4a|aac|flac|opus)(\?|$)/i.test(base) || base.includes('/audio/');
@@ -861,10 +863,25 @@ export function feedPosterUrl(item: FeedItem): string | null {
 
 export function feedMediaUrl(item: FeedItem): string | null {
   const finished = item.resolutions?.find((r) => r.status === 'FINISH' && r.url);
-  if (finished?.url) return finished.url;
-  if (item.download_url?.trim()) return item.download_url;
+  if (finished?.url?.trim()) return finished.url.trim();
+  if (item.download_url?.trim()) return item.download_url.trim();
   const anyRes = item.resolutions?.find((r) => r.url);
-  return anyRes?.url || null;
+  if (anyRes?.url?.trim()) return anyRes.url.trim();
+  if (item.url?.trim()) return item.url.trim();
+  return null;
+}
+
+/** Direct video URL for hover preview / playback (excludes audio). */
+export function feedVideoPreviewUrl(item: FeedItem): string | null {
+  const t = (item.type || '').toLowerCase();
+  if (t === 'image' || t === 'image-upscale' || t === 'remove-bg') return null;
+  if (t === 'music' || t === 'tts' || t.includes('audio')) return null;
+
+  const media = feedMediaUrl(item);
+  if (!media || isAudioMediaUrl(media)) return null;
+  if (isVideoMediaUrl(media)) return media;
+  if (t === 'video' || t === 'avatar-lipsync') return media;
+  return null;
 }
 
 export function feedSourceCount(item: FeedItem): number {

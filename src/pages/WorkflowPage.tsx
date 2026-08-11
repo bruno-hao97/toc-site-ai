@@ -1604,7 +1604,7 @@ function WfEdge({
         interactionWidth={26}
         style={{
           ...style,
-          stroke: active ? 'var(--brand, #2dd4bf)' : (style?.stroke as string | undefined),
+          stroke: active ? 'var(--brand, #53eb67)' : (style?.stroke as string | undefined),
           strokeWidth: active ? 2.5 : (style?.strokeWidth as number | undefined),
         }}
       />
@@ -1672,7 +1672,7 @@ const NODE_GROUPS: NodeGroup[] = [
   {
     id: 'control',
     label: 'Luồng điều khiển',
-    color: '#a78bfa',
+    color: '#53eb67',
     icon: GitBranch,
     nodes: [
       { key: 'start', label: 'Bắt đầu', icon: Play, implemented: true },
@@ -1687,7 +1687,7 @@ const NODE_GROUPS: NodeGroup[] = [
   {
     id: 'content',
     label: 'Tạo nội dung AI',
-    color: '#2dd4bf',
+    color: '#53eb67',
     icon: Sparkles,
     defaultOpen: true,
     nodes: [
@@ -1702,7 +1702,7 @@ const NODE_GROUPS: NodeGroup[] = [
   {
     id: 'process',
     label: 'Xử lý',
-    color: '#a78bfa',
+    color: '#53eb67',
     icon: Wand2,
     nodes: [
       { key: 'api', label: 'Gọi API', icon: Globe, implemented: true },

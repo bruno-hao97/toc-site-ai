@@ -25,14 +25,14 @@ export interface ProjectItem {
 export type ProjectItemSnapshot = Omit<ProjectItem, 'projectId' | 'addedAt'>;
 
 export const PROJECT_COLORS = [
-  '#2dd4bf',
-  '#60a5fa',
-  '#a78bfa',
+  '#53eb67',
+  '#3cd74d',
+  '#22c55e',
   '#f472b6',
   '#fbbf24',
   '#34d399',
   '#f87171',
-  '#38bdf8',
+  '#16a34a',
 ];
 
 const EVENT = 'projects:updated';

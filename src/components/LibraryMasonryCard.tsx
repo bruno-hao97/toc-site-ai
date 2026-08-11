@@ -4,9 +4,9 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type MouseEvent,
 } from 'react';
-import { Heart, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
+import ComposerSelectCircle from './ComposerSelectCircle';
 import {
   feedPosterUrl,
   feedThumb,
@@ -14,7 +14,6 @@ import {
   isVideoMediaUrl,
   type FeedItem,
 } from '../services/feedApi';
-import { isFavorite, toggleFavorite } from '../services/feedFavoritesStore';
 import {
   releaseFeedHoverPreview,
   requestFeedHoverPreview,
@@ -36,19 +35,21 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-export default function FeedMasonryCard({
+export default function LibraryMasonryCard({
   item,
+  kind,
+  selected = false,
+  onToggleSelect,
   onOpen,
-  onFavoriteChange,
   hoverPreview = false,
 }: {
   item: FeedItem;
+  kind: 'image' | 'video';
+  selected?: boolean;
+  onToggleSelect?: () => void;
   onOpen?: () => void;
-  onFavoriteChange?: () => void;
-  /** Leo-style muted video preview on hover (community feed). */
   hoverPreview?: boolean;
 }) {
-  const [fav, setFav] = useState(() => isFavorite(item.id_base));
   const [previewing, setPreviewing] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const itemIdRef = useRef(item.id_base);
@@ -60,11 +61,9 @@ export default function FeedMasonryCard({
   const poster = feedPosterUrl(item);
   const posterIsImage = Boolean(poster && !isVideoMediaUrl(poster));
   const previewUrl = feedVideoPreviewUrl(item);
-  const video = Boolean(previewUrl);
-  const canHoverPreview = hoverPreview && video && !reducedMotion;
-  const author = item.author?.name || 'Ẩn danh';
-  const likes = item.likes_count ?? item.like_count ?? 0;
-  const openable = Boolean(onOpen && (previewUrl || thumb));
+  const isVideo = kind === 'video' || Boolean(previewUrl);
+  const canHoverPreview = hoverPreview && isVideo && Boolean(previewUrl) && !reducedMotion;
+  const openable = Boolean(onOpen && (previewUrl || thumb || poster));
 
   const stopPreview = useCallback(() => {
     setPreviewing(false);
@@ -86,12 +85,6 @@ export default function FeedMasonryCard({
     void el.play().catch(() => stopPreview());
   }, [previewUrl, stopPreview]);
 
-  useEffect(() => {
-    const sync = () => setFav(isFavorite(item.id_base));
-    document.addEventListener('favorites:updated', sync);
-    return () => document.removeEventListener('favorites:updated', sync);
-  }, [item.id_base]);
-
   useLayoutEffect(() => {
     if (previewing) playPreview();
   }, [previewing, playPreview]);
@@ -102,14 +95,6 @@ export default function FeedMasonryCard({
       stopPreview();
     };
   }, [stopPreview]);
-
-  const onHeart = (e: MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const next = toggleFavorite(item.id_base, item);
-    setFav(next);
-    onFavoriteChange?.();
-  };
 
   const onPointerEnter = () => {
     if (!canHoverPreview) return;
@@ -123,7 +108,7 @@ export default function FeedMasonryCard({
   };
 
   return (
-    <article className="feed-masonry-card">
+    <article className={`feed-masonry-card${selected ? ' selected' : ''}`}>
       <div
         className={`feed-masonry-media${openable ? ' feed-masonry-media-openable' : ''}${previewing ? ' feed-masonry-media--previewing' : ''}`}
         role={openable ? 'button' : undefined}
@@ -142,7 +127,7 @@ export default function FeedMasonryCard({
       >
         {posterIsImage ? (
           <img className="feed-masonry-poster" src={poster!} alt="" loading="lazy" />
-        ) : video ? (
+        ) : isVideo && !thumb ? (
           <span className="feed-masonry-empty feed-masonry-empty--video" aria-hidden />
         ) : thumb ? (
           <img className="feed-masonry-poster" src={thumb} alt="" loading="lazy" />
@@ -162,38 +147,21 @@ export default function FeedMasonryCard({
           />
         )}
 
-        {video && (
+        {isVideo && (
           <span className="feed-masonry-play">
             <Play size={16} fill="currentColor" />
           </span>
         )}
 
-        <span className="feed-masonry-type">{video ? 'Video' : 'Ảnh'}</span>
+        <span className="feed-masonry-type">{isVideo ? 'Video' : 'Ảnh'}</span>
 
-        {item.duration && Number(item.duration) > 0 && (
+        {item.duration && Number(item.duration) > 0 && !onToggleSelect && (
           <span className="feed-masonry-duration">{item.duration}s</span>
         )}
 
-        <div className="feed-masonry-overlay">
-          <div className="feed-masonry-user">
-            {item.author?.avatar ? (
-              <img className="feed-masonry-avatar" src={item.author.avatar} alt="" loading="lazy" />
-            ) : (
-              <span className="feed-masonry-avatar feed-masonry-avatar-empty" />
-            )}
-            <span className="feed-masonry-name">{author}</span>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          className={`feed-masonry-fav${fav ? ' fav-on' : ''}`}
-          aria-label={fav ? 'Bỏ yêu thích' : 'Yêu thích'}
-          onClick={onHeart}
-        >
-          <Heart size={14} fill={fav ? 'currentColor' : 'none'} />
-          {(fav || likes > 0) && <span>{fav ? Math.max(likes, 1) : likes}</span>}
-        </button>
+        {onToggleSelect && (
+          <ComposerSelectCircle selected={selected} onToggle={onToggleSelect} />
+        )}
       </div>
     </article>
   );

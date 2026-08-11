@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Lock, Mail, Phone, User, UserPlus, X } from 'lucide-react';
 import { loginWithPlatformSession } from '../services/authStore';
 import { platformRegister, PlatformAuthError } from '../services/platformAuth';
 
@@ -37,62 +38,85 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="page auth-page">
-      <div className="auth-card panel">
-        <h1>Đăng ký</h1>
-        <p className="lead">Tạo tài khoản AGI Center miễn phí.</p>
+    <div className="page auth-page auth-login">
+      <div className="auth-card auth-card-79 auth-card-glass">
+        <button type="button" className="auth-close" onClick={() => navigate(-1)} aria-label="Đóng">
+          <X size={18} />
+        </button>
+
+        <div className="auth-head">
+          <div className="auth-head-icon auth-head-icon-purple">
+            <UserPlus size={26} />
+          </div>
+          <h1>Đăng ký</h1>
+          <p>Tạo tài khoản AGI Center miễn phí.</p>
+        </div>
 
         <form onSubmit={handleSubmit} className="form">
           <label className="field">
             <span className="label">Tên hiển thị</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Tên của bạn"
-            />
+            <span className="auth-input">
+              <User size={16} className="auth-input-icon" />
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Tên của bạn"
+                autoComplete="name"
+              />
+            </span>
           </label>
           <label className="field">
             <span className="label">Email</span>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-            />
+            <span className="auth-input">
+              <Mail size={16} className="auth-input-icon" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+                required
+              />
+            </span>
           </label>
           <label className="field">
             <span className="label">Số điện thoại</span>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="0xxxxxxxxx"
-              required
-            />
+            <span className="auth-input">
+              <Phone size={16} className="auth-input-icon" />
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="0xxxxxxxxx"
+                autoComplete="tel"
+                required
+              />
+            </span>
           </label>
           <label className="field">
             <span className="label">Mật khẩu (≥6 ký tự)</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              minLength={6}
-              placeholder="••••••••"
-              required
-            />
+            <span className="auth-input">
+              <Lock size={16} className="auth-input-icon" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={6}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                required
+              />
+            </span>
           </label>
           {error && <p className="error">{error}</p>}
-          <button type="submit" className="btn primary" disabled={loading}>
+          <button type="submit" className="btn auth-submit" disabled={loading}>
             {loading ? 'Đang tạo tài khoản…' : 'Đăng ký'}
           </button>
         </form>
 
-        <div className="auth-links">
-          <span>
-            Đã có tài khoản? <Link to="/login">Đăng nhập</Link>
-          </span>
-        </div>
+        <p className="auth-register">
+          Đã có tài khoản? <Link to="/login">Đăng nhập</Link>
+        </p>
       </div>
     </div>
   );

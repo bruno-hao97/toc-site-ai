@@ -40,10 +40,10 @@ const TIME_TABS: { id: string; label: string; days: number | null }[] = [
 const CHART_TABS = [7, 14, 30];
 
 const CATEGORY_STYLE: Record<Category, { color: string; bg: string; icon: LucideIcon }> = {
-  image: { color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', icon: ImageIcon },
+  image: { color: '#53eb67', bg: 'rgba(83,235,103,0.12)', icon: ImageIcon },
   video: { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)', icon: Video },
   audio: { color: '#4ade80', bg: 'rgba(74,222,128,0.12)', icon: Mic },
-  music: { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)', icon: Music },
+  music: { color: '#53eb67', bg: 'rgba(83,235,103,0.12)', icon: Music },
   other: { color: 'var(--muted)', bg: 'rgba(255,255,255,0.06)', icon: Sparkles },
 };
 

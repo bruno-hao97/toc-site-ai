@@ -55,8 +55,10 @@ export default function HomeLeonardoHero() {
         <nav className="home-leonardo-chips" aria-label="Lối tắt studio">
           {CHIPS.map(({ to, label, icon: Icon }) => (
             <Link key={to} to={to} className="home-leonardo-chip">
-              <Icon size={15} strokeWidth={1.75} aria-hidden />
-              <span>{label}</span>
+              <span className="home-leonardo-chip-icon">
+                <Icon size={22} strokeWidth={1.75} aria-hidden />
+              </span>
+              <span className="home-leonardo-chip-label">{label}</span>
             </Link>
           ))}
         </nav>

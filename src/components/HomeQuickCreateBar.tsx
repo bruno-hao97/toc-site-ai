@@ -80,6 +80,7 @@ function typeShortLabel(type: JobType): string {
 }
 
 const HERO_COLLAPSED_PLACEHOLDER = 'Nhập mô tả để tạo ảnh hoặc video…';
+const HERO_PROMPT_PLACEHOLDER = 'Mô tả điều bạn muốn tạo…';
 
 function promptPlaceholder(type: JobType): string {
   switch (type) {
@@ -389,7 +390,7 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
     description: modelPriceRangeLabel(m) || undefined,
   }));
 
-  const showStoryboard = expanded && (type === 'video' || type === 'image');
+  const showStoryboard = expanded && !isHero && (type === 'video' || type === 'image');
 
   const menuCount = (item: QuickMenuItem): number | null => {
     if (item.fixedCount != null) return item.fixedCount;
@@ -416,9 +417,35 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
     }
   };
 
-  const heroCollapsed = isHero && !expanded;
-  const promptPlaceholderText =
-    heroCollapsed ? HERO_COLLAPSED_PLACEHOLDER : promptPlaceholder(type);
+  const promptPlaceholderText = isHero
+    ? expanded
+      ? HERO_PROMPT_PLACEHOLDER
+      : HERO_COLLAPSED_PLACEHOLDER
+    : promptPlaceholder(type);
+
+  const generateDisabled =
+    submitting ||
+    providerBusy ||
+    loadingModels ||
+    (!prompt.trim() && refs.length === 0);
+
+  const renderGenerateBtn = () => (
+    <button
+      type="button"
+      className="qc-generate-btn"
+      onClick={(e) => {
+        e.stopPropagation();
+        void submit();
+      }}
+      disabled={generateDisabled}
+    >
+      {submitting || providerBusy ? (
+        <Loader2 size={16} className="qc-spin" />
+      ) : (
+        'Tạo'
+      )}
+    </button>
+  );
 
   const openHeroBar = () => {
     setExpanded(true);
@@ -430,7 +457,7 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
       ref={barRef}
       className={`qc-bar${isHero ? ' qc-bar--hero' : ''}${expanded ? ' expanded' : ''}`}
       aria-label="Tạo nhanh ảnh, video, giọng nói"
-      onClick={heroCollapsed ? openHeroBar : undefined}
+      onClick={isHero && !expanded ? openHeroBar : undefined}
     >
       <div className="qc-hero-prompt-shell">
         <div className="qc-prompt-row">
@@ -455,20 +482,20 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
             rows={isHero ? (expanded ? 2 : 1) : expanded ? 2 : 1}
             placeholder={promptPlaceholderText}
             value={prompt}
-            readOnly={heroCollapsed}
             onChange={(e) => setPrompt(e.target.value)}
             onFocus={() => {
-              if (heroCollapsed) openHeroBar();
+              if (isHero) openHeroBar();
               else setExpanded(true);
             }}
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && expanded) {
+              if (e.key === 'Enter' && !e.shiftKey && (expanded || isHero)) {
                 e.preventDefault();
                 void submit();
               }
             }}
           />
+          {isHero && !expanded && renderGenerateBtn()}
         </div>
       </div>
 
@@ -476,7 +503,7 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
         className={`qc-hero-expand${expanded ? ' qc-hero-expand--open' : ''}`}
         aria-hidden={isHero && !expanded}
       >
-        {result && (
+        {result && !isHero && (
           <div className="qc-result">
             <button type="button" className="qc-result-close" onClick={() => setResult(null)}>
               <X size={14} />
@@ -534,8 +561,8 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
           </div>
         )}
 
-        {error && <div className="qc-error">{error}</div>}
-        {info && !error && <div className="qc-info">{info}</div>}
+        {error && !isHero && <div className="qc-error">{error}</div>}
+        {info && !error && !isHero && <div className="qc-info">{info}</div>}
 
         <div className="qc-toolbar">
         {isHero ? (
@@ -688,23 +715,7 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
           {cost > 0 && <span className="qc-cost">{cost.toLocaleString('vi-VN')}</span>}
           {progress && <span className="qc-progress">{progress}</span>}
           {isHero ? (
-            <button
-              type="button"
-              className="qc-generate-btn"
-              onClick={() => void submit()}
-              disabled={
-                submitting ||
-                providerBusy ||
-                loadingModels ||
-                (!prompt.trim() && refs.length === 0)
-              }
-            >
-              {submitting || providerBusy ? (
-                <Loader2 size={16} className="qc-spin" />
-              ) : (
-                'Tạo'
-              )}
-            </button>
+            renderGenerateBtn()
           ) : (
             <button
               type="button"
@@ -723,6 +734,30 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
         </div>
       </div>
       </div>
+
+      {isHero && (result || error || info) && (
+        <div className="qc-hero-feedback">
+          {result && (
+            <div className="qc-result">
+              <button type="button" className="qc-result-close" onClick={() => setResult(null)}>
+                <X size={14} />
+              </button>
+              {result.type === 'video' ? (
+                <video src={result.url} controls className="qc-result-media" />
+              ) : result.type === 'image' ? (
+                <img src={result.url} alt="kết quả" className="qc-result-media" />
+              ) : (
+                <audio src={result.url} controls className="qc-result-audio" />
+              )}
+              <a href={result.url} target="_blank" rel="noreferrer" className="qc-result-link">
+                Mở kết quả
+              </a>
+            </div>
+          )}
+          {error && <div className="qc-error">{error}</div>}
+          {info && !error && <div className="qc-info">{info}</div>}
+        </div>
+      )}
     </div>
   );
 }

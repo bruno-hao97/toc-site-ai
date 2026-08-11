@@ -13,8 +13,8 @@
   --color-focus: oklch(82% 0.21 145);
 
   --color-tool-violet: oklch(72% 0.16 285);
-  --color-tool-blue: oklch(72% 0.14 250);
-  --color-tool-teal: oklch(74% 0.12 195);
+  --color-tool-blue: oklch(82% 0.21 145);
+  --color-tool-teal: oklch(72% 0.16 145);
   --color-tool-rose: oklch(68% 0.14 15);
 
   --font-display: 'Plus Jakarta Sans', 'IBM Plex Sans', system-ui, sans-serif;
