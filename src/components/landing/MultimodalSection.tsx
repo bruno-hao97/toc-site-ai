@@ -2,12 +2,12 @@ import { Code2, Image, MessageSquare, Mic, Music, Video } from 'lucide-react';
 import LandingShot from './LandingShot';
 
 const capabilities = [
-  { icon: Image, label: 'Tạo ảnh', detail: 'Flux · MidJourney · Nano Babana Pro' },
-  { icon: Video, label: 'Tạo video', detail: 'Kling · Veo · Seedance' },
+  { icon: Image, label: 'Tạo ảnh', detail: 'Nano Banana · GPT Image 2 · MJ 8' },
+  { icon: Video, label: 'Tạo video', detail: 'Minimax H3 · Kling · Seedance' },
   { icon: Mic, label: 'Giọng nói', detail: 'ElevenLabs · Murf' },
   { icon: Music, label: 'Tạo nhạc', detail: 'Suno · Udio' },
-  { icon: MessageSquare, label: 'Chat & suy luận', detail: 'GPT-4o · Gemini · Claude' },
-  { icon: Code2, label: 'Viết code', detail: 'Claude · Codex' },
+  { icon: MessageSquare, label: 'Chat & suy luận', detail: 'GPT-5.5 · DeepSeek · GLM' },
+  { icon: Code2, label: 'Viết code', detail: 'DeepSeek V4 · Composer' },
 ];
 
 const flows = ['Text → Image → Video', 'Image → Video', 'Text → Speech', 'Audio → Text', 'Text → Code'];

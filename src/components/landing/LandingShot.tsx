@@ -7,22 +7,39 @@ import {
 } from '../../lib/landingMedia';
 
 interface Props {
-  slot: LandingMediaSlot;
+  slot?: LandingMediaSlot;
+  /** URL tùy chỉnh — bỏ qua Magnific CDN khi có. */
+  src?: string;
   alt: string;
   priority?: boolean;
   sizes?: string;
   className?: string;
-  showCaption?: boolean;
 }
 
 export default function LandingShot({
   slot,
+  src,
   alt,
   priority = false,
   sizes,
   className = '',
-  showCaption = false,
 }: Props) {
+  if (src) {
+    return (
+      <figure className={`landing-shot${className ? ` ${className}` : ''}`}>
+        <img
+          src={src}
+          alt={alt}
+          loading={priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : undefined}
+          decoding="async"
+        />
+      </figure>
+    );
+  }
+
+  if (!slot) return null;
+
   const slug = LANDING_MEDIA[slot];
 
   return (
@@ -36,9 +53,6 @@ export default function LandingShot({
         fetchPriority={priority ? 'high' : undefined}
         decoding="async"
       />
-      {showCaption ? (
-        <figcaption className="landing-shot-cap">Ảnh demo · thay bằng screenshot AGI Center</figcaption>
-      ) : null}
     </figure>
   );
 }

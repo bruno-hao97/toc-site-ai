@@ -1,5 +1,3 @@
-import { Link } from 'react-router-dom';
-import { appEntryPath } from '../../lib/landingConfig';
 import LandingShot from './LandingShot';
 
 const plans = [
@@ -9,7 +7,6 @@ const plans = [
     fromPrice: '0.2',
     unit: 'credits / 1K ký tự',
     features: ['ElevenLabs & Mumax', 'Đa ngôn ngữ & cảm xúc'],
-    featured: false,
   },
   {
     tier: 'Image',
@@ -21,7 +18,6 @@ const plans = [
       'Tạo ảnh siêu tốc',
       'Quyền thương mại',
     ],
-    featured: true,
   },
   {
     tier: 'Video',
@@ -33,13 +29,10 @@ const plans = [
       'Chất lượng 1080p',
       'Chuyển đổi thương mại',
     ],
-    featured: false,
   },
 ];
 
 export default function PricingSection() {
-  const appPath = appEntryPath();
-
   return (
     <section id="pricing" className="pricing-section">
       <div className="container">
@@ -61,10 +54,7 @@ export default function PricingSection() {
 
         <div className="pricing-grid">
           {plans.map((plan) => (
-            <article
-              key={plan.name}
-              className={`pricing-card${plan.featured ? ' featured' : ''}`}
-            >
+            <article key={plan.name} className="pricing-card">
               <p className="pricing-tier">{plan.tier}</p>
               <h3 className="pricing-name">{plan.name}</h3>
               <span className="price-num">{plan.fromPrice}</span>
@@ -74,12 +64,6 @@ export default function PricingSection() {
                   <li key={f}>{f}</li>
                 ))}
               </ul>
-              <Link
-                to={appPath}
-                className={`pricing-cta${plan.featured ? ' solid' : ' ghost'}`}
-              >
-                Bắt đầu ngay
-              </Link>
             </article>
           ))}
         </div>

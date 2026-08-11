@@ -46,7 +46,7 @@ export default function FeaturesSection() {
                 <span className="tok-kw">const</span> <span className="tok-fn">response</span> ={' '}
                 <span className="tok-kw">await</span> ai.generate({'{'}
                 {'\n'}
-                {'  '}model: <span className="tok-str">&quot;gemini-2.5-pro&quot;</span>,{'\n'}
+                {'  '}model: <span className="tok-str">&quot;gpt-5.5::cheap&quot;</span>,{'\n'}
                 {'  '}prompt: <span className="tok-str">&quot;…&quot;</span>{'\n'}
                 {'}'});
                 {'\n'}

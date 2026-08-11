@@ -1,31 +1,86 @@
+import { Link } from 'react-router-dom';
 import BrandLogo from '../BrandLogo';
-import { CONTACT_PHONE_TEL, contactPhoneLine } from '../../lib/brand';
+import { BRAND_NAME, CONTACT_PHONE_TEL, contactPhoneLine } from '../../lib/brand';
+import { SUPPORT_LINKS } from '../../config/supportLinks';
+import { scrollAppToTop } from '../../lib/scrollAppToTop';
+import { APP_SITE_URL } from '../../services/settingsStore';
+import SupportLinkIcons from '../SupportLinkIcons';
 
-const footLinks = [
-  { label: 'Models', href: '#models' },
+const FOOT_PLATFORM = [
+  { label: 'Tính năng', href: '/features' },
+  { label: 'Models', href: '/models' },
   { label: 'Khám phá', href: '/explore' },
   { label: 'Bảng giá', href: '/pricing' },
+] as const;
+
+const FOOT_LEGAL = [
+  { label: 'Chính sách bảo mật', href: '/privacy' },
+  { label: 'Điều khoản dịch vụ', href: '/terms' },
   { label: contactPhoneLine('Liên hệ'), href: CONTACT_PHONE_TEL },
-];
+] as const;
+
+function FootLink({ label, href }: { label: string; href: string }) {
+  if (href.startsWith('/') && !href.startsWith('//')) {
+    return (
+      <Link to={href} className="foot-col-link" onClick={() => scrollAppToTop()}>
+        {label}
+      </Link>
+    );
+  }
+
+  return (
+    <a href={href} className="foot-col-link">
+      {label}
+    </a>
+  );
+}
+
+function FootColumn({
+  title,
+  links,
+  ariaLabel,
+}: {
+  title: string;
+  links: ReadonlyArray<{ label: string; href: string }>;
+  ariaLabel: string;
+}) {
+  return (
+    <nav className="foot-col" aria-label={ariaLabel}>
+      <p className="foot-col-title">{title}</p>
+      <ul className="foot-col-links">
+        {links.map((link) => (
+          <li key={link.label}>
+            <FootLink label={link.label} href={link.href} />
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
 
 export default function LandingFooter() {
+  const siteHost = APP_SITE_URL.replace(/^https?:\/\//, '');
+
   return (
     <footer className="footer">
-      <div className="container">
-        <p className="foot-stmt-line">
-          Model mới, giá thật — một cổng cho ảnh, video, nhạc và code.
-        </p>
-        <div className="foot-stmt-meta">
+      <div className="container foot-grid">
+        <div className="foot-col foot-col-brand">
           <BrandLogo to="/" />
-          <nav className="foot-links" aria-label="Footer">
-            {footLinks.map((link) => (
-              <a key={link.label} href={link.href}>
-                {link.label}
-              </a>
-            ))}
-          </nav>
-          <span className="copyright">© {new Date().getFullYear()} AGI Center</span>
+          <p className="foot-tagline">
+            Model mới, giá thật — một cổng cho ảnh, video, nhạc và chat.
+          </p>
+          <SupportLinkIcons links={SUPPORT_LINKS} />
         </div>
+
+        <FootColumn title="Nền tảng" links={FOOT_PLATFORM} ariaLabel="Nền tảng" />
+        <FootColumn title="Pháp lý & hỗ trợ" links={FOOT_LEGAL} ariaLabel="Pháp lý & hỗ trợ" />
+      </div>
+
+      <div className="container foot-bottom">
+        <span className="foot-bottom-copy">
+          © {new Date().getFullYear()} {BRAND_NAME}
+        </span>
+        <span className="foot-bottom-meta">{siteHost}</span>
       </div>
     </footer>
   );

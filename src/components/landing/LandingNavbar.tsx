@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { Zap } from 'lucide-react';
 import BrandLogo from '../BrandLogo';
 import { getCreditsAi, getDisplayUser, isLoggedIn } from '../../services/authStore';
@@ -18,9 +18,13 @@ export default function LandingNavbar() {
         <div className="nav-links">
           {NAV_LINKS.map((item) =>
             item.href.startsWith('/') ? (
-              <Link key={item.label} to={item.href}>
+              <NavLink
+                key={item.label}
+                to={item.href}
+                className={({ isActive }) => (isActive ? 'active' : undefined)}
+              >
                 {item.label}
-              </Link>
+              </NavLink>
             ) : (
               <a key={item.label} href={item.href}>
                 {item.label}

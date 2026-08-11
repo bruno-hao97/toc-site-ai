@@ -1,17 +1,22 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
-import { appEntryPath } from '../../lib/landingConfig';
+import { LANDING_FEATURED_MODELS, type LandingFeaturedModel } from '../../config/landingFeaturedModels';
+import { resolveLandingFeaturedModels } from '../../services/landingFeaturedModels';
 import LandingShot from './LandingShot';
 
-const models = [
-  { name: 'Gemini 1.5 Pro', vendor: 'Google', desc: 'Model AI mạnh nhất của Google tại thời điểm hiện tại' },
-  { name: 'Google Veo', vendor: 'Video', desc: 'Tạo video 1080p từ mô tả văn bản hoặc hình ảnh' },
-  { name: 'Imagen 3', vendor: 'Ảnh', desc: 'Hình ảnh chất lượng cao với độ chi tiết vượt trội' },
-  { name: 'Claude 3.5 Sonnet', vendor: 'Code', desc: 'Tiêu chuẩn cho lập trình và suy luận logic nâng cao' },
-];
-
 export default function ModelsSection() {
-  const appPath = appEntryPath();
+  const [models, setModels] = useState<LandingFeaturedModel[]>(LANDING_FEATURED_MODELS);
+
+  useEffect(() => {
+    let cancelled = false;
+    resolveLandingFeaturedModels().then((next) => {
+      if (!cancelled) setModels(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <section id="models" className="split-section">
@@ -20,26 +25,25 @@ export default function ModelsSection() {
           <div className="models-header">
             <div>
               <h2>Studio &amp; model phổ biến</h2>
-              <p className="models-header-sub">Khám phá các model AI được sử dụng nhiều nhất</p>
+              <p className="models-header-sub">
+                4 model mới nhất trên catalog — tự cập nhật từ AGI Center
+              </p>
             </div>
-            <a href="#models" className="view-all-link">
+            <Link to="/models" className="view-all-link">
               Xem tất cả
               <ArrowRight size={14} />
-            </a>
+            </Link>
           </div>
 
           <div className="model-index">
             {models.map((model) => (
-              <div key={model.name} className="model-row">
+              <article key={model.id} className="model-row">
                 <div className="model-row-main">
                   <h3>{model.name}</h3>
-                  <p>{model.desc}</p>
+                  <p>{model.description}</p>
                 </div>
-                <span className="model-row-tag">{model.vendor}</span>
-                <Link to={appPath} className="model-row-link">
-                  Thử ngay →
-                </Link>
-              </div>
+                <span className="model-row-tag">{model.tag}</span>
+              </article>
             ))}
           </div>
         </div>

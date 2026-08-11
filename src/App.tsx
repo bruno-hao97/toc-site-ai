@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
-import { Coins, Compass, Globe, Menu, X, Zap } from 'lucide-react';
+import { Coins, Globe, Menu, X, Zap } from 'lucide-react';
+import { scrollAppToTop } from './lib/scrollAppToTop';
 import {
   ensureValidPlatformSession,
   handlePlatformAuthFailure,
@@ -36,6 +37,10 @@ import ApiPlaygroundPage from './pages/ApiPlaygroundPage';
 import DashboardPage from './pages/DashboardPage';
 import WalletPage from './pages/WalletPage';
 import PricingPage from './pages/PricingPage';
+import ModelsPage from './pages/ModelsPage';
+import FeaturesPage from './pages/FeaturesPage';
+import PrivacyPage from './pages/PrivacyPage';
+import TermsPage from './pages/TermsPage';
 import ChatPage from './pages/ChatPage';
 import AccountLayout from './pages/account/AccountLayout';
 import AccountSettingsPage from './pages/account/AccountSettingsPage';
@@ -44,6 +49,12 @@ import AccountSubscriptionPage from './pages/account/AccountSubscriptionPage';
 import AccountTransferPage from './pages/account/AccountTransferPage';
 import AccountTransactionsPage from './pages/account/AccountTransactionsPage';
 import { useLocale } from './i18n';
+
+const GUEST_SHELL_ROUTES = ['/pricing', '/explore'] as const;
+
+function isGuestShellRoute(pathname: string): boolean {
+  return GUEST_SHELL_ROUTES.includes(pathname as (typeof GUEST_SHELL_ROUTES)[number]);
+}
 
 const STUDIO_NAV: Record<string, JobType> = {
   '/image': 'image',
@@ -96,7 +107,7 @@ function AppHeader({ slim = false, mobileNavOpen, onMobileNavToggle }: AppHeader
     <header className={`app-header${slim ? ' app-header--slim' : ''}`}>
       <div className="app-header-inner">
         <div className="app-header-pill">
-          {loggedIn && slim && (
+          {slim && (
             <button
               type="button"
               className="nav-toggle app-header-menu-btn"
@@ -153,14 +164,14 @@ function AppHeader({ slim = false, mobileNavOpen, onMobileNavToggle }: AppHeader
                 onCreditsRefresh={refreshCredits}
               />
             </div>
+          ) : slim ? (
+            <div className="header-meta">
+              <Link to="/login" className="btn primary sm app-header-login-btn">
+                {t('header.login')}
+              </Link>
+            </div>
           ) : (
             <nav className="nav nav--guest">
-              <Link to="/explore" className="price-pill">
-                <Compass size={15} /> {t('nav.explore')}
-              </Link>
-              <Link to="/pricing" className="price-pill">
-                <Coins size={15} /> {t('header.pricing')}
-              </Link>
               <Link to="/login">{t('header.login')}</Link>
             </nav>
           )}
@@ -168,6 +179,16 @@ function AppHeader({ slim = false, mobileNavOpen, onMobileNavToggle }: AppHeader
       </div>
     </header>
   );
+}
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    scrollAppToTop();
+  }, [pathname]);
+
+  return null;
 }
 
 function AppShell() {
@@ -184,7 +205,7 @@ function AppShell() {
     setMobileNavOpen(false);
   }, [location.pathname]);
 
-  const BARE_PAGES = ['/', '/login', '/register'];
+  const BARE_PAGES = ['/', '/login', '/register', '/models', '/features', '/privacy', '/terms'];
   const isBarePage = BARE_PAGES.includes(location.pathname);
   const isWorkflow = location.pathname === '/workflow';
   const isChat = location.pathname === '/chat';
@@ -196,11 +217,14 @@ function AppShell() {
     isWorkflow ||
     isChat;
   const hideHeader = isBarePage || isWorkflow || isChat;
-  const showAppSidebar = loggedIn && !isBarePage && !isWorkflow && !isChat;
-  const showQuickChat = loggedIn && !isBarePage && !isWorkflow && !isChat;
+  const showAppShell =
+    !isBarePage && !isWorkflow && !isChat && (loggedIn || isGuestShellRoute(location.pathname));
+  const showAppSidebar = showAppShell;
+  const showQuickChat = loggedIn && showAppShell;
 
   return (
     <div className={`app${showAppSidebar ? ' app--shell' : ''}`}>
+      <ScrollToTop />
       {showAppSidebar && (
         <AppSidebar
           mobileOpen={mobileNavOpen}
@@ -228,6 +252,10 @@ function AppShell() {
             <Route path="/register" element={isLoggedIn() ? <Navigate to="/home" /> : <RegisterPage />} />
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/explore" element={<ExplorePage />} />
+            <Route path="/models" element={<ModelsPage />} />
+            <Route path="/features" element={<FeaturesPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/home" element={<HomePage />} />
               <Route path="/home/library" element={<HomeLibraryPage />} />

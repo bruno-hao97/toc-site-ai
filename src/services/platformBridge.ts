@@ -26,4 +26,5 @@ export const PLATFORM_BRIDGE = {
   jobDelete: '/api/platform/job-delete.php',
   newfeeds: '/api/platform/newfeeds.php',
   publicVideos: '/api/platform/public-videos.php',
+  publicModels: '/api/platform/public-models.php',
 } as const;

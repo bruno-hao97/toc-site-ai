@@ -1,8 +1,8 @@
 import { isLoggedIn } from '../services/authStore';
 
 export const NAV_LINKS = [
-  { href: '#models', label: 'Mô hình' },
-  { href: '#multimodal', label: 'Tiện ích' },
+  { href: '/features', label: 'Tính năng' },
+  { href: '/models', label: 'Models' },
   { href: '/explore', label: 'Khám phá' },
   { href: '/pricing', label: 'Bảng giá' },
 ] as const;
