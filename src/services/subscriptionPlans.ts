@@ -108,9 +108,13 @@ const PLANS_URL = `${GOMMO_AUTH_PATH}/subscriptions/plans`;
 const CREATE_PAYMENT_URL = `${GOMMO_AUTH_PATH}/subscriptions/create_payment`;
 
 /** platform_token (JWT) ưu tiên — khớp getGommoClient(). */
-function requireAuthBearerToken(): string {
+function optionalAuthBearerToken(): string | null {
   const auth = loadAuth();
-  const token = auth?.platform_token?.trim() || auth?.access_token?.trim();
+  return auth?.platform_token?.trim() || auth?.access_token?.trim() || null;
+}
+
+function requireAuthBearerToken(): string {
+  const token = optionalAuthBearerToken();
   if (!token) throw new Error('Chưa đăng nhập');
   return token;
 }
@@ -139,7 +143,7 @@ function parsePlansPayload(input: unknown): PlansPayload {
 }
 
 export async function fetchSubscriptionPlans(type: SubscriptionPlanType): Promise<SubscriptionPlan[]> {
-  const token = requireAuthBearerToken();
+  const token = optionalAuthBearerToken();
 
   const body = new URLSearchParams({
     action_type: 'plans',
@@ -148,12 +152,14 @@ export async function fetchSubscriptionPlans(type: SubscriptionPlanType): Promis
     ...gommoDeviceFields(),
   }).toString();
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
   const res = await fetch(PLANS_URL, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+    headers,
     body,
   });
   const text = await res.text();

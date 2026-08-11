@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
-import { Coins, Globe, Menu, X, Zap } from 'lucide-react';
+import { Coins, Compass, Globe, Menu, X, Zap } from 'lucide-react';
 import {
   ensureValidPlatformSession,
   handlePlatformAuthFailure,
@@ -155,6 +155,12 @@ function AppHeader({ slim = false, mobileNavOpen, onMobileNavToggle }: AppHeader
             </div>
           ) : (
             <nav className="nav nav--guest">
+              <Link to="/explore" className="price-pill">
+                <Compass size={15} /> {t('nav.explore')}
+              </Link>
+              <Link to="/pricing" className="price-pill">
+                <Coins size={15} /> {t('header.pricing')}
+              </Link>
               <Link to="/login">{t('header.login')}</Link>
             </nav>
           )}
@@ -220,11 +226,12 @@ function AppShell() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={isLoggedIn() ? <Navigate to="/home" /> : <LoginPage />} />
             <Route path="/register" element={isLoggedIn() ? <Navigate to="/home" /> : <RegisterPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/explore" element={<ExplorePage />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/home" element={<HomePage />} />
               <Route path="/home/library" element={<HomeLibraryPage />} />
               <Route path="/chat" element={<ChatPage />} />
-              <Route path="/explore" element={<ExplorePage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/workflow" element={<WorkflowPage />} />
               <Route path="/audio" element={<AudioPage />} />
@@ -260,7 +267,6 @@ function AppShell() {
               </Route>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/wallet" element={<WalletPage />} />
-              <Route path="/pricing" element={<PricingPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Check, ChevronDown, Loader2, Phone, Sparkles } from 'lucide-react';
 import SubscriptionConfirmModal from '../components/SubscriptionConfirmModal';
 import SubscriptionPaymentModal from '../components/SubscriptionPaymentModal';
 import CreditConfirmModal from '../components/CreditConfirmModal';
 import ModelCreditComparison from '../components/ModelCreditComparison';
-import { getDisplayUser, notifyCreditsUpdated, refreshSession } from '../services/authStore';
+import { getDisplayUser, isLoggedIn, notifyCreditsUpdated, refreshSession } from '../services/authStore';
 import {
   createTopupRequest,
   fetchCreditPackages,
@@ -126,7 +127,9 @@ function isFeaturedPlan(plan: SubscriptionPlan): boolean {
 }
 
 export default function PricingPage() {
-  const [tab, setTab] = useState<PricingTab>('combo');
+  const navigate = useNavigate();
+  const loggedIn = isLoggedIn();
+  const [tab, setTab] = useState<PricingTab>('credit');
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [creditPackages, setCreditPackages] = useState<CreditPackage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -253,7 +256,14 @@ export default function PricingPage() {
     return [...set];
   }, [plans]);
 
+  function requireLoginForPurchase(): boolean {
+    if (loggedIn) return true;
+    navigate('/login');
+    return false;
+  }
+
   function openSubscribeModal(plan: SubscriptionPlan): void {
+    if (!requireLoginForPurchase()) return;
     if (!qrEnabled) {
       setPayError(qrDisabledMessage);
       return;
@@ -283,6 +293,7 @@ export default function PricingPage() {
   }
 
   function openCreditModal(creditPackage: CreditPackage): void {
+    if (!requireLoginForPurchase()) return;
     if (!qrEnabled) {
       setPayError(qrDisabledMessage);
       return;
@@ -368,6 +379,12 @@ export default function PricingPage() {
         <p className="lead">
           Chọn đúng gói theo nhu cầu tạo ảnh/video.
         </p>
+        {!loggedIn ? (
+          <p className="pricing-guest-note">
+            Bạn có thể xem bảng giá mà không cần đăng nhập.{' '}
+            <Link to="/login">Đăng nhập</Link> hoặc <Link to="/register">đăng ký</Link> để mua gói.
+          </p>
+        ) : null}
         {!qrEnabled ? (
           <div className="banner warn pricing-pay-error" style={{ marginTop: '1rem' }}>
             <p style={{ margin: 0 }}>{qrDisabledMessage}</p>

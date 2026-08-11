@@ -47,6 +47,18 @@ async function platformFeedGet<T extends { success?: boolean; message?: string }
   return parseFeedRes<T>(res);
 }
 
+/** Public feed — không cần Bearer (guest / landing explore). */
+async function platformFeedGetPublic<T extends { success?: boolean; message?: string }>(
+  baseUrl: string,
+  params: Record<string, string>,
+): Promise<T> {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`${baseUrl}?${qs}`, {
+    headers: { Accept: 'application/json' },
+  });
+  return parseFeedRes<T>(res, { noAuthRedirect: true });
+}
+
 async function feedRequest<T extends { success?: boolean; message?: string }>(
   gommoUrl: string,
   fields: Record<string, string>,
@@ -71,6 +83,7 @@ async function feedRequest<T extends { success?: boolean; message?: string }>(
 
 async function parseFeedRes<T extends { success?: boolean; message?: string }>(
   res: Response,
+  opts?: { noAuthRedirect?: boolean },
 ): Promise<T> {
   const text = await res.text();
   let parsed: T;
@@ -79,7 +92,7 @@ async function parseFeedRes<T extends { success?: boolean; message?: string }>(
   } catch {
     if (res.status === 401 || res.status === 403) {
       const msg = humanizePlatformError(text, res.status);
-      handlePlatformAuthFailure(res.status, msg);
+      if (!opts?.noAuthRedirect) handlePlatformAuthFailure(res.status, msg);
       throw new UpstreamMeError(msg, res.status);
     }
     throw new UpstreamMeError(humanizePlatformError(text, res.status), res.status);
@@ -87,7 +100,7 @@ async function parseFeedRes<T extends { success?: boolean; message?: string }>(
 
   if (res.status === 401 || res.status === 403) {
     const msg = humanizePlatformError(text, res.status, parsed.message);
-    handlePlatformAuthFailure(res.status, msg);
+    if (!opts?.noAuthRedirect) handlePlatformAuthFailure(res.status, msg);
     throw new UpstreamMeError(msg, res.status);
   }
 
@@ -259,26 +272,27 @@ export async function fetchPublicVideos(params: FetchPublicVideosParams = {}): P
     afterId = '',
   } = params;
 
+  const q: Record<string, string> = {
+    type,
+    public_prompt: String(publicPrompt),
+    limit: String(limit),
+  };
+  if (afterId) q.after_id = afterId;
+
   let parsed: PublicVideosResponse;
-  if (usesPlatformJobs()) {
-    const q: Record<string, string> = {
-      type,
-      public_prompt: String(publicPrompt),
-      limit: String(limit),
-    };
-    if (afterId) q.after_id = afterId;
+  const auth = loadAuth();
+  const platformToken = auth?.platform_token?.trim();
+  const gommoToken = auth?.access_token?.trim();
+
+  if (platformToken) {
     parsed = await platformFeedGet<PublicVideosResponse>(PLATFORM_BRIDGE.publicVideos, q);
-  } else {
-    const fields: Record<string, string> = {
-      type,
-      public_prompt: String(publicPrompt),
-      limit: String(limit),
-    };
-    if (afterId) fields.after_id = afterId;
+  } else if (gommoToken) {
     parsed = await feedRequest<PublicVideosResponse>(
       `${GOMMO_AUTH_PATH}/ai/public-videos`,
-      fields,
+      q,
     );
+  } else {
+    parsed = await platformFeedGetPublic<PublicVideosResponse>(PLATFORM_BRIDGE.publicVideos, q);
   }
 
   const items = parsed.data ?? [];

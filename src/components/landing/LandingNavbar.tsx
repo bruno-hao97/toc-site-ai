@@ -16,11 +16,17 @@ export default function LandingNavbar() {
         <BrandLogo to="/" />
 
         <div className="nav-links">
-          {NAV_LINKS.map((item) => (
-            <a key={item.label} href={item.href}>
-              {item.label}
-            </a>
-          ))}
+          {NAV_LINKS.map((item) =>
+            item.href.startsWith('/') ? (
+              <Link key={item.label} to={item.href}>
+                {item.label}
+              </Link>
+            ) : (
+              <a key={item.label} href={item.href}>
+                {item.label}
+              </a>
+            ),
+          )}
         </div>
 
         <div className="nav-actions">

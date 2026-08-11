@@ -3,8 +3,8 @@ import { CONTACT_PHONE_TEL, contactPhoneLine } from '../../lib/brand';
 
 const footLinks = [
   { label: 'Models', href: '#models' },
-  { label: 'Bảng giá', href: '#pricing' },
-  { label: 'API', href: '#features' },
+  { label: 'Khám phá', href: '/explore' },
+  { label: 'Bảng giá', href: '/pricing' },
   { label: contactPhoneLine('Liên hệ'), href: CONTACT_PHONE_TEL },
 ];
 

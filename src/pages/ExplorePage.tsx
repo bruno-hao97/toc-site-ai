@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Heart, MessageCircle, Play, Share2, Wand2 } from 'lucide-react';
-import { isLoggedIn } from '../services/authStore';
 import {
   feedMediaUrl,
   feedModelLabel,
@@ -88,11 +87,6 @@ export default function ExplorePage() {
 
   const loadMore = useCallback(async () => {
     if (loading || done) return;
-    if (!isLoggedIn()) {
-      setError('Chưa đăng nhập.');
-      setDone(true);
-      return;
-    }
 
     setLoading(true);
     setError('');

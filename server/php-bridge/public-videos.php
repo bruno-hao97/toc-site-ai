@@ -13,8 +13,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_out(405, ['success' => false, 'message' => 'Method not allowed']);
 }
 
-require_bearer_user();
-
 $type = trim((string) ($_GET['type'] ?? 'public_home'));
 $publicPrompt = trim((string) ($_GET['public_prompt'] ?? 'false'));
 $limit = max(1, min(50, (int) ($_GET['limit'] ?? 30)));

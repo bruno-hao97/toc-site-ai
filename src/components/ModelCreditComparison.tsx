@@ -94,7 +94,8 @@ export default function ModelCreditComparison({ creditPackages }: Props) {
     let active = true;
     if (!isLoggedIn()) {
       setLoading(false);
-      setError('Đăng nhập để xem bảng giá model.');
+      setCategories([]);
+      setError('');
       return;
     }
 
