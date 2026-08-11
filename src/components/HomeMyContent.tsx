@@ -14,7 +14,6 @@ import {
   feedIsAudioItem,
   feedIsDisplayable,
   feedMediaUrl,
-  feedThumb,
   fetchMyAudio,
   fetchMyImages,
   fetchMyMusic,
