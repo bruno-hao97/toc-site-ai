@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { FEATURED_MODELS } from '../../config/featuredModels';
+import { featuredLinkState } from '../../utils/featuredStudioNav';
 
 const SCROLL_STEP = 580;
 
@@ -89,16 +90,7 @@ export default function HomeFeaturedTools() {
             <Link
               key={id}
               to={to}
-              state={
-                studio
-                  ? {
-                      reuseHistory: {
-                        type: studio.type,
-                        modelSlug: studio.modelSlug,
-                      },
-                    }
-                  : undefined
-              }
+              state={featuredLinkState(studio)}
               className="home-featured-card"
             >
               <span className="home-featured-card-thumb">

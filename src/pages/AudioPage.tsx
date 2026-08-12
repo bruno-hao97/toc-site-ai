@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   ChevronLeft,
   ChevronRight,
@@ -45,6 +46,8 @@ import {
   formatSaleMultiplierLabel,
 } from '../services/audioPricing';
 import { modelSlug, parseModelsList } from '../services/modelSchema';
+import { resolveFeaturedModelSlug } from '../utils/featuredModelPick';
+import type { FeaturedReuseHistory } from '../utils/featuredStudioNav';
 import {
   addHistoryEntry,
   listHistory,
@@ -257,6 +260,7 @@ function isVoiceProvider(value: string | undefined): value is VoiceProvider {
 
 
 export default function AudioPage() {
+  const location = useLocation();
   const { t, locale } = useLocale();
   const auth = loadAuth();
   const client = useMemo(
@@ -313,6 +317,7 @@ export default function AudioPage() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [pendingJobs, setPendingJobs] = useState<AudioPendingJob[]>([]);
   const sessionStartRef = useRef(Date.now());
+  const reuseModelAppliedRef = useRef<string | null>(null);
 
   const [designQuery, setDesignQuery] = useState('');
   const [designName, setDesignName] = useState('');
@@ -535,6 +540,42 @@ export default function AudioPage() {
   }, [client]);
 
   useEffect(() => {
+    reuseModelAppliedRef.current = null;
+  }, [location.key]);
+
+  useEffect(() => {
+    const reuse = (location.state as { reuseHistory?: FeaturedReuseHistory } | null)?.reuseHistory;
+    if (reuse?.type !== 'tts' || reuseModelAppliedRef.current === location.key) return;
+    if (!reuse.modelSlug && !reuse.pickLatest) return;
+
+    let slug = reuse.modelSlug;
+    if (reuse.pickLatest && models.length) {
+      slug = resolveFeaturedModelSlug(models, {
+        pickLatest: true,
+        match: reuse.match,
+        modelSlug: reuse.modelSlug,
+      });
+    }
+    if (!slug || !modelOptions.length) return;
+
+    const match = modelOptions.find(
+      (m) =>
+        m.resolvedId === slug ||
+        m.modelId === slug ||
+        m.matchIds.some((id) => id === slug),
+    );
+    if (!match) return;
+
+    setVoiceEngineModel(
+      match.labelKey
+        ? modelSelectValue(match.labelKey, match.resolvedId)
+        : match.resolvedId,
+    );
+    reuseModelAppliedRef.current = location.key;
+  }, [location.key, location.state, modelOptions, models]);
+
+  useEffect(() => {
+    if (reuseModelAppliedRef.current === location.key) return;
     if (modelOptions.length) {
       const first = modelOptions[0];
       const label = 'labelKey' in first && first.labelKey ? first.labelKey : first.resolvedId;
@@ -546,7 +587,7 @@ export default function AudioPage() {
     } else {
       setVoiceEngineModel('');
     }
-  }, [selectedVoice, provider, modelOptions]);
+  }, [selectedVoice, provider, modelOptions, location.key]);
 
   useEffect(() => {
     if (activeFeature !== 'tts') return;

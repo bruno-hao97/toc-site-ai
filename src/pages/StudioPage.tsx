@@ -56,6 +56,7 @@ import UrlField from '../components/UrlField';
 import {
   defaultSelectionsForType,
   historyPromptFromSelections,
+  isImageRouteJob,
   jobTypeToHistoryType,
   REUSABLE_JOB_TYPES,
   STUDIO_JOB_TYPES,
@@ -113,6 +114,8 @@ import {
   isClibHistoryEntry,
 } from '../utils/historyFeedAdapter';
 import { feedItemToHistoryEntry } from '../utils/feedItemReuse';
+import { resolveFeaturedModelSlug } from '../utils/featuredModelPick';
+import type { FeaturedReuseHistory } from '../utils/featuredStudioNav';
 import { useHistoryUpdated } from '../hooks/useHistoryUpdated';
 import { extractPollSnapshot } from '../services/mediaGenerationStatus';
 import {
@@ -809,7 +812,7 @@ export default function StudioPage({
   );
   const isMotionView = jobType === 'video' && videoMode === 'motion' && hasMotionModels;
   const isEditView = jobType === 'video' && videoMode === 'edit' && hasEditModels;
-  const isImageComposer = jobType === 'image';
+  const isImageComposer = isImageRouteJob(jobType);
   const isVideoComposer = jobType === 'video';
   const isMediaComposer = isImageComposer || isVideoComposer;
   const isMusicComposer = jobType === 'music';
@@ -1127,43 +1130,51 @@ export default function StudioPage({
   );
 
   useEffect(() => {
-    const reuse = (location.state as { reuseHistory?: {
-      type: JobType;
-      prompt?: string;
-      modelSlug?: string;
-      meta?: Record<string, string>;
-    } } | null)?.reuseHistory;
-    if (!reuse?.type || !REUSABLE_JOB_TYPES.includes(reuse.type)) return;
-    applyReuse({
-      id: '',
-      type: jobTypeToHistoryType(reuse.type),
-      resultUrl: '',
-      prompt: reuse.prompt,
-      modelSlug: reuse.modelSlug,
-      createdAt: new Date().toISOString(),
-      meta: reuse.meta,
-    });
+    const reuse = (location.state as { reuseHistory?: FeaturedReuseHistory } | null)?.reuseHistory;
+    if (!reuse?.type) return;
+
+    if (REUSABLE_JOB_TYPES.includes(reuse.type)) {
+      applyReuse({
+        id: '',
+        type: jobTypeToHistoryType(reuse.type),
+        resultUrl: '',
+        prompt: reuse.prompt,
+        modelSlug: reuse.pickLatest ? '' : reuse.modelSlug,
+        createdAt: new Date().toISOString(),
+        meta: reuse.meta,
+      });
+      return;
+    }
+
+    if (isImageRouteJob(reuse.type) && reuse.type !== 'image') {
+      setJobType(reuse.type);
+      setSelectedSlug('');
+      setSelections(defaultSelectionsForType(reuse.type));
+    }
   }, [location.key, applyReuse]);
 
   useEffect(() => {
     void loadModelsList(jobType);
   }, [jobType, loadModelsList]);
 
-  useEffect(() => {
-    const reuse = (location.state as { reuseHistory?: {
-      type: JobType;
-      modelSlug?: string;
-    } } | null)?.reuseHistory;
-    if (!reuse || reuse.type !== jobType || !models.length || !reuse.modelSlug) return;
-    if (models.some((m) => modelSlug(m) === reuse.modelSlug)) {
-      setSelectedSlug(reuse.modelSlug);
-    }
-  }, [models, jobType, location.state]);
-
   // Luôn chọn sẵn 1 model khi vào trang / đổi loại job (giống 79AI): ưu tiên model
   // dùng gần đây còn khả dụng, rồi tới model đầu tiên đang ON.
   useEffect(() => {
     if (!pickerModels.length) return;
+
+    const reuse = (location.state as { reuseHistory?: FeaturedReuseHistory } | null)?.reuseHistory;
+    if (reuse?.type === jobType && (reuse.pickLatest || reuse.modelSlug)) {
+      const slug = resolveFeaturedModelSlug(pickerModels, {
+        pickLatest: reuse.pickLatest,
+        match: reuse.match,
+        modelSlug: reuse.modelSlug,
+      });
+      if (slug && pickerModels.some((m) => modelSlug(m) === slug)) {
+        setSelectedSlug(slug);
+        return;
+      }
+    }
+
     if (selectedSlug && pickerModels.some((m) => modelSlug(m) === selectedSlug)) return;
     const bySlug = new Map(pickerModels.map((m) => [modelSlug(m), m] as const));
     const recent = loadRecentModelSlugs()
@@ -1172,7 +1183,7 @@ export default function StudioPage({
     const fallback = pickerModels.find((m) => !isModelMaintenance(m)) ?? pickerModels[0];
     const pick = recent ?? fallback;
     if (pick) setSelectedSlug(modelSlug(pick));
-  }, [pickerModels, selectedSlug]);
+  }, [pickerModels, selectedSlug, jobType, location.state]);
 
   useEffect(() => {
     if (!currentModel) {
@@ -1543,7 +1554,7 @@ export default function StudioPage({
       return;
     }
 
-    const batchType = jobType === 'image' || jobType === 'video';
+    const batchType = isImageRouteJob(jobType) || jobType === 'video';
     const useMultiPrompt = composerMode === 'auto' && multiPrompt && batchType;
     let basePrompt = selections.prompt || '';
     if (multiShotEnabled && schema.fields.multiShots && activeShots.length >= 2) {
@@ -2849,7 +2860,7 @@ export default function StudioPage({
             </div>
           )}
 
-          {composerMode === 'auto' && !isMotionView && !isEditView && (jobType === 'image' || jobType === 'video') && (
+          {composerMode === 'auto' && !isMotionView && !isEditView && (isImageRouteJob(jobType) || jobType === 'video') && (
             <div className="composer-multiprompt">
               <label className="composer-switch-row">
                 <span className="composer-switch-text">
@@ -3319,7 +3330,7 @@ export default function StudioPage({
             <div className="composer-toolbar-right">
               {selectionCount > 0 && (
                 <div className="composer-toolbar-actions">
-                  {jobType === 'image' && (
+                  {isImageRouteJob(jobType) && (
                     <button
                       type="button"
                       className="composer-toolbar-action"

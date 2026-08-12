@@ -75,6 +75,17 @@ export const REUSABLE_JOB_TYPES: JobType[] = [
   'avatar-lipsync',
 ];
 
+/** Job types dùng route /image nhưng fetch model catalog riêng (Featured, reuse). */
+export const IMAGE_ROUTE_JOB_TYPES: JobType[] = [
+  'image',
+  'image-upscale',
+  'remove-bg',
+];
+
+export function isImageRouteJob(type: JobType): boolean {
+  return IMAGE_ROUTE_JOB_TYPES.includes(type);
+}
+
 /** Route studio theo loại job (thay cho /app cũ). */
 export function studioRouteForType(type: JobType): string {
   switch (type) {
