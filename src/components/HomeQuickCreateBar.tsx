@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { anchoredPanelStyle, useAnchoredDropdown } from '../hooks/useAnchoredDropdown';
 import {
   Bot,
   ChevronDown,
@@ -110,44 +112,111 @@ interface MiniDropdownProps {
 
 function MiniDropdown({ icon, options, value, onChange }: MiniDropdownProps) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const { triggerRef, panelRef, pos } = useAnchoredDropdown(open, setOpen);
   const current = options.find((o) => o.value === value) ?? options[0];
-
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [open]);
+  const panelStyle = anchoredPanelStyle(pos, 110);
 
   if (!options.length) return null;
 
   return (
-    <div className="qc-mini" ref={ref}>
-      <button type="button" className="qc-mini-trigger" onClick={() => setOpen((v) => !v)}>
+    <div className="qc-mini" ref={triggerRef}>
+      <button
+        type="button"
+        className="qc-mini-trigger"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+      >
         {icon}
         <span>{current?.label ?? value}</span>
         <ChevronDown size={12} />
       </button>
-      {open && (
-        <div className="qc-mini-menu">
-          {options.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              className={o.value === value ? 'active' : ''}
-              onClick={() => {
-                onChange(o.value);
-                setOpen(false);
-              }}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {open &&
+        pos &&
+        createPortal(
+          <div className="qc-mini-menu qc-dropdown-portal" ref={panelRef} style={panelStyle}>
+            {options.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                className={o.value === value ? 'active' : ''}
+                onClick={() => {
+                  onChange(o.value);
+                  setOpen(false);
+                }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+interface QuickModelDropdownProps {
+  loading: boolean;
+  label: string;
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  options: ModelOption[];
+  value: string;
+  onChange: (v: string) => void;
+}
+
+function QuickModelDropdown({
+  loading,
+  label,
+  open,
+  setOpen,
+  options,
+  value,
+  onChange,
+}: QuickModelDropdownProps) {
+  const { triggerRef, panelRef, pos } = useAnchoredDropdown(open, setOpen);
+  const panelStyle = anchoredPanelStyle(pos, 220);
+
+  return (
+    <div className="qc-model" ref={triggerRef}>
+      <button
+        type="button"
+        className="qc-model-trigger"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(!open);
+        }}
+        disabled={loading}
+      >
+        <Sparkles size={13} />
+        <span>{label}</span>
+        <ChevronDown size={12} />
+      </button>
+      {open &&
+        options.length > 0 &&
+        pos &&
+        createPortal(
+          <div className="qc-model-menu qc-dropdown-portal" ref={panelRef} style={panelStyle}>
+            {options.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                className={o.value === value ? 'active' : ''}
+                onClick={() => {
+                  onChange(o.value);
+                  setOpen(false);
+                }}
+              >
+                <span>{o.label}</span>
+                {(o.description || o.price != null) && (
+                  <small>{o.description || o.price}</small>
+                )}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -181,7 +250,6 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
   const [providerBusy, setProviderBusy] = useState(false);
 
   const typeRef = useRef<HTMLDivElement>(null);
-  const modelRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -252,7 +320,6 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
       if (typeRef.current && !typeRef.current.contains(e.target as Node)) setTypeMenuOpen(false);
-      if (modelRef.current && !modelRef.current.contains(e.target as Node)) setModelMenuOpen(false);
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
@@ -630,42 +697,19 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
           </div>
         )}
 
-        <div className="qc-model" ref={modelRef}>
-          <button
-            type="button"
-            className="qc-model-trigger"
-            onClick={() => setModelMenuOpen((v) => !v)}
-            disabled={loadingModels}
-          >
-            <Sparkles size={13} />
-            <span>
-              {loadingModels
-                ? 'Đang tải…'
-                : currentModel?.name || modelSlugSel || 'Chọn model'}
-            </span>
-            <ChevronDown size={12} />
-          </button>
-          {modelMenuOpen && modelOptions.length > 0 && (
-            <div className="qc-model-menu">
-              {modelOptions.map((o) => (
-                <button
-                  key={o.value}
-                  type="button"
-                  className={o.value === modelSlugSel ? 'active' : ''}
-                  onClick={() => {
-                    setModelSlugSel(o.value);
-                    setModelMenuOpen(false);
-                  }}
-                >
-                  <span>{o.label}</span>
-                  {(o.description || o.price != null) && (
-                    <small>{o.description || o.price}</small>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <QuickModelDropdown
+          loading={loadingModels}
+          label={
+            loadingModels
+              ? 'Đang tải…'
+              : currentModel?.name || modelSlugSel || 'Chọn model'
+          }
+          open={modelMenuOpen}
+          setOpen={setModelMenuOpen}
+          options={modelOptions}
+          value={modelSlugSel}
+          onChange={setModelSlugSel}
+        />
 
         {schema?.fields.ratio && (
           <MiniDropdown

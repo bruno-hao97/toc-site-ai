@@ -8,7 +8,6 @@ export default function TermsPage() {
     <LegalPageShell
       icon={FileText}
       title="Điều khoản dịch vụ"
-      updated="01/01/2026"
       otherLink={{ to: '/privacy', label: 'Chính sách bảo mật' }}
     >
       <p className="legal-intro">

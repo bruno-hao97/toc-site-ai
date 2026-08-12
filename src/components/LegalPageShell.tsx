@@ -7,12 +7,11 @@ import { BRAND_NAME } from '../lib/brand';
 interface Props {
   icon: LucideIcon;
   title: string;
-  updated: string;
   otherLink: { to: string; label: string };
   children: ReactNode;
 }
 
-export default function LegalPageShell({ icon: Icon, title, updated, otherLink, children }: Props) {
+export default function LegalPageShell({ icon: Icon, title, otherLink, children }: Props) {
   return (
     <MarketingPageShell className="legal-page">
       <div className="container legal-page-inner">
@@ -31,7 +30,6 @@ export default function LegalPageShell({ icon: Icon, title, updated, otherLink, 
               <Icon size={22} strokeWidth={1.75} />
             </span>
             <h1>{title}</h1>
-            <p className="legal-updated">Cập nhật lần cuối: {updated}</p>
           </header>
 
           <div className="legal-body">{children}</div>

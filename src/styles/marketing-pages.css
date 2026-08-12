@@ -1147,12 +1147,6 @@
   letter-spacing: -0.02em;
 }
 
-.legal-updated {
-  margin: 0;
-  font-size: var(--text-sm, 0.875rem);
-  color: var(--color-ink-3, oklch(60% 0 0));
-}
-
 .legal-body {
   display: flex;
   flex-direction: column;

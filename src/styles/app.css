@@ -4865,6 +4865,14 @@ a.user-pill:hover { color: var(--text); }
   z-index: 5;
 }
 
+.qc-mini-menu.qc-dropdown-portal,
+.qc-model-menu.qc-dropdown-portal {
+  position: fixed;
+  bottom: auto;
+  overflow-y: auto;
+  z-index: 200;
+}
+
 .qc-qty {
   display: inline-flex;
   align-items: center;

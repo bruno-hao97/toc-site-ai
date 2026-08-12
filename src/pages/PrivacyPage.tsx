@@ -8,7 +8,6 @@ export default function PrivacyPage() {
     <LegalPageShell
       icon={Shield}
       title="Chính sách bảo mật"
-      updated="01/03/2025"
       otherLink={{ to: '/terms', label: 'Điều khoản dịch vụ' }}
     >
       <p className="legal-intro">
