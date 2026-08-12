@@ -24,8 +24,8 @@ import {
   type FeedItem,
 } from '../services/feedApi';
 import type { JobType } from '../services/api';
-import { classifyGatewayStatus } from '../services/mediaGenerationStatus';
 import { groupRelativeAgeLabel } from '../services/feedLibraryMeta';
+import { isFeedItemProcessing } from '../utils/feedProcessing';
 import ProjectPicker from './ProjectPicker';
 import type { ProjectItemType } from '../services/projectStore';
 
@@ -75,18 +75,6 @@ function blockCounts(item: FeedItem): { ok: number; fail: number } {
   const ok = SUCCESS_RE.test(item.status || '') || hasMedia ? 1 : 0;
   const fail = FAIL_RE.test(item.status || '') ? 1 : 0;
   return { ok, fail };
-}
-
-function isFeedItemProcessing(item: FeedItem): boolean {
-  if (FAIL_RE.test(item.status || '')) return false;
-  const urls = blockUrls(item);
-  if (SUCCESS_RE.test(item.status || '') && urls.length > 0) return false;
-  if (classifyGatewayStatus(item.status, urls[0] || null) === 'running') return true;
-  if (item.resolutions?.some((r) => classifyGatewayStatus(r.status, r.url) === 'running')) {
-    return true;
-  }
-  const { ok } = blockCounts(item);
-  return ok === 0 && urls.length === 0 && !FAIL_RE.test(item.status || '');
 }
 
 function tsToDate(value: string | number | undefined): Date | null {
@@ -283,7 +271,7 @@ export default function ComposerHistory({
     return [...map.values()];
   }, [sortedItems, t]);
 
-  const displayCount = filteredItems.length;
+  const displayCount = filteredItems.length + activePending.length;
 
   useEffect(() => {
     onCountChange?.(displayCount);
@@ -296,7 +284,7 @@ export default function ComposerHistory({
       if (id && url) urlMap[id] = url;
     }
     onUrlMapChange?.(urlMap);
-  }, [sortedItems, displayCount, onCountChange, onVisibleIdsChange, onUrlMapChange]);
+  }, [sortedItems, displayCount, activePending.length, onCountChange, onVisibleIdsChange, onUrlMapChange]);
 
   useEffect(() => {
     setSelectMode(false);

@@ -135,6 +135,7 @@ export async function createJobAndPoll(
   fields: Record<string, unknown>,
   onProgress?: (p: PollProgress | { phase: 'creating' }) => void,
   signal?: AbortSignal,
+  onJobAccepted?: (info: { providerJobId?: string }) => void,
 ): Promise<{
   createEnvelope: unknown;
   pollResult?: PollResult;
@@ -149,8 +150,15 @@ export async function createJobAndPoll(
   const snap = extractPollSnapshot(createEnvelope);
   const providerJobId = snap.idBase?.trim() || undefined;
   const acceptedOnProvider = Boolean(providerJobId);
+  let acceptedNotified = false;
+  const notifyAccepted = () => {
+    if (acceptedNotified || !onJobAccepted || !providerJobId) return;
+    acceptedNotified = true;
+    onJobAccepted({ providerJobId });
+  };
 
   if (snap.resultUrl && classifyGatewayStatus(snap.status, snap.resultUrl) === 'success') {
+    notifyAccepted();
     return {
       createEnvelope,
       resultUrl: snap.resultUrl,
@@ -162,6 +170,7 @@ export async function createJobAndPoll(
 
   const pollMedia = pollMediaForJobType(type);
   if (!pollMedia) {
+    notifyAccepted();
     return {
       createEnvelope,
       resultUrl: snap.resultUrl,
@@ -179,6 +188,8 @@ export async function createJobAndPoll(
       acceptedOnProvider: false,
     };
   }
+
+  notifyAccepted();
 
   const pollResult = await startPolling(client, providerJobId, pollMedia, {
     onProgress,

@@ -57,6 +57,7 @@ export interface QuickGenerateArgs {
   model: GommoModel;
   selections: JobSelections;
   onProgress?: (msg: string) => void;
+  onJobAccepted?: (info: { providerJobId?: string }) => void;
   signal?: AbortSignal;
 }
 
@@ -65,6 +66,7 @@ export async function quickGenerate({
   model,
   selections,
   onProgress,
+  onJobAccepted,
   signal,
 }: QuickGenerateArgs): Promise<string> {
   const auth = loadAuth();
@@ -91,6 +93,7 @@ export async function quickGenerate({
       onProgress?.(formatPollProgressMessage(prog));
     },
     signal,
+    onJobAccepted,
   );
   return requireJobResultUrl({
     resultUrl,

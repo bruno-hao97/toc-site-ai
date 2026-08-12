@@ -44,6 +44,8 @@ import StudioGallery, { type SessionItem } from '../components/StudioGallery';
 import ComposerHistory from '../components/ComposerHistory';
 import ComposerLibrary from '../components/ComposerLibrary';
 import ComposerGalleryEmpty from '../components/composer/ComposerGalleryEmpty';
+import ComposerPendingMasonry from '../components/composer/ComposerPendingMasonry';
+import ComposerSessionProcessing from '../components/composer/ComposerSessionProcessing';
 import LibraryMasonryCard from '../components/LibraryMasonryCard';
 import ComposerLibraryPreviewModal, {
   type ComposerPreviewHandlers,
@@ -771,6 +773,9 @@ export default function StudioPage({
   const [mainTab, setMainTab] = useState<'current' | 'history' | 'folder'>('current');
   const [libraryCount, setLibraryCount] = useState(0);
   const [historyCount, setHistoryCount] = useState(0);
+  const [sessionProcessingCount, setSessionProcessingCount] = useState(0);
+  const [sessionProcessingLoading, setSessionProcessingLoading] = useState(false);
+  const [upstreamPendingJobs, setUpstreamPendingJobs] = useState<PendingJob[]>([]);
   const [libraryVisibleIds, setLibraryVisibleIds] = useState<string[]>([]);
   const [historyVisibleIds, setHistoryVisibleIds] = useState<string[]>([]);
   const [libraryUrlMap, setLibraryUrlMap] = useState<Record<string, string>>({});
@@ -1226,6 +1231,11 @@ export default function StudioPage({
     );
   }
 
+  function pushPendingJobs(jobs: PendingJob[]) {
+    setMainTab('current');
+    setPendingJobs((prev) => [...jobs, ...prev.filter((p) => p.status === 'processing')]);
+  }
+
   function recordSuccess(
     url: string,
     slug: string,
@@ -1454,15 +1464,14 @@ export default function StudioPage({
           prompt,
           pendingId: crypto.randomUUID(),
         }));
-        setPendingJobs((prev) => [
-          ...motionTasks.map((t) => ({
+        pushPendingJobs(
+          motionTasks.map((t) => ({
             id: t.pendingId,
             prompt: t.prompt,
             status: 'processing' as const,
             progress: 5,
           })),
-          ...prev.filter((p) => p.status === 'processing'),
-        ]);
+        );
 
         const limit = Math.max(1, Math.min(concurrencyLimit, motionTasks.length));
         let cursor = 0;
@@ -1510,9 +1519,8 @@ export default function StudioPage({
       setResultUrl(null);
       const slug = modelSlug(currentModel);
       const pendingId = crypto.randomUUID();
-      setPendingJobs((prev) => [
+      pushPendingJobs([
         { id: pendingId, prompt: editPrompt, status: 'processing', progress: 5 },
-        ...prev.filter((p) => p.status === 'processing'),
       ]);
 
       try {
@@ -1650,7 +1658,7 @@ export default function StudioPage({
       status: 'processing' as const,
       progress: 5,
     }));
-    setPendingJobs((prev) => [...newPending, ...prev.filter((p) => p.status === 'processing')]);
+    pushPendingJobs(newPending);
 
     try {
       const limit = Math.max(1, Math.min(concurrencyLimit, tasks.length));
@@ -1758,6 +1766,7 @@ export default function StudioPage({
     setSchema(null);
     setResultUrl(null);
     setPendingJobs([]);
+    setSessionProcessingCount(0);
     setMultiRefs([]);
     setMotionVideoUrl('');
     setEditVideoUrl('');
@@ -1784,14 +1793,34 @@ export default function StudioPage({
     return composerResults;
   }, [mainTab, composerResults]);
 
+  useEffect(() => {
+    if (mainTab !== 'current') setUpstreamPendingJobs([]);
+  }, [mainTab]);
+
+  const activePendingCount = useMemo(
+    () => pendingJobs.filter((p) => p.status === 'processing').length,
+    [pendingJobs],
+  );
+
+  const sessionPendingJobs = useMemo(() => {
+    const localActive = pendingJobs.filter((p) => p.status === 'processing');
+    return [...localActive, ...upstreamPendingJobs];
+  }, [pendingJobs, upstreamPendingJobs]);
+
+  const hasCurrentSessionContent =
+    displayedResults.length > 0 ||
+    activePendingCount > 0 ||
+    sessionProcessingCount > 0 ||
+    sessionProcessingLoading;
+
   const toolbarCount =
     isMusicComposer && mainTab === 'folder'
-      ? composerResults.length
+      ? composerResults.length + activePendingCount
       : mainTab === 'folder'
         ? libraryCount
         : mainTab === 'history'
           ? historyCount
-          : displayedResults.length;
+          : displayedResults.length + activePendingCount + sessionProcessingCount;
 
   const groupedResults = useMemo(() => {
     const map = new Map<string, HistoryEntry[]>();
@@ -3342,15 +3371,12 @@ export default function StudioPage({
 
           {isMusicComposer ? (
             (() => {
-              const pendingItems: MusicTrackItem[] =
-                mainTab === 'current'
-                  ? pendingJobs.map((p) => ({
-                      id: p.id,
-                      title: p.prompt || selections.name || t('composer.submitting'),
-                      status: p.status === 'failed' ? 'failed' : 'processing',
-                      progress: p.progress,
-                    }))
-                  : [];
+              const pendingItems: MusicTrackItem[] = pendingJobs.map((p) => ({
+                id: p.id,
+                title: p.prompt || selections.name || t('composer.submitting'),
+                status: p.status === 'failed' ? 'failed' : 'processing',
+                progress: p.progress,
+              }));
               const source =
                 mainTab === 'folder' ? composerResults : displayedResults;
               const doneItems: MusicTrackItem[] = source.map((e) => ({
@@ -3405,6 +3431,7 @@ export default function StudioPage({
               jobType={jobType}
               zoom={zoom}
               refreshKey={historyTick}
+              pendingJobs={pendingJobs}
               onCountChange={setLibraryCount}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
@@ -3413,74 +3440,39 @@ export default function StudioPage({
               onItemDeleted={handleFeedItemDeleted}
               buildPreviewHandlers={buildPreviewHandlers}
             />
-          ) : displayedResults.length === 0 && !(mainTab === 'current' && pendingJobs.length > 0) ? (
-            <ComposerGalleryEmpty
-              title={t('composer.gallery.emptyTitle', { type: typeLabel() })}
-              description={
-                jobType === 'video'
-                  ? t('composer.gallery.emptyHintVideo')
-                  : t('composer.gallery.emptyHint')
-              }
-              focusLabel={t('composer.gallery.focusPanel')}
-            />
           ) : (
-            <div className={useClibLayout ? 'clib-wrap' : 'composer-results'}>
-              {mainTab === 'current' && pendingJobs.length > 0 && (
-                <section className={useClibLayout ? 'clib-group' : 'composer-day-group'}>
-                  {useClibLayout ? (
-                    <header className="clib-group-head">
-                      <span className="clib-group-label">{t('composer.processing')}</span>
-                      <span className="clib-count">({pendingJobs.length})</span>
-                    </header>
-                  ) : (
-                    <h3 className="composer-day">{t('composer.processing')}</h3>
-                  )}
-                  <div
-                    className={useClibLayout ? 'home-masonry home-masonry--library' : 'composer-grid'}
-                    style={useClibLayout ? undefined : { ['--thumb' as string]: `${zoom}px` }}
-                  >
-                    {pendingJobs.map((p) => (
-                      <article
-                        key={p.id}
-                        className={`hist-card hist-card-pending-vmedia ${p.status}`}
-                      >
-                        <div className="pending-vmedia-body">
-                          {p.status === 'processing' ? (
-                            <>
-                              <span className="pending-spinner-lg" aria-hidden />
-                              <span className="pending-vmedia-label">{t('composer.processingLabel')}</span>
-                              <div
-                                className="pending-vmedia-bar"
-                                role="progressbar"
-                                aria-valuenow={p.progress ?? 12}
-                                aria-valuemin={0}
-                                aria-valuemax={100}
-                                aria-label={t('composer.progressAria')}
-                              >
-                                <div
-                                  className="pending-vmedia-bar-fill"
-                                  style={{ width: `${p.progress ?? 12}%` }}
-                                />
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <span className="pending-failed-icon-lg">!</span>
-                              <span className="pending-vmedia-label failed">{t('composer.failedLabel')}</span>
-                            </>
-                          )}
-                        </div>
-                        {p.prompt ? (
-                          <p className="pending-vmedia-prompt" title={p.prompt}>
-                            {p.prompt}
-                          </p>
-                        ) : null}
-                      </article>
-                    ))}
-                  </div>
-                </section>
+            <>
+              {mainTab === 'current' && (
+                <ComposerSessionProcessing
+                  jobType={jobType}
+                  refreshKey={historyTick}
+                  pendingJobs={pendingJobs}
+                  onCountChange={setSessionProcessingCount}
+                  onLoadingChange={setSessionProcessingLoading}
+                  onUpstreamPendingChange={setUpstreamPendingJobs}
+                />
               )}
-              {groupedResults.map(([day, entries]) => (
+              {!hasCurrentSessionContent ? (
+                <ComposerGalleryEmpty
+                  title={t('composer.gallery.emptyTitle', { type: typeLabel() })}
+                  description={
+                    jobType === 'video'
+                      ? t('composer.gallery.emptyHintVideo')
+                      : t('composer.gallery.emptyHint')
+                  }
+                  focusLabel={t('composer.gallery.focusPanel')}
+                />
+              ) : (
+                <div className={useClibLayout ? 'clib-wrap' : 'composer-results'}>
+                  {mainTab === 'current' && (
+                    <ComposerPendingMasonry
+                      jobs={sessionPendingJobs}
+                      thumbSize={zoom}
+                      wrapClassName={useClibLayout ? 'clib-group' : 'composer-day-group'}
+                      className={useClibLayout ? 'clib-grid' : 'composer-grid'}
+                    />
+                  )}
+                  {groupedResults.map(([day, entries]) => (
                 <section key={day} className={useClibLayout ? 'clib-group' : 'composer-day-group'}>
                   {useClibLayout ? (
                     <header className="clib-group-head">
@@ -3613,6 +3605,8 @@ export default function StudioPage({
                 />
               )}
             </div>
+              )}
+            </>
           )}
         </section>
 

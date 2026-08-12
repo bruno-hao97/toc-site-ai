@@ -3,11 +3,13 @@ import {
   Check,
   Download,
   ExternalLink,
+  Loader2,
   MoreVertical,
   Play,
   Trash2,
   Volume2,
 } from 'lucide-react';
+import { useLocale } from '../i18n';
 import {
   feedMediaUrl,
   type FeedItem,
@@ -17,6 +19,7 @@ import {
   formatFileSize,
 } from '../services/feedLibraryMeta';
 import { downloadMediaUrl } from '../utils/downloadMedia';
+import { isFeedItemProcessing } from '../utils/feedProcessing';
 import HomeLibLayoutSwitcher, { type HomeLibLayout } from './HomeLibLayoutSwitcher';
 
 const STORAGE_KEY = 'home_audio_lib_layout';
@@ -80,8 +83,10 @@ function AudioRow({
   onCloseMenu: () => void;
   onDelete?: () => void;
 }) {
+  const { t } = useLocale();
   const menuRef = useRef<HTMLDivElement>(null);
   const media = feedMediaUrl(item);
+  const processing = isFeedItemProcessing(item);
   const title = (item.prompt || item.title || 'Âm thanh AI').trim();
   const model = feedModelDisplay(item);
   const size = formatFileSize(item.file_size);
@@ -119,7 +124,7 @@ function AudioRow({
 
   return (
     <li
-      className={`home-audio-row home-audio-row--${layout}${selected ? ' selected' : ''}${playing ? ' playing' : ''}`}
+      className={`home-audio-row home-audio-row--${layout}${selected ? ' selected' : ''}${playing ? ' playing' : ''}${processing ? ' home-audio-row--pending' : ''}`}
     >
       <button
         type="button"
@@ -133,11 +138,15 @@ function AudioRow({
       <button
         type="button"
         className="home-audio-play"
-        aria-label="Phát"
-        disabled={!media}
+        aria-label={processing ? t('composer.processingLabel') : 'Phát'}
+        disabled={!media || processing}
         onClick={onPlay}
       >
-        <Play size={14} fill="currentColor" />
+        {processing ? (
+          <Loader2 size={14} className="spin" aria-hidden />
+        ) : (
+          <Play size={14} fill="currentColor" />
+        )}
       </button>
 
       <div className="home-audio-text">
@@ -145,16 +154,29 @@ function AudioRow({
           {title}
         </p>
         <p className="home-audio-meta">
-          {[model || 'AI Audio', size].filter(Boolean).join(' · ')}
+          {processing
+            ? t('audio.generating')
+            : [model || 'AI Audio', size].filter(Boolean).join(' · ')}
         </p>
+        {processing && (
+          <div
+            className="chist-pending-bar home-lib-pending-bar"
+            role="progressbar"
+            aria-valuenow={12}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div className="chist-pending-bar-fill" style={{ width: '12%' }} />
+          </div>
+        )}
       </div>
 
-      {(layout === 'list' || layout === 'wide') && <Waveform />}
+      {(layout === 'list' || layout === 'wide') && !processing && <Waveform />}
 
       {duration && <span className="home-audio-duration">{duration}</span>}
 
       <div className="home-audio-hover-actions">
-        {media && (
+        {media && !processing && (
           <>
             <button
               type="button"

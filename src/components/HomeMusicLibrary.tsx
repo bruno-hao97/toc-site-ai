@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Download, ExternalLink, Music2, Play, Trash2 } from 'lucide-react';
+import { Download, ExternalLink, Loader2, Music2, Play, Trash2 } from 'lucide-react';
+import { useLocale } from '../i18n';
 import {
   feedMediaUrl,
   feedThumb,
@@ -7,6 +8,7 @@ import {
 } from '../services/feedApi';
 import { feedModelDisplay } from '../services/feedLibraryMeta';
 import { downloadMediaUrl } from '../utils/downloadMedia';
+import { isFeedItemProcessing } from '../utils/feedProcessing';
 import HomeLibLayoutSwitcher, { type HomeLibLayout } from './HomeLibLayoutSwitcher';
 
 const STORAGE_KEY = 'home_music_lib_layout';
@@ -47,8 +49,10 @@ function MusicItem({
   onPlay: (item: FeedItem) => void;
   onDelete?: (item: FeedItem) => void;
 }) {
+  const { t } = useLocale();
   const cover = feedThumb(item);
   const media = feedMediaUrl(item);
+  const processing = isFeedItemProcessing(item);
   const title = (item.prompt || item.title || 'Bản nhạc AI').trim();
   const subtitle = feedModelDisplay(item) || 'AI MUSIC';
   const duration = formatDuration(item.duration);
@@ -73,23 +77,27 @@ function MusicItem({
   };
 
   return (
-    <article className={`home-music-item home-music-item--${layout}`}>
+    <article className={`home-music-item home-music-item--${layout}${processing ? ' home-music-item--pending' : ''}`}>
       <button
         type="button"
         className="home-music-cover-btn"
         onClick={() => onPlay(item)}
-        disabled={!media}
-        aria-label={`Phát ${title}`}
+        disabled={!media || processing}
+        aria-label={processing ? t('composer.processingLabel') : `Phát ${title}`}
       >
         <span className="home-music-cover">
-          {cover ? (
+          {processing ? (
+            <Loader2 size={28} className="spin" aria-hidden />
+          ) : cover ? (
             <img src={cover} alt="" loading="lazy" />
           ) : (
             <Music2 size={28} />
           )}
-          <span className="home-music-cover-play">
-            <Play size={18} fill="currentColor" />
-          </span>
+          {!processing && (
+            <span className="home-music-cover-play">
+              <Play size={18} fill="currentColor" />
+            </span>
+          )}
         </span>
       </button>
 
@@ -98,25 +106,37 @@ function MusicItem({
           type="button"
           className="home-music-text-btn"
           onClick={() => onPlay(item)}
-          disabled={!media}
+          disabled={!media || processing}
         >
           <span className="home-music-title" title={title}>
             {title}
           </span>
           <span className="home-music-sub" title={subtitle}>
-            {subtitle}
+            {processing ? t('composer.processingLabel') : subtitle}
           </span>
-          <span className="home-music-tags">
-            <span className="home-music-pill">AI MUSIC</span>
-            {metaBits.length > 0 && (
-              <span className="home-music-meta-bits">{metaBits.join(', ')}</span>
-            )}
-          </span>
+          {processing ? (
+            <div
+              className="chist-pending-bar home-lib-pending-bar"
+              role="progressbar"
+              aria-valuenow={12}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div className="chist-pending-bar-fill" style={{ width: '12%' }} />
+            </div>
+          ) : (
+            <span className="home-music-tags">
+              <span className="home-music-pill">AI MUSIC</span>
+              {metaBits.length > 0 && (
+                <span className="home-music-meta-bits">{metaBits.join(', ')}</span>
+              )}
+            </span>
+          )}
         </button>
       </div>
 
       <div className="home-music-actions">
-        {media && (
+        {media && !processing && (
           <>
             <button
               type="button"

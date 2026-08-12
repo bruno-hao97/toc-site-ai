@@ -371,23 +371,26 @@ interface MineImagesResponse {
 }
 
 function mapImageToFeedItem(img: MyImageItem): FeedItem {
-  const resolutions = img.resolutions?.map((r) => ({
-    type: r.name || r.value || 'image',
-    name: r.name,
-    value: r.value,
-    width: r.width,
-    height: r.height,
-    ratio: r.ratio,
-    status: 'FINISH',
-    url: img.url,
-  }));
+  const hasResultUrl = Boolean((img.url || '').trim());
+  const resolutions = hasResultUrl
+    ? img.resolutions?.map((r) => ({
+        type: r.name || r.value || 'image',
+        name: r.name,
+        value: r.value,
+        width: r.width,
+        height: r.height,
+        ratio: r.ratio,
+        status: 'FINISH',
+        url: img.url,
+      }))
+    : undefined;
   const resolutionName = img.resolutions?.[0]?.name || img.resolutions?.[0]?.value;
   const platformJobId = (img.platform_job_id || '').trim() || undefined;
   return {
     id_base: img.id_base,
     platform_job_id: platformJobId,
     type: 'image',
-    status: img.status || 'SUCCESS',
+    status: img.status || (hasResultUrl ? 'SUCCESS' : 'processing'),
     prompt: img.prompt,
     model: img.model,
     ratio: img.ratio || img.resolutions?.[0]?.ratio,

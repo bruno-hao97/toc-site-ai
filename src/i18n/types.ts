@@ -447,6 +447,18 @@ export type TranslationKey =
   | 'dashboard.tx.job_charge'
   | 'dashboard.tx.job_refund'
   | 'dashboard.tx.topup'
-  | 'dashboard.tx.promotion';
+  | 'dashboard.tx.promotion'
+  | 'feed.anonymous'
+  | 'feed.typeImage'
+  | 'feed.typeVideo'
+  | 'feed.processingShort'
+  | 'feed.favorite'
+  | 'feed.unfavorite'
+  | 'library.status.filterAria'
+  | 'library.status.all'
+  | 'library.status.success'
+  | 'library.status.failed'
+  | 'library.status.emptySuccess'
+  | 'library.status.emptyFailed';
 
 export type TranslationMap = Record<TranslationKey, string>;

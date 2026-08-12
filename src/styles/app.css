@@ -3779,6 +3779,25 @@ a.user-pill:hover { color: var(--text); }
   border-color: var(--leo-border, rgba(255, 255, 255, 0.1));
 }
 
+.qc-hero-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 12px;
+  background: rgba(18, 18, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #b0b4bc;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.qc-hero-progress .qc-spin {
+  flex-shrink: 0;
+  color: var(--brand, #53eb67);
+}
+
 .qc-hero-tabs {
   display: inline-flex;
   align-items: center;
@@ -4145,6 +4164,18 @@ a.user-pill:hover { color: var(--text); }
 
 .home-library-tabs {
   justify-content: flex-start;
+}
+
+.home-library-status-tabs {
+  justify-content: flex-start;
+  gap: 0.25rem;
+  padding: 0.15rem 0 0.75rem;
+  border-bottom: none;
+}
+
+.home-library-status-tab {
+  font-size: 0.75rem;
+  padding: 0.28rem 0.65rem;
 }
 
 @media (max-width: 640px) {
@@ -8999,9 +9030,8 @@ body.qc-sidebar-open .home-quick-create-dock {
   cursor: pointer;
 }
 
-/* Thẻ "đang tạo" trong grid kết quả — mint terminal (align chist-block-pending) */
+/* Thẻ "đang tạo" — clib-grid / composer-grid: ô vuông gọn theo --clib-thumb / --thumb */
 .hist-card-pending-vmedia {
-  grid-column: 1 / -1;
   border: 1px solid color-mix(in srgb, var(--brand, #53eb67) 35%, transparent);
   border-radius: var(--radius-lg, 14px);
   overflow: hidden;
@@ -9019,14 +9049,9 @@ body.qc-sidebar-open .home-quick-create-dock {
   box-shadow: none;
 }
 
-.clib-grid .hist-card-pending-vmedia {
+.clib-grid .hist-card-pending-vmedia,
+.composer-grid .hist-card-pending-vmedia {
   grid-column: auto;
-  aspect-ratio: 1 / 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.home-masonry--library .hist-card-pending-vmedia {
   aspect-ratio: 1 / 1;
   display: flex;
   flex-direction: column;
@@ -9048,13 +9073,9 @@ body.qc-sidebar-open .home-quick-create-dock {
   );
 }
 
-.clib-grid .pending-vmedia-body {
-  min-height: 0;
-  padding: 1.25rem 0.85rem 0.85rem;
-  gap: 0.55rem;
-}
-
-.home-masonry--library .pending-vmedia-body {
+.clib-grid .pending-vmedia-body,
+.composer-grid .pending-vmedia-body {
+  flex: 0 1 auto;
   min-height: 0;
   padding: 1.25rem 0.85rem 0.85rem;
   gap: 0.55rem;
@@ -9077,13 +9098,8 @@ body.qc-sidebar-open .home-quick-create-dock {
   animation: pending-spin 0.85s linear infinite;
 }
 
-.clib-grid .pending-spinner-lg {
-  width: 36px;
-  height: 36px;
-  border-width: 2.5px;
-}
-
-.home-masonry--library .pending-spinner-lg {
+.clib-grid .pending-spinner-lg,
+.composer-grid .pending-spinner-lg {
   width: 36px;
   height: 36px;
   border-width: 2.5px;
@@ -9111,12 +9127,8 @@ body.qc-sidebar-open .home-quick-create-dock {
   overflow: hidden;
 }
 
-.clib-grid .pending-vmedia-bar {
-  width: min(160px, 78%);
-  height: 3px;
-}
-
-.home-masonry--library .pending-vmedia-bar {
+.clib-grid .pending-vmedia-bar,
+.composer-grid .pending-vmedia-bar {
   width: min(160px, 78%);
   height: 3px;
 }
@@ -9144,14 +9156,98 @@ body.qc-sidebar-open .home-quick-create-dock {
   background: color-mix(in srgb, var(--surface) 92%, transparent);
 }
 
-.clib-grid .pending-vmedia-prompt {
+.clib-grid .pending-vmedia-prompt,
+.composer-grid .pending-vmedia-prompt {
   padding: 0.45rem 0.55rem 0.5rem;
   font-size: 0.72rem;
 }
 
-.home-masonry--library .pending-vmedia-prompt {
+/* Pending cards inside home / studio library masonry columns */
+.feed-masonry-card--pending {
+  border: 1px solid color-mix(in srgb, var(--brand, #53eb67) 35%, transparent);
+  background: color-mix(in srgb, var(--brand, #53eb67) 5%, var(--surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand, #53eb67) 12%, transparent);
+}
+
+.feed-masonry-card--pending.failed {
+  border-color: color-mix(in srgb, #ef4444 35%, transparent);
+  background: color-mix(in srgb, #ef4444 5%, var(--surface));
+  box-shadow: none;
+}
+
+.feed-masonry-pending-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.feed-masonry-media--pending {
+  display: flex;
+  flex-direction: column;
+  min-height: 180px;
+}
+
+.home-masonry--library .feed-masonry-card--pending .pending-vmedia-body,
+.feed-masonry-card--pending .pending-vmedia-body {
+  flex: 1;
+  min-height: 160px;
+  padding: 1.25rem 0.85rem 0.85rem;
+  gap: 0.55rem;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand, #53eb67) 8%, transparent) 0%,
+    color-mix(in srgb, var(--surface) 96%, transparent) 100%
+  );
+}
+
+.feed-masonry-card--pending.failed .pending-vmedia-body {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #ef4444 8%, transparent) 0%,
+    color-mix(in srgb, var(--surface) 96%, transparent) 100%
+  );
+}
+
+.home-masonry--library .feed-masonry-card--pending .pending-spinner-lg,
+.feed-masonry-card--pending .pending-spinner-lg {
+  width: 36px;
+  height: 36px;
+  border-width: 2.5px;
+}
+
+.home-masonry--library .feed-masonry-card--pending .pending-vmedia-bar,
+.feed-masonry-card--pending .pending-vmedia-bar {
+  width: min(160px, 78%);
+  height: 3px;
+}
+
+.home-masonry--library .feed-masonry-card--pending .pending-vmedia-prompt,
+.feed-masonry-card--pending .pending-vmedia-prompt {
   padding: 0.45rem 0.55rem 0.5rem;
   font-size: 0.72rem;
+}
+
+.home-masonry--library .feed-masonry-card--pending .composer-select-circle {
+  opacity: 1;
+}
+
+.home-music-item--pending,
+.home-audio-row--pending {
+  border-color: color-mix(in srgb, var(--brand, #53eb67) 28%, transparent);
+}
+
+.home-music-item--pending .home-music-sub,
+.home-audio-row--pending .home-audio-meta {
+  color: var(--brand, #53eb67);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.home-lib-pending-bar {
+  margin-top: 0.45rem;
+  max-width: 220px;
 }
 
 .pending-failed-icon-lg {
@@ -18872,6 +18968,23 @@ input.wf-gen-pill--select {
 .audio-session-row.active .audio-session-actions {
   opacity: 1;
   pointer-events: auto;
+}
+
+.audio-session-row--pending,
+.audio-session-card--pending {
+  border-color: color-mix(in oklch, var(--color-accent, oklch(72% 0.19 155)) 35%, transparent);
+}
+
+.audio-session-card--pending .audio-session-card-body {
+  cursor: default;
+}
+
+.audio-session-card--pending .chist-pending-bar {
+  width: 100%;
+}
+
+.audio-session-row--pending .chist-pending-bar {
+  margin-top: 0.35rem;
 }
 
 .audio-result-group h3 {

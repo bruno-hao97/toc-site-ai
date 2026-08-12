@@ -464,6 +464,18 @@ const vi: TranslationMap = {
   'dashboard.tx.job_refund': 'Hoàn credit',
   'dashboard.tx.topup': 'Nạp tiền',
   'dashboard.tx.promotion': 'Khuyến mãi',
+  'feed.anonymous': 'Ẩn danh',
+  'feed.typeImage': 'Ảnh',
+  'feed.typeVideo': 'Video',
+  'feed.processingShort': 'Đang xử lý…',
+  'feed.favorite': 'Yêu thích',
+  'feed.unfavorite': 'Bỏ yêu thích',
+  'library.status.filterAria': 'Lọc theo trạng thái',
+  'library.status.all': 'Tất cả',
+  'library.status.success': 'Thành công',
+  'library.status.failed': 'Thất bại',
+  'library.status.emptySuccess': 'Không có mục thành công',
+  'library.status.emptyFailed': 'Không có mục thất bại',
 };
 
 export default vi;

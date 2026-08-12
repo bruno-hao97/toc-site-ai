@@ -1,10 +1,22 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { useLocale } from '../i18n';
 import HomeFavoritesFeed from '../components/HomeFavoritesFeed';
 import HomeMyContent, { type MineFilter } from '../components/HomeMyContent';
+import type { LibraryTabId } from '../utils/libraryTabForJobType';
+import {
+  librarySearchParams,
+  statusFilterFromSearchParams,
+  type LibraryStatusFilter,
+} from '../utils/feedLibraryStatus';
 
-const LIBRARY_TABS: { id: string; label: string; filter?: MineFilter; favorites?: boolean }[] = [
+const LIBRARY_TABS: {
+  id: LibraryTabId;
+  label: string;
+  filter?: MineFilter;
+  favorites?: boolean;
+}[] = [
   { id: 'all', label: 'Của tôi', filter: 'all' },
   { id: 'video', label: 'Videos', filter: 'video' },
   { id: 'image', label: 'Hình ảnh', filter: 'image' },
@@ -13,16 +25,66 @@ const LIBRARY_TABS: { id: string; label: string; filter?: MineFilter; favorites?
   { id: 'favorite', label: 'Yêu thích', favorites: true },
 ];
 
+const STATUS_FILTERS: LibraryStatusFilter[] = ['all', 'success', 'failed'];
+
+const STATUS_LABEL_KEYS: Record<LibraryStatusFilter, 'library.status.all' | 'library.status.success' | 'library.status.failed'> = {
+  all: 'library.status.all',
+  success: 'library.status.success',
+  failed: 'library.status.failed',
+};
+
+const VALID_TAB_IDS = new Set(LIBRARY_TABS.map((t) => t.id));
+
+function tabFromSearchParams(params: URLSearchParams): LibraryTabId {
+  const tab = params.get('tab');
+  if (tab && VALID_TAB_IDS.has(tab as LibraryTabId)) {
+    return tab as LibraryTabId;
+  }
+  return 'all';
+}
+
 export default function HomeLibraryPage() {
-  const [libraryTab, setLibraryTab] = useState(LIBRARY_TABS[0].id);
+  const { t } = useLocale();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [libraryTab, setLibraryTab] = useState<LibraryTabId>(() =>
+    tabFromSearchParams(searchParams),
+  );
+  const [statusFilter, setStatusFilter] = useState<LibraryStatusFilter>(() =>
+    statusFilterFromSearchParams(searchParams),
+  );
   const activeLibrary = LIBRARY_TABS.find((t) => t.id === libraryTab) ?? LIBRARY_TABS[0];
+
+  useEffect(() => {
+    setLibraryTab(tabFromSearchParams(searchParams));
+    setStatusFilter(statusFilterFromSearchParams(searchParams));
+  }, [searchParams]);
+
+  function applySearchParams(tabId: LibraryTabId, status: LibraryStatusFilter) {
+    setSearchParams(librarySearchParams(tabId, status), { replace: true });
+  }
+
+  function selectTab(tabId: LibraryTabId) {
+    setLibraryTab(tabId);
+    applySearchParams(tabId, statusFilter);
+  }
+
+  function selectStatusFilter(status: LibraryStatusFilter) {
+    setStatusFilter(status);
+    applySearchParams(libraryTab, status);
+  }
 
   function renderBody() {
     if (activeLibrary.favorites) {
-      return <HomeFavoritesFeed key="favorites" />;
+      return <HomeFavoritesFeed statusFilter={statusFilter} />;
     }
     if (activeLibrary.filter) {
-      return <HomeMyContent key={activeLibrary.filter} filter={activeLibrary.filter} />;
+      return (
+        <HomeMyContent
+          key={activeLibrary.filter}
+          filter={activeLibrary.filter}
+          statusFilter={statusFilter}
+        />
+      );
     }
     return null;
   }
@@ -38,16 +100,35 @@ export default function HomeLibraryPage() {
       </header>
 
       <nav className="home-subtabs home-library-tabs" role="tablist" aria-label="Lọc thư viện">
-        {LIBRARY_TABS.map((t) => (
+        {LIBRARY_TABS.map((tab) => (
           <button
-            key={t.id}
+            key={tab.id}
             type="button"
             role="tab"
-            aria-selected={libraryTab === t.id}
-            className={`home-subtab${libraryTab === t.id ? ' active' : ''}`}
-            onClick={() => setLibraryTab(t.id)}
+            aria-selected={libraryTab === tab.id}
+            className={`home-subtab${libraryTab === tab.id ? ' active' : ''}`}
+            onClick={() => selectTab(tab.id)}
           >
-            {t.label}
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      <nav
+        className="home-subtabs home-library-status-tabs"
+        role="tablist"
+        aria-label={t('library.status.filterAria')}
+      >
+        {STATUS_FILTERS.map((status) => (
+          <button
+            key={status}
+            type="button"
+            role="tab"
+            aria-selected={statusFilter === status}
+            className={`home-subtab home-library-status-tab${statusFilter === status ? ' active' : ''}`}
+            onClick={() => selectStatusFilter(status)}
+          >
+            {t(STATUS_LABEL_KEYS[status])}
           </button>
         ))}
       </nav>

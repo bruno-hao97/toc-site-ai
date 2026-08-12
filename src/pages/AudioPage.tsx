@@ -68,6 +68,12 @@ import AudioTtsSettingsPanel, {
   type StabilityMode,
   type SettingsSideTab,
 } from '../components/audio/AudioTtsSettingsPanel';
+import {
+  AudioPendingGridCards,
+  AudioPendingListRows,
+  activeAudioPending,
+  type AudioPendingJob,
+} from '../components/audio/AudioPendingRows';
 import { useLocale } from '../i18n';
 import type { TranslationKey } from '../i18n';
 
@@ -305,6 +311,7 @@ export default function AudioPage() {
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [pendingJobs, setPendingJobs] = useState<AudioPendingJob[]>([]);
   const sessionStartRef = useRef(Date.now());
 
   const [designQuery, setDesignQuery] = useState('');
@@ -386,6 +393,30 @@ export default function AudioPage() {
   }, [audioLists, mainTab, sessionStartSec]);
 
   const recentCount = audioLists.length;
+
+  const activePending = useMemo(() => activeAudioPending(pendingJobs), [pendingJobs]);
+  const hasListContent = filteredLists.length > 0 || activePending.length > 0;
+
+  function beginAudioPending(text: string): string {
+    const id = crypto.randomUUID();
+    setMainTab('current');
+    setPendingJobs((prev) => [
+      { id, text, status: 'processing', progress: 8 },
+      ...prev.filter((p) => p.status === 'processing'),
+    ]);
+    return id;
+  }
+
+  function finishAudioPending(id: string) {
+    setPendingJobs((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  function holdAudioPending(id: string) {
+    setPendingJobs((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, progress: 40 } : p)),
+    );
+    window.setTimeout(() => finishAudioPending(id), 45_000);
+  }
 
   const selectedItems = useMemo(
     () => filteredLists.filter((item) => selectedListIds.has(item.id_base)),
@@ -521,6 +552,14 @@ export default function AudioPage() {
     if (activeFeature !== 'tts') return;
     void loadAudioLists();
   }, [activeFeature, mainTab, loadAudioLists, resultUrl]);
+
+  useEffect(() => {
+    if (activeFeature !== 'tts' || activePending.length === 0) return;
+    const id = window.setInterval(() => {
+      void loadAudioLists();
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [activeFeature, activePending.length, loadAudioLists]);
 
   useEffect(() => {
     setError('');
@@ -662,6 +701,7 @@ export default function AudioPage() {
       return;
     }
 
+    const pendingId = beginAudioPending(text);
     setSubmitting(true);
     setError('');
     setProgress(t('audio.generating'));
@@ -719,12 +759,13 @@ export default function AudioPage() {
       void loadAudioLists();
       notifyCreditsUpdated();
       setProgress('');
+      finishAudioPending(pendingId);
     } catch (err) {
       if (isJobAcceptedPendingError(err)) {
-        // TTS đã nhận trên provider — giữ credit, không hoàn.
         charged = 0;
         setError('');
         setProgress(err.message);
+        holdAudioPending(pendingId);
       } else {
         if (charged > 0) {
           try {
@@ -735,6 +776,7 @@ export default function AudioPage() {
         }
         setError(err instanceof Error ? err.message : String(err));
         setProgress('');
+        finishAudioPending(pendingId);
       }
     } finally {
       setSubmitting(false);
@@ -780,6 +822,7 @@ export default function AudioPage() {
       return;
     }
 
+    const pendingId = beginAudioPending(text);
     setSubmitting(true);
     setError('');
     setProgress(t('audio.generating'));
@@ -853,11 +896,13 @@ export default function AudioPage() {
       }
       notifyCreditsUpdated();
       setProgress('');
+      finishAudioPending(pendingId);
     } catch (err) {
       if (isJobAcceptedPendingError(err)) {
         charged = 0;
         setError('');
         setProgress(err.message);
+        holdAudioPending(pendingId);
       } else {
         if (charged > 0) {
           try {
@@ -868,6 +913,7 @@ export default function AudioPage() {
         }
         setError(err instanceof Error ? err.message : String(err));
         setProgress('');
+        finishAudioPending(pendingId);
       }
     } finally {
       setSubmitting(false);
@@ -1047,14 +1093,15 @@ export default function AudioPage() {
             {listsError && <p className="audio-error">{listsError || t('audio.session.listsFailed')}</p>}
 
             <div className="audio-results">
-              {listsLoading && filteredLists.length === 0 ? (
+              {listsLoading && !hasListContent ? (
                 <p className="audio-empty">
                   <Loader2 size={18} className="spin" /> {t('audio.generating')}
                 </p>
-              ) : filteredLists.length === 0 ? (
+              ) : !hasListContent ? (
                 <p className="audio-empty">{t('audio.empty')}</p>
               ) : mainTab === 'recent' ? (
                 <div className="audio-session-grid">
+                  <AudioPendingGridCards jobs={pendingJobs} />
                   {filteredLists.map((item) => {
                     const isChecked = selectedListIds.has(item.id_base);
                     const isActive = activeListId === item.id_base || isChecked;
@@ -1095,6 +1142,7 @@ export default function AudioPage() {
                 </div>
               ) : (
                 <div className="audio-session-list">
+                  <AudioPendingListRows jobs={pendingJobs} />
                   {filteredLists.map((item, idx) => {
                     const isChecked = selectedListIds.has(item.id_base);
                     return (
@@ -1109,7 +1157,7 @@ export default function AudioPage() {
                           onChange={() => toggleListSelection(item.id_base)}
                         />
                       </label>
-                      <span className="audio-session-index">{idx + 1}</span>
+                      <span className="audio-session-index">{idx + 1 + activePending.length}</span>
                       <button
                         type="button"
                         className="audio-session-play"

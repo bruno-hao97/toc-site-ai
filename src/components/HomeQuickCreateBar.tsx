@@ -38,6 +38,7 @@ import {
 import { notifyCreditsUpdated } from '../services/authStore';
 import { modelPriceRangeLabel, resolveModelPrice } from '../services/modelPricing';
 import { isJobAcceptedPendingError } from '../services/jobInfraErrors';
+import { libraryPathForJobType } from '../utils/libraryTabForJobType';
 
 type QuickMenuId = 'chat' | 'script' | 'video' | 'image' | 'tts' | 'music' | 'audio' | 'apps';
 
@@ -419,26 +420,41 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
     setResult(null);
     setProgress('Đang tạo job…');
 
+    let navigatedAway = false;
+    const goToLibrary = () => {
+      if (navigatedAway) return;
+      navigatedAway = true;
+      notifyCreditsUpdated();
+      navigate(libraryPathForJobType(type));
+      abortRef.current?.abort();
+      setSubmitting(false);
+    };
+
     try {
       const url = await quickGenerate({
         type,
         model: currentModel,
         selections: sel,
-        onProgress: setProgress,
+        onProgress: (msg) => {
+          if (!navigatedAway) setProgress(msg);
+        },
+        onJobAccepted: goToLibrary,
         signal: abortRef.current.signal,
       });
+      if (navigatedAway) return;
       setResult({ url, type });
       setProgress('');
       setProviderBusy(false);
       notifyCreditsUpdated();
-      if (isHero) setExpanded(true);
+      goToLibrary();
     } catch (err) {
+      if (navigatedAway) return;
       if (isJobAcceptedPendingError(err)) {
         setError('');
         setInfo(err.message);
         setProgress('');
         setProviderBusy(true);
-        // Mở khóa sau 45s — đủ để giảm spam; user vẫn xem được info.
+        goToLibrary();
         window.setTimeout(() => setProviderBusy(false), 45_000);
       } else {
         setError(err instanceof Error ? err.message : String(err));
@@ -446,7 +462,7 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
         if (isHero) setExpanded(true);
       }
     } finally {
-      setSubmitting(false);
+      if (!navigatedAway) setSubmitting(false);
     }
   };
 
@@ -757,7 +773,7 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
 
         <div className="qc-toolbar-right">
           {cost > 0 && <span className="qc-cost">{cost.toLocaleString('vi-VN')}</span>}
-          {progress && <span className="qc-progress">{progress}</span>}
+          {progress && !isHero && <span className="qc-progress">{progress}</span>}
           {isHero ? (
             renderGenerateBtn()
           ) : (
@@ -779,8 +795,14 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
       </div>
       </div>
 
-      {isHero && (result || error || info) && (
+      {isHero && (result || error || info || progress) && (
         <div className="qc-hero-feedback">
+          {progress && (
+            <div className="qc-hero-progress" role="status" aria-live="polite">
+              <Loader2 size={15} className="qc-spin" aria-hidden />
+              <span>{progress}</span>
+            </div>
+          )}
           {result && (
             <div className="qc-result">
               <button type="button" className="qc-result-close" onClick={() => setResult(null)}>

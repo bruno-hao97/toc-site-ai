@@ -7,7 +7,9 @@ import {
   type MouseEvent,
 } from 'react';
 import { Heart, Play } from 'lucide-react';
+import { useLocale } from '../i18n';
 import {
+  feedIsFailed,
   feedPosterUrl,
   feedThumb,
   feedVideoPreviewUrl,
@@ -15,10 +17,12 @@ import {
   type FeedItem,
 } from '../services/feedApi';
 import { isFavorite, toggleFavorite } from '../services/feedFavoritesStore';
+import { feedItemPrompt, isFeedItemProcessing } from '../utils/feedProcessing';
 import {
   releaseFeedHoverPreview,
   requestFeedHoverPreview,
 } from '../utils/feedHoverPreviewManager';
+import { MasonryPendingMedia } from './FeedItemPendingCard';
 
 function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(() => {
@@ -48,6 +52,7 @@ export default function FeedMasonryCard({
   /** Leo-style muted video preview on hover (community feed). */
   hoverPreview?: boolean;
 }) {
+  const { t } = useLocale();
   const [fav, setFav] = useState(() => isFavorite(item.id_base));
   const [previewing, setPreviewing] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -61,10 +66,14 @@ export default function FeedMasonryCard({
   const posterIsImage = Boolean(poster && !isVideoMediaUrl(poster));
   const previewUrl = feedVideoPreviewUrl(item);
   const video = Boolean(previewUrl);
-  const canHoverPreview = hoverPreview && video && !reducedMotion;
-  const author = item.author?.name || 'Ẩn danh';
+  const processing = isFeedItemProcessing(item);
+  const failed = feedIsFailed(item);
+  const hasVisual = Boolean(thumb || posterIsImage);
+  const prompt = feedItemPrompt(item);
+  const canHoverPreview = hoverPreview && video && !reducedMotion && !processing;
+  const author = item.author?.name || t('feed.anonymous');
   const likes = item.likes_count ?? item.like_count ?? 0;
-  const openable = Boolean(onOpen && (previewUrl || thumb));
+  const openable = Boolean(onOpen && (previewUrl || thumb) && !processing);
 
   const stopPreview = useCallback(() => {
     setPreviewing(false);
@@ -122,6 +131,24 @@ export default function FeedMasonryCard({
     releaseFeedHoverPreview(item.id_base);
   };
 
+  if (!hasVisual && processing) {
+    return (
+      <article className="feed-masonry-card feed-masonry-card--pending processing">
+        <MasonryPendingMedia prompt={prompt} status="processing" />
+      </article>
+    );
+  }
+
+  if (!hasVisual && failed) {
+    return (
+      <article className="feed-masonry-card feed-masonry-card--pending failed">
+        <MasonryPendingMedia prompt={prompt} status="failed" />
+      </article>
+    );
+  }
+
+  const typeLabel = video ? t('feed.typeVideo') : t('feed.typeImage');
+
   return (
     <article className="feed-masonry-card">
       <div
@@ -147,7 +174,7 @@ export default function FeedMasonryCard({
         ) : thumb ? (
           <img className="feed-masonry-poster" src={thumb} alt="" loading="lazy" />
         ) : (
-          <span className="feed-masonry-empty">Đang xử lý…</span>
+          <span className="feed-masonry-empty">{t('feed.processingShort')}</span>
         )}
 
         {canHoverPreview && (
@@ -168,7 +195,7 @@ export default function FeedMasonryCard({
           </span>
         )}
 
-        <span className="feed-masonry-type">{video ? 'Video' : 'Ảnh'}</span>
+        <span className="feed-masonry-type">{typeLabel}</span>
 
         {item.duration && Number(item.duration) > 0 && (
           <span className="feed-masonry-duration">{item.duration}s</span>
@@ -188,7 +215,7 @@ export default function FeedMasonryCard({
         <button
           type="button"
           className={`feed-masonry-fav${fav ? ' fav-on' : ''}`}
-          aria-label={fav ? 'Bỏ yêu thích' : 'Yêu thích'}
+          aria-label={fav ? t('feed.unfavorite') : t('feed.favorite')}
           onClick={onHeart}
         >
           <Heart size={14} fill={fav ? 'currentColor' : 'none'} />

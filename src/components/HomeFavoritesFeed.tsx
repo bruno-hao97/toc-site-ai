@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLocale } from '../i18n';
 import ComposerLibraryPreviewModal, {
   type ComposerPreviewHandlers,
 } from './ComposerLibraryPreviewModal';
@@ -13,8 +14,17 @@ import {
   feedPreviewKind,
   navigateFeedItemReuse,
 } from '../utils/feedItemReuse';
+import {
+  matchesLibraryStatusFilter,
+  type LibraryStatusFilter,
+} from '../utils/feedLibraryStatus';
 
-export default function HomeFavoritesFeed() {
+export default function HomeFavoritesFeed({
+  statusFilter = 'all',
+}: {
+  statusFilter?: LibraryStatusFilter;
+}) {
+  const { t } = useLocale();
   const navigate = useNavigate();
   const [items, setItems] = useState<FeedItem[]>([]);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -29,9 +39,14 @@ export default function HomeFavoritesFeed() {
     return () => document.removeEventListener('favorites:updated', refresh);
   }, [refresh]);
 
+  const displayItems = useMemo(
+    () => items.filter((it) => matchesLibraryStatusFilter(it, statusFilter)),
+    [items, statusFilter],
+  );
+
   const visualItems = useMemo(
-    () => items.filter((it) => !feedIsAudioItem(it) && canOpenFeedPreview(it)),
-    [items],
+    () => displayItems.filter((it) => !feedIsAudioItem(it) && canOpenFeedPreview(it)),
+    [displayItems],
   );
   const previewItem = previewIndex != null ? visualItems[previewIndex] : null;
   const previewKindValue = previewItem ? feedPreviewKind(previewItem) : 'video';
@@ -55,10 +70,18 @@ export default function HomeFavoritesFeed() {
     };
   }, [previewItem, navigate]);
 
+  const emptyTitle = useMemo(() => {
+    if (items.length > 0 && displayItems.length === 0) {
+      if (statusFilter === 'success') return t('library.status.emptySuccess');
+      if (statusFilter === 'failed') return t('library.status.emptyFailed');
+    }
+    return 'Chưa có mục yêu thích';
+  }, [items.length, displayItems.length, statusFilter, t]);
+
   return (
     <div className="home-feed home-feed--column">
       <div className="home-feed-column">
-        {items.map((item) => (
+        {displayItems.map((item) => (
           <FeedPostCard
             key={item.id_base}
             item={item}
@@ -80,9 +103,9 @@ export default function HomeFavoritesFeed() {
         />
       )}
 
-      {!items.length && (
+      {!displayItems.length && (
         <HomeFeedEmpty
-          title="Chưa có mục yêu thích"
+          title={emptyTitle}
           description="Bấm ♥ trên bảng tin hoặc thư viện để lưu vào đây."
           showCreate={false}
         />

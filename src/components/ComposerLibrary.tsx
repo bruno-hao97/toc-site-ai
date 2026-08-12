@@ -15,8 +15,11 @@ import {
 } from '../services/feedApi';
 import { formatModelLabel } from '../services/feedLibraryMeta';
 import ComposerGalleryEmpty from './composer/ComposerGalleryEmpty';
+import ComposerPendingMasonry, { activePendingJobs } from './composer/ComposerPendingMasonry';
+import type { ComposerPendingJob } from './ComposerHistory';
 import { useLocale } from '../i18n';
 import type { JobType } from '../services/api';
+import { feedItemPrompt, isFeedItemProcessing } from '../utils/feedProcessing';
 
 type Kind = 'image' | 'video' | 'unsupported';
 
@@ -54,8 +57,9 @@ interface KeyedItem {
 
 export default function ComposerLibrary({
   jobType,
-  zoom: _zoom,
+  zoom,
   refreshKey = 0,
+  pendingJobs = [],
   onCountChange,
   selectedIds,
   onToggleSelect,
@@ -67,6 +71,7 @@ export default function ComposerLibrary({
   jobType: JobType;
   zoom: number;
   refreshKey?: number;
+  pendingJobs?: ComposerPendingJob[];
   onCountChange?: (count: number) => void;
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
@@ -95,6 +100,27 @@ export default function ComposerLibrary({
   const [deletingId, setDeletingId] = useState('');
   const loadingRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const activePending = useMemo(() => activePendingJobs(pendingJobs), [pendingJobs]);
+
+  const pendingIdSet = useMemo(
+    () => new Set(activePending.map((p) => p.id)),
+    [activePending],
+  );
+
+  const pendingPromptSet = useMemo(() => {
+    const set = new Set<string>();
+    activePending.forEach((p) => {
+      const text = p.prompt.trim();
+      if (text) set.add(text);
+    });
+    return set;
+  }, [activePending]);
+
+  const hasProcessingUpstream = useMemo(
+    () => items.some(isFeedItemProcessing),
+    [items],
+  );
 
   const load = useCallback(
     async (after: string, reset: boolean) => {
@@ -151,6 +177,14 @@ export default function ComposerLibrary({
     return () => obs.disconnect();
   }, [afterId, hasMore, load]);
 
+  useEffect(() => {
+    if (activePending.length === 0 && !hasProcessingUpstream) return;
+    const id = window.setInterval(() => {
+      if (!loadingRef.current) load('', true);
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [activePending.length, hasProcessingUpstream, load]);
+
   const models = useMemo(() => {
     const set = new Set<string>();
     items.forEach((it) => {
@@ -174,15 +208,20 @@ export default function ComposerLibrary({
     return items.filter((it) => {
       if (modelFilter && feedModelLabel(it) !== modelFilter) return false;
       if (ratioFilter && (it.ratio || '') !== ratioFilter) return false;
+      if (isFeedItemProcessing(it)) {
+        if (pendingIdSet.has(it.id_base)) return false;
+        const prompt = feedItemPrompt(it);
+        if (prompt && pendingPromptSet.has(prompt)) return false;
+      }
       if (!q) return true;
       return [it.prompt, it.model, it.id_base, it.platform_job_id]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     });
-  }, [items, query, modelFilter, ratioFilter]);
+  }, [items, query, modelFilter, ratioFilter, pendingIdSet, pendingPromptSet]);
 
   useEffect(() => {
-    onCountChange?.(filteredItems.length);
+    onCountChange?.(filteredItems.length + activePending.length);
     const ids = filteredItems.map((it) => it.id_base).filter(Boolean);
     onVisibleIdsChange?.(ids);
     const urlMap: Record<string, string> = {};
@@ -192,7 +231,7 @@ export default function ComposerLibrary({
       if (id && url) urlMap[id] = url;
     }
     onUrlMapChange?.(urlMap);
-  }, [filteredItems, onCountChange, onVisibleIdsChange, onUrlMapChange]);
+  }, [filteredItems, activePending.length, onCountChange, onVisibleIdsChange, onUrlMapChange]);
 
   const sortedItems = useMemo(() => {
     const list = [...filteredItems];
@@ -263,7 +302,7 @@ export default function ComposerLibrary({
     );
   }
 
-  if (error && items.length === 0) {
+  if (error && items.length === 0 && activePending.length === 0) {
     return (
       <div className="clib-status clib-error">
         <p>{t('composer.library.loadError')}: {error}</p>
@@ -349,13 +388,13 @@ export default function ComposerLibrary({
         </button>
       </div>
 
-      {loading && items.length === 0 && (
+      {loading && items.length === 0 && activePending.length === 0 && (
         <div className="clib-status">
           <Loader2 size={18} className="clib-spin" /> {t('composer.library.loading')}
         </div>
       )}
 
-      {!loading && filteredItems.length === 0 && (
+      {!loading && filteredItems.length === 0 && activePending.length === 0 && (
         <ComposerGalleryEmpty
           title={
             query || modelFilter || ratioFilter
@@ -377,6 +416,8 @@ export default function ComposerLibrary({
           focusLabel={t('composer.gallery.focusPanel')}
         />
       )}
+
+      <ComposerPendingMasonry jobs={pendingJobs} thumbSize={zoom} />
 
       {groups.map(([label, list]) => (
         <section key={label} className="clib-group">

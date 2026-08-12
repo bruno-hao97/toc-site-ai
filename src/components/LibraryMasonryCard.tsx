@@ -6,18 +6,22 @@ import {
   useState,
 } from 'react';
 import { Play } from 'lucide-react';
+import { useLocale } from '../i18n';
 import ComposerSelectCircle from './ComposerSelectCircle';
 import {
+  feedIsFailed,
   feedPosterUrl,
   feedThumb,
   feedVideoPreviewUrl,
   isVideoMediaUrl,
   type FeedItem,
 } from '../services/feedApi';
+import { feedItemPrompt, isFeedItemProcessing } from '../utils/feedProcessing';
 import {
   releaseFeedHoverPreview,
   requestFeedHoverPreview,
 } from '../utils/feedHoverPreviewManager';
+import { MasonryPendingMedia } from './FeedItemPendingCard';
 
 function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(() => {
@@ -50,6 +54,7 @@ export default function LibraryMasonryCard({
   onOpen?: () => void;
   hoverPreview?: boolean;
 }) {
+  const { t } = useLocale();
   const [previewing, setPreviewing] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const itemIdRef = useRef(item.id_base);
@@ -62,8 +67,13 @@ export default function LibraryMasonryCard({
   const posterIsImage = Boolean(poster && !isVideoMediaUrl(poster));
   const previewUrl = feedVideoPreviewUrl(item);
   const isVideo = kind === 'video' || Boolean(previewUrl);
-  const canHoverPreview = hoverPreview && isVideo && Boolean(previewUrl) && !reducedMotion;
-  const openable = Boolean(onOpen && (previewUrl || thumb || poster));
+  const processing = isFeedItemProcessing(item);
+  const failed = feedIsFailed(item);
+  const hasVisual = Boolean(thumb || posterIsImage);
+  const prompt = feedItemPrompt(item);
+  const canHoverPreview =
+    hoverPreview && isVideo && Boolean(previewUrl) && !reducedMotion && !processing;
+  const openable = Boolean(onOpen && (previewUrl || thumb || poster) && !processing);
 
   const stopPreview = useCallback(() => {
     setPreviewing(false);
@@ -107,6 +117,34 @@ export default function LibraryMasonryCard({
     releaseFeedHoverPreview(item.id_base);
   };
 
+  if (!hasVisual && processing) {
+    return (
+      <article className={`feed-masonry-card feed-masonry-card--pending processing${selected ? ' selected' : ''}`}>
+        <div className="feed-masonry-media feed-masonry-media--pending">
+          <MasonryPendingMedia prompt={prompt} status="processing" />
+          {onToggleSelect && (
+            <ComposerSelectCircle selected={selected} onToggle={onToggleSelect} />
+          )}
+        </div>
+      </article>
+    );
+  }
+
+  if (!hasVisual && failed) {
+    return (
+      <article className={`feed-masonry-card feed-masonry-card--pending failed${selected ? ' selected' : ''}`}>
+        <div className="feed-masonry-media feed-masonry-media--pending">
+          <MasonryPendingMedia prompt={prompt} status="failed" />
+          {onToggleSelect && (
+            <ComposerSelectCircle selected={selected} onToggle={onToggleSelect} />
+          )}
+        </div>
+      </article>
+    );
+  }
+
+  const typeLabel = isVideo ? t('feed.typeVideo') : t('feed.typeImage');
+
   return (
     <article className={`feed-masonry-card${selected ? ' selected' : ''}`}>
       <div
@@ -127,12 +165,12 @@ export default function LibraryMasonryCard({
       >
         {posterIsImage ? (
           <img className="feed-masonry-poster" src={poster!} alt="" loading="lazy" />
-        ) : isVideo && !thumb ? (
-          <span className="feed-masonry-empty feed-masonry-empty--video" aria-hidden />
         ) : thumb ? (
           <img className="feed-masonry-poster" src={thumb} alt="" loading="lazy" />
+        ) : isVideo ? (
+          <span className="feed-masonry-empty feed-masonry-empty--video" aria-hidden />
         ) : (
-          <span className="feed-masonry-empty">Đang xử lý…</span>
+          <span className="feed-masonry-empty">{t('feed.processingShort')}</span>
         )}
 
         {canHoverPreview && (
@@ -147,13 +185,13 @@ export default function LibraryMasonryCard({
           />
         )}
 
-        {isVideo && (
+        {isVideo && !processing && (
           <span className="feed-masonry-play">
             <Play size={16} fill="currentColor" />
           </span>
         )}
 
-        <span className="feed-masonry-type">{isVideo ? 'Video' : 'Ảnh'}</span>
+        <span className="feed-masonry-type">{typeLabel}</span>
 
         {item.duration && Number(item.duration) > 0 && !onToggleSelect && (
           <span className="feed-masonry-duration">{item.duration}s</span>

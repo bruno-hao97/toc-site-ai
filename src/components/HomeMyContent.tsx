@@ -6,6 +6,7 @@ import ComposerLibraryPreviewModal, {
 } from './ComposerLibraryPreviewModal';
 import HomeAudioLibrary from './HomeAudioLibrary';
 import HomeMusicLibrary from './HomeMusicLibrary';
+import { useCreditsUpdated } from '../hooks/useCreditsUpdated';
 import { isLoggedIn } from '../services/authStore';
 import { studioRouteForType } from '../constants/studioTypes';
 import type { JobType } from '../services/api';
@@ -18,6 +19,7 @@ import {
   fetchMyImages,
   fetchMyMusic,
   fetchMyVideos,
+  invalidateMineAudioMusicCaches,
   type FeedItem,
   type MinePage,
 } from '../services/feedApi';
@@ -25,6 +27,12 @@ import {
   loadFavorites,
 } from '../services/feedFavoritesStore';
 import { UpstreamMeError } from '../services/upstreamMe';
+import { isFeedItemProcessing } from '../utils/feedProcessing';
+import {
+  matchesLibraryStatusFilter,
+  type LibraryStatusFilter,
+} from '../utils/feedLibraryStatus';
+import { useLocale } from '../i18n';
 import HomeFeedEmpty from './home/HomeFeedEmpty';
 
 export type MineFilter = 'all' | 'video' | 'image' | 'music' | 'tts' | 'favorite';
@@ -74,7 +82,14 @@ async function fetchSource(source: SourceKey, afterId: string, limit: number): P
   }
 }
 
-export default function HomeMyContent({ filter }: { filter: MineFilter }) {
+export default function HomeMyContent({
+  filter,
+  statusFilter = 'all',
+}: {
+  filter: MineFilter;
+  statusFilter?: LibraryStatusFilter;
+}) {
+  const { t } = useLocale();
   const navigate = useNavigate();
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -100,6 +115,47 @@ export default function HomeMyContent({ filter }: { filter: MineFilter }) {
   const seen = useRef<Set<string>>(new Set());
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const refreshingRef = useRef(false);
+  const [discoveryActive, setDiscoveryActive] = useState(true);
+
+  const refreshRecent = useCallback(async () => {
+    if (!isLoggedIn() || refreshingRef.current) return;
+    refreshingRef.current = true;
+    try {
+      const sources = sourcesForFilter(filter);
+      if (sources.includes('music') || sources.includes('tts')) {
+        invalidateMineAudioMusicCaches();
+      }
+      const favIds = filter === 'favorite' ? loadFavorites() : null;
+      if (favIds && favIds.size === 0) return;
+
+      const pages = await Promise.all(
+        sources.map(async (source) => fetchSource(source, '', 30)),
+      );
+
+      const merged: FeedItem[] = [];
+      for (const page of pages) {
+        for (const it of page.items) {
+          if (!it.id_base || !feedIsDisplayable(it)) continue;
+          if (favIds && !favIds.has(it.id_base)) continue;
+          seen.current.add(it.id_base);
+          merged.push(it);
+        }
+      }
+
+      if (!merged.length) return;
+
+      setItems((prev) => {
+        const byId = new Map(prev.map((it) => [it.id_base, it]));
+        for (const it of merged) byId.set(it.id_base, it);
+        return [...byId.values()].sort((a, b) => mineTime(b) - mineTime(a));
+      });
+    } catch {
+      /* giữ danh sách cũ */
+    } finally {
+      refreshingRef.current = false;
+    }
+  }, [filter]);
 
   const loadMore = useCallback(async () => {
     if (loading || done) return;
@@ -166,6 +222,29 @@ export default function HomeMyContent({ filter }: { filter: MineFilter }) {
   }, []);
 
   useEffect(() => {
+    setDiscoveryActive(true);
+    const id = window.setTimeout(() => setDiscoveryActive(false), 120_000);
+    return () => window.clearTimeout(id);
+  }, [filter]);
+
+  const hasProcessing = useMemo(
+    () => items.some(isFeedItemProcessing),
+    [items],
+  );
+
+  useEffect(() => {
+    if (!hasProcessing && !discoveryActive) return;
+    const id = window.setInterval(() => {
+      void refreshRecent();
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [hasProcessing, discoveryActive, refreshRecent]);
+
+  useCreditsUpdated(() => {
+    void refreshRecent();
+  });
+
+  useEffect(() => {
     const onFav = () => setFavTick((n) => n + 1);
     document.addEventListener('favorites:updated', onFav);
     return () => document.removeEventListener('favorites:updated', onFav);
@@ -197,9 +276,14 @@ export default function HomeMyContent({ filter }: { filter: MineFilter }) {
     });
   }, [audioPlayerUrl]);
 
+  const displayItems = useMemo(
+    () => items.filter((it) => matchesLibraryStatusFilter(it, statusFilter)),
+    [items, statusFilter],
+  );
+
   const visualItems = useMemo(
-    () => items.filter((it) => !feedIsAudioItem(it)),
-    [items],
+    () => displayItems.filter((it) => !feedIsAudioItem(it)),
+    [displayItems],
   );
 
   const previewItem = previewIndex != null ? visualItems[previewIndex] : null;
@@ -264,18 +348,18 @@ export default function HomeMyContent({ filter }: { filter: MineFilter }) {
     };
   }, [previewItem, goStudioReuse]);
 
-  const emptyTitle =
-    filter === 'favorite'
-      ? 'Chưa có mục yêu thích'
-      : filter === 'music'
-        ? 'Chưa có bài nhạc'
-        : filter === 'tts'
-          ? 'Chưa có âm thanh'
-          : filter === 'video'
-            ? 'Chưa có video'
-            : filter === 'image'
-              ? 'Chưa có hình ảnh'
-              : 'Thư viện trống';
+  const emptyTitle = useMemo(() => {
+    if (items.length > 0 && displayItems.length === 0) {
+      if (statusFilter === 'success') return t('library.status.emptySuccess');
+      if (statusFilter === 'failed') return t('library.status.emptyFailed');
+    }
+    if (filter === 'favorite') return 'Chưa có mục yêu thích';
+    if (filter === 'music') return 'Chưa có bài nhạc';
+    if (filter === 'tts') return 'Chưa có âm thanh';
+    if (filter === 'video') return 'Chưa có video';
+    if (filter === 'image') return 'Chưa có hình ảnh';
+    return 'Thư viện trống';
+  }, [items.length, displayItems.length, statusFilter, filter, t]);
 
   const emptyDescription =
     filter === 'favorite'
@@ -302,10 +386,10 @@ export default function HomeMyContent({ filter }: { filter: MineFilter }) {
   const libraryBody =
     filter === 'tts' ? (
       <HomeAudioLibrary
-        items={items}
+        items={displayItems}
         playingId={
           audioPlayerUrl
-            ? items.find((it) => feedMediaUrl(it) === audioPlayerUrl)?.id_base ?? null
+            ? displayItems.find((it) => feedMediaUrl(it) === audioPlayerUrl)?.id_base ?? null
             : null
         }
         onPlay={playAudioItem}
@@ -313,13 +397,13 @@ export default function HomeMyContent({ filter }: { filter: MineFilter }) {
       />
     ) : filter === 'music' ? (
       <HomeMusicLibrary
-        items={items}
+        items={displayItems}
         onPlay={playAudioItem}
         onDelete={deleteLibraryItem}
       />
     ) : (
       <div className="home-masonry home-masonry--library">
-        {items.map((item) => (
+        {displayItems.map((item) => (
           <FeedMasonryCard
             key={item.id_base}
             item={item}
@@ -363,11 +447,11 @@ export default function HomeMyContent({ filter }: { filter: MineFilter }) {
 
       {error && <p className="error feed-status">{error}</p>}
       {loading && <p className="muted feed-status">Đang tải…</p>}
-      {!loading && !items.length && !error && (
+      {!loading && !displayItems.length && !error && (
         <HomeFeedEmpty
           title={emptyTitle}
           description={emptyDescription}
-          showCreate={filter !== 'favorite'}
+          showCreate={filter !== 'favorite' && statusFilter === 'all'}
         />
       )}
 

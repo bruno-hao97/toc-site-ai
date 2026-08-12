@@ -464,6 +464,18 @@ const en: TranslationMap = {
   'dashboard.tx.job_refund': 'Credit refund',
   'dashboard.tx.topup': 'Top-up',
   'dashboard.tx.promotion': 'Promotion',
+  'feed.anonymous': 'Anonymous',
+  'feed.typeImage': 'Image',
+  'feed.typeVideo': 'Video',
+  'feed.processingShort': 'Processing…',
+  'feed.favorite': 'Favorite',
+  'feed.unfavorite': 'Remove favorite',
+  'library.status.filterAria': 'Filter by status',
+  'library.status.all': 'All',
+  'library.status.success': 'Successful',
+  'library.status.failed': 'Failed',
+  'library.status.emptySuccess': 'No successful items',
+  'library.status.emptyFailed': 'No failed items',
 };
 
 export default en;
