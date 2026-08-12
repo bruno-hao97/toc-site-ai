@@ -15,6 +15,14 @@ export const CONTACT_PHONE = '0973636888';
 export const CONTACT_PHONE_DISPLAY = '097 3636 888';
 export const CONTACT_PHONE_TEL = `tel:+84${CONTACT_PHONE.replace(/^0/, '')}`;
 
+/** Email liên hệ / hỗ trợ — dùng thống nhất toàn site. */
+export const CONTACT_EMAIL = 'App.agi.vn@gmail.com';
+export const CONTACT_EMAIL_MAILTO = `mailto:${CONTACT_EMAIL}`;
+
 export function contactPhoneLine(prefix = 'Hỗ trợ'): string {
   return `${prefix}: ${CONTACT_PHONE_DISPLAY}`;
+}
+
+export function contactEmailLine(prefix = 'Email'): string {
+  return `${prefix}: ${CONTACT_EMAIL}`;
 }

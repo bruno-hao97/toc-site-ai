@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Check, ChevronDown, Loader2, Phone, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, Loader2, Sparkles } from 'lucide-react';
+import ContactSupportLinks from '../components/ContactSupportLinks';
 import SubscriptionConfirmModal from '../components/SubscriptionConfirmModal';
 import SubscriptionPaymentModal from '../components/SubscriptionPaymentModal';
 import CreditConfirmModal from '../components/CreditConfirmModal';
@@ -20,7 +21,6 @@ import {
   type SubscriptionPlan,
   type SubscriptionPlanType,
 } from '../services/subscriptionPlans';
-import { CONTACT_PHONE_TEL, contactPhoneLine } from '../lib/brand';
 
 const QR_DISABLED_FALLBACK =
   'Nạp tiền QR tạm khóa — đang chờ kích hoạt webhook thanh toán. Vui lòng liên hệ hỗ trợ để được cấp credit.';
@@ -388,10 +388,7 @@ export default function PricingPage() {
         {!qrEnabled ? (
           <div className="banner warn pricing-pay-error" style={{ marginTop: '1rem' }}>
             <p style={{ margin: 0 }}>{qrDisabledMessage}</p>
-            <a className="pricing-contact-phone" href={CONTACT_PHONE_TEL} style={{ marginTop: '0.5rem', display: 'inline-flex' }}>
-              <Phone size={14} />
-              {contactPhoneLine('Liên hệ')}
-            </a>
+            <ContactSupportLinks layout="stack" linkClassName="pricing-contact-phone" iconSize={14} />
           </div>
         ) : null}
       </section>
@@ -638,10 +635,7 @@ export default function PricingPage() {
               <article className="panel">
                 <h3>Hỗ trợ 24/7</h3>
                 <p className="muted">Đội ngũ hỗ trợ liên tục, xử lý nhanh vấn đề gói và thanh toán.</p>
-                <a className="pricing-contact-phone" href={CONTACT_PHONE_TEL}>
-                  <Phone size={14} />
-                  {contactPhoneLine('Liên hệ')}
-                </a>
+                <ContactSupportLinks layout="stack" linkClassName="pricing-contact-phone" iconSize={14} />
               </article>
               <article className="panel">
                 <h3>Hiệu năng cao</h3>

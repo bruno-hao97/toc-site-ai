@@ -1268,6 +1268,32 @@
   color: var(--color-accent, oklch(82% 0.21 145));
 }
 
+.contact-support-links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem 1rem;
+}
+
+.contact-support-links--stack {
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.contact-support-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  color: var(--color-ink, #fff);
+  text-decoration: none;
+}
+
+.contact-support-link:hover {
+  color: var(--color-accent, oklch(82% 0.21 145));
+}
+
 .legal-page-copy {
   margin: var(--space-lg, 1.5rem) 0 0;
   text-align: center;

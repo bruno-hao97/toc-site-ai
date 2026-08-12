@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Crown, Loader2, X } from 'lucide-react';
+import ContactSupportLinks from './ContactSupportLinks';
 import type { SubscriptionPlan, SubscriptionPlanModel } from '../services/subscriptionPlans';
-import { contactPhoneLine, CONTACT_PHONE_TEL } from '../lib/brand';
 
 interface PlanHighlight {
   label: string;
@@ -190,9 +190,7 @@ export default function SubscriptionConfirmModal({
             </p>
 
             <div className="pricing-confirm-support">
-              <p>
-                <a href={CONTACT_PHONE_TEL}>{contactPhoneLine()}</a>
-              </p>
+              <ContactSupportLinks layout="stack" linkClassName="pricing-confirm-support-link" iconSize={13} />
               <p>Cộng đồng: Zalo · Facebook · TikTok</p>
             </div>
 

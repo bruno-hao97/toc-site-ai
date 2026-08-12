@@ -20518,9 +20518,18 @@ input.wf-gen-pill--select {
   text-decoration: underline;
 }
 
+.pricing-contact-links.contact-support-links--stack {
+  align-items: flex-start;
+  margin-top: 0.5rem;
+}
+
 .pricing-credit-support {
   margin: 0.75rem 0 0;
   text-align: center;
+}
+
+.pricing-credit-support .contact-support-links--stack {
+  align-items: center;
 }
 
 .pricing-credit-support a {
@@ -20957,13 +20966,26 @@ input.wf-gen-pill--select {
   margin: 0.2rem 0 0;
 }
 
-.pricing-confirm-support a {
+.pricing-confirm-support a,
+.pricing-confirm-support-link {
   color: var(--ok);
   font-weight: 600;
   text-decoration: none;
 }
 
-.pricing-confirm-support a:hover {
+.pricing-confirm-support .contact-support-links--stack {
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.pricing-confirm-support-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pricing-confirm-support a:hover,
+.pricing-confirm-support-link:hover {
   text-decoration: underline;
 }
 

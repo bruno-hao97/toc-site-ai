@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom';
 import BrandLogo from '../BrandLogo';
-import { BRAND_NAME, CONTACT_PHONE_TEL, contactPhoneLine } from '../../lib/brand';
+import { BRAND_NAME, CONTACT_EMAIL_MAILTO, CONTACT_PHONE_TEL, contactEmailLine, contactPhoneLine } from '../../lib/brand';
 import { SUPPORT_LINKS } from '../../config/supportLinks';
 import { scrollAppToTop } from '../../lib/scrollAppToTop';
-import { APP_SITE_URL } from '../../services/settingsStore';
 import SupportLinkIcons from '../SupportLinkIcons';
 
 const FOOT_PLATFORM = [
@@ -17,6 +16,7 @@ const FOOT_LEGAL = [
   { label: 'Chính sách bảo mật', href: '/privacy' },
   { label: 'Điều khoản dịch vụ', href: '/terms' },
   { label: contactPhoneLine('Liên hệ'), href: CONTACT_PHONE_TEL },
+  { label: contactEmailLine('Email'), href: CONTACT_EMAIL_MAILTO },
 ] as const;
 
 function FootLink({ label, href }: { label: string; href: string }) {
@@ -49,7 +49,7 @@ function FootColumn({
       <p className="foot-col-title">{title}</p>
       <ul className="foot-col-links">
         {links.map((link) => (
-          <li key={link.label}>
+          <li key={link.href}>
             <FootLink label={link.label} href={link.href} />
           </li>
         ))}
@@ -59,8 +59,6 @@ function FootColumn({
 }
 
 export default function LandingFooter() {
-  const siteHost = APP_SITE_URL.replace(/^https?:\/\//, '');
-
   return (
     <footer className="footer">
       <div className="container foot-grid">
@@ -77,10 +75,7 @@ export default function LandingFooter() {
       </div>
 
       <div className="container foot-bottom">
-        <span className="foot-bottom-copy">
-          © {new Date().getFullYear()} {BRAND_NAME}
-        </span>
-        <span className="foot-bottom-meta">{siteHost}</span>
+        <p className="foot-bottom-copy">© {new Date().getFullYear()} {BRAND_NAME}</p>
       </div>
     </footer>
   );

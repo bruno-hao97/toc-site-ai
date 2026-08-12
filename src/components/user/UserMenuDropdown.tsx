@@ -15,6 +15,7 @@ import {
   Gift,
   LayoutDashboard,
   LogOut,
+  Mail,
   Moon,
   Phone,
   Settings,
@@ -25,7 +26,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { APP_SITE_URL } from '../../services/settingsStore';
-import { CONTACT_PHONE_TEL, contactPhoneLine } from '../../lib/brand';
+import { CONTACT_EMAIL_MAILTO, CONTACT_PHONE_TEL, contactEmailLine, contactPhoneLine } from '../../lib/brand';
 
 const ICON = { size: 16, strokeWidth: 1.75, className: 'user-menu-item-icon' } as const;
 
@@ -202,6 +203,9 @@ export default function UserMenuDropdown({
             </a>
             <a href={CONTACT_PHONE_TEL} className="user-menu-item">
               <Phone {...ICON} /> {contactPhoneLine('Liên hệ')}
+            </a>
+            <a href={CONTACT_EMAIL_MAILTO} className="user-menu-item">
+              <Mail {...ICON} /> {contactEmailLine('Email')}
             </a>
             <a href={EXTERNAL.referral} target="_blank" rel="noreferrer" className="user-menu-item">
               <Gift {...ICON} /> Giới thiệu bạn bè

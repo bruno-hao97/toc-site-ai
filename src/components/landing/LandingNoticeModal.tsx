@@ -4,7 +4,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import BrandLogo from '../BrandLogo';
-import { contactPhoneLine } from '../../lib/brand';
+import { contactEmailLine, contactPhoneLine } from '../../lib/brand';
 import { SUPPORT_LINKS } from '../../config/supportLinks';
 
 interface Props {
@@ -73,7 +73,7 @@ export default function LandingNoticeModal({ open, onAccept }: Props) {
               ))}
             </ul>
             <p className="landing-notice-warn-foot">
-              {contactPhoneLine('Liên hệ hỗ trợ')} · Mọi hành vi vi phạm sẽ bị xử lý theo quy định.
+              {contactPhoneLine('Liên hệ hỗ trợ')} · {contactEmailLine()} · Mọi hành vi vi phạm sẽ bị xử lý theo quy định.
             </p>
           </section>
 
