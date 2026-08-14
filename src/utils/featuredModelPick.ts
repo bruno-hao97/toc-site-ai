@@ -1,5 +1,5 @@
 import type { GommoModel } from '../services/api';
-import { isModelAvailable, modelSlug } from '../services/modelSchema';
+import { isModelAvailable, modelCreatedTs, modelSlug } from '../services/modelSchema';
 
 export interface FeaturedModelMatch {
   /** Khớp `m.server` (không phân biệt hoa thường), vd. `klingai`, `bytedanceai`. */
@@ -8,10 +8,6 @@ export interface FeaturedModelMatch {
   slugIncludes?: string[];
   /** Tên model chứa ít nhất một chuỗi (không phân biệt hoa thường). */
   nameIncludes?: string[];
-}
-
-function modelCreatedTs(m: GommoModel): number {
-  return typeof m.created_time === 'number' && m.created_time > 0 ? m.created_time : 0;
 }
 
 function includesAny(haystack: string, needles: string[]): boolean {

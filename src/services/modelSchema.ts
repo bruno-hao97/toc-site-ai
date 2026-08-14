@@ -103,6 +103,12 @@ export function isModelAvailable(model: GommoModel): boolean {
   return s === 'ON' || s === 'ACTIVE';
 }
 
+/** Unix seconds — upstream dùng `created_time` (image) hoặc `created_at` (video). */
+export function modelCreatedTs(model: GommoModel): number {
+  const raw = model.created_time ?? model.created_at;
+  return typeof raw === 'number' && raw > 0 ? raw : 0;
+}
+
 export function normalizeOptions(list: unknown): ModelOption[] {
   if (!Array.isArray(list) || list.length === 0) return [];
   return list.map((item) => {

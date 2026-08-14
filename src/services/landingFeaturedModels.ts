@@ -1,4 +1,3 @@
-import type { GommoModel } from './api';
 import { LANDING_FEATURED_MODELS, type LandingFeaturedModel } from '../config/landingFeaturedModels';
 import type { CatalogModel } from './publicModelsApi';
 import {
@@ -6,7 +5,7 @@ import {
   fetchAllPublicModels,
   providerLabel,
 } from './publicModelsApi';
-import { isModelAvailable, modelSlug } from './modelSchema';
+import { isModelAvailable, modelCreatedTs, modelSlug } from './modelSchema';
 
 const LANDING_FEATURED_COUNT = 4;
 const LANDING_HERO_MODEL_COUNT = 3;
@@ -27,12 +26,8 @@ function catalogTag(type: CatalogModel['catalogType']): string {
   return CATALOG_TYPE_LABELS[type];
 }
 
-function createdTs(m: GommoModel): number {
-  return typeof m.created_time === 'number' && m.created_time > 0 ? m.created_time : 0;
-}
-
 function sortNewestFirst(a: CatalogModel, b: CatalogModel): number {
-  const byTime = createdTs(b) - createdTs(a);
+  const byTime = modelCreatedTs(b) - modelCreatedTs(a);
   if (byTime !== 0) return byTime;
   return (a.name || modelSlug(a)).localeCompare(b.name || modelSlug(b));
 }

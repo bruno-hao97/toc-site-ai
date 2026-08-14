@@ -78,6 +78,7 @@ import {
   analyzeModel,
   buildJobPayload,
   mergeSelectionsForSchema,
+  modelCreatedTs,
   normalizeComponentSelections,
   modelSlug,
   parseModelsList,
@@ -299,16 +300,16 @@ function modelSelectNotices(m: GommoModel | null): string[] {
   return [];
 }
 
-// NEW = model nằm trong đợt phát hành mới nhất (created_time trong vòng 30 ngày
+// NEW = model nằm trong đợt phát hành mới nhất (created trong vòng 30 ngày
 // so với model mới nhất của danh sách). Robust với clock tuyệt đối.
 function buildNewModelChecker(models: GommoModel[]): (m: GommoModel) => boolean {
   let newest = 0;
   for (const m of models) {
-    if (typeof m.created_time === 'number' && m.created_time > newest) newest = m.created_time;
+    const ts = modelCreatedTs(m);
+    if (ts > newest) newest = ts;
   }
   const threshold = newest - 30 * 24 * 60 * 60;
-  return (m: GommoModel) =>
-    newest > 0 && typeof m.created_time === 'number' && m.created_time >= threshold;
+  return (m: GommoModel) => newest > 0 && modelCreatedTs(m) >= threshold;
 }
 
 function modelOnSale(m: GommoModel): boolean {

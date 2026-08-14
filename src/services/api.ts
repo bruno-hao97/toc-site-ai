@@ -318,7 +318,9 @@ export interface GommoModel {
   status_message?: string;
   description?: string;
   server?: string;
+  /** Unix seconds — một số catalog trả `created_at` thay vì field này. */
   created_time?: number;
+  created_at?: number;
   price?: number;
   /** % giảm giá model (vd. 20 = −20%). */
   sale?: number;

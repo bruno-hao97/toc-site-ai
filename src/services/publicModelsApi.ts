@@ -1,5 +1,5 @@
 import type { GommoModel, JobType } from './api';
-import { isModelAvailable, modelSlug, parseModelsList } from './modelSchema';
+import { isModelAvailable, modelCreatedTs, modelSlug, parseModelsList } from './modelSchema';
 import { formatPriceVariant, modelPriceRangeLabel } from './modelPricing';
 import { PLATFORM_BRIDGE } from './platformBridge';
 
@@ -188,8 +188,8 @@ export function modelPriceTableRows(m: GommoModel): ModelPriceTableRow[] {
 
 export function isModelNew(m: GommoModel): boolean {
   if (Number(m.sale || 0) > 0) return true;
-  const created = m.created_time;
-  if (typeof created !== 'number' || created <= 0) return false;
+  const created = modelCreatedTs(m);
+  if (created <= 0) return false;
   const ageMs = Date.now() - created * 1000;
   return ageMs < 45 * 24 * 60 * 60 * 1000;
 }
