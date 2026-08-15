@@ -11847,6 +11847,107 @@ body.qc-sidebar-open .home-quick-create-dock {
   font-size: 2rem;
 }
 
+/* App items: chat & workflow cards */
+.project-item--app {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #14161c;
+}
+
+.project-item-app-link {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s ease;
+}
+
+.project-item-app-link:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.project-item-app-thumb {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88px;
+  background: linear-gradient(145deg, #171a22 0%, #0e1014 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.project-item-app-dot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+}
+
+.project-item-app-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #d4d4d8;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.project-item-app-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--project-accent, #53eb67) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--project-accent, #53eb67) 28%, transparent);
+  color: var(--project-accent, #53eb67);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.project-item-app-body {
+  padding: 0.55rem 0.65rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-height: 3.25rem;
+}
+
+.project-item-app-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #f1f2f4;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.project-item-app-meta {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #8b8f98;
+}
+
+.project-item-thumb--link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.project-item-thumb--link:hover {
+  background: rgba(83, 235, 103, 0.08);
+}
+
 .project-item-remove {
   position: absolute;
   top: 6px;
@@ -14962,6 +15063,12 @@ body.qc-sidebar-open .app--shell .app-body {
   align-items: center;
   gap: 0.4rem;
   padding: 0.5rem 0.7rem 0.6rem;
+}
+
+.wflib-card-project.project-pick-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
 }
 
 .wflib-card-open {
@@ -21848,6 +21955,26 @@ input.wf-gen-pill--select {
 .chat-sidebar-row-delete:hover {
   background: rgba(248, 113, 113, 0.15);
   color: #f87171;
+}
+
+.chat-sidebar-project-picker.project-pick-btn {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  opacity: 0;
+}
+
+.chat-sidebar-row-wrap:hover .chat-sidebar-project-picker,
+.chat-sidebar-row-wrap:focus-within .chat-sidebar-project-picker {
+  opacity: 1;
+}
+
+.chat-sidebar-project-picker.project-pick-btn:hover {
+  background: rgba(83, 235, 103, 0.12);
+  border-color: transparent;
 }
 
 .chat-sidebar-row-icon {

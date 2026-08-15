@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Check, FolderOpen, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Check, FolderOpen, Pencil, Plus, Sparkles, Trash2, Workflow, X } from 'lucide-react';
 import {
   countByProject,
   createProject,
   deleteProject,
+  getItemProjectId,
   listItemsByProject,
   loadProjectItems,
   loadProjects,
@@ -15,8 +16,9 @@ import {
   type Project,
   type ProjectItem,
 } from '../services/projectStore';
+import { getTemplate } from '../services/workflowLibraryStore';
 
-type CatFilter = 'all' | 'image' | 'video' | 'tts' | 'music';
+type CatFilter = 'all' | 'image' | 'video' | 'tts' | 'music' | 'chat' | 'workflow';
 
 const CATS: { value: CatFilter; label: string }[] = [
   { value: 'all', label: 'Tất cả' },
@@ -24,7 +26,36 @@ const CATS: { value: CatFilter; label: string }[] = [
   { value: 'video', label: 'Video' },
   { value: 'tts', label: 'Audio' },
   { value: 'music', label: 'Nhạc' },
+  { value: 'chat', label: 'Chat' },
+  { value: 'workflow', label: 'Workflow' },
 ];
+
+function itemLink(it: ProjectItem): string | null {
+  if (it.type === 'chat') return `/chat?session=${encodeURIComponent(it.itemId)}`;
+  if (it.type === 'workflow') return `/workflow?template=${encodeURIComponent(it.itemId)}`;
+  return it.downloadUrl || it.thumbnailUrl || null;
+}
+
+function isAppItem(it: ProjectItem): it is ProjectItem & { type: 'chat' | 'workflow' } {
+  return it.type === 'chat' || it.type === 'workflow';
+}
+
+function itemAccentColor(it: ProjectItem, projects: Project[]): string | undefined {
+  const pid = getItemProjectId(it.itemId);
+  return projects.find((p) => p.id === pid)?.color;
+}
+
+function appItemMeta(it: ProjectItem): string {
+  if (it.type === 'workflow') {
+    const t = getTemplate(it.itemId);
+    return t ? `${t.nodeCount} node` : 'Workflow đã lưu';
+  }
+  return 'Đoạn chat';
+}
+
+function appItemTitle(it: ProjectItem): string {
+  return it.prompt?.trim() || (it.type === 'chat' ? 'Đoạn chat' : 'Workflow');
+}
 
 function renderMedia(it: ProjectItem) {
   const url = it.downloadUrl || it.thumbnailUrl || '';
@@ -213,21 +244,71 @@ export default function ProjectsPage() {
 
           {items.length === 0 ? (
             <p className="muted projects-empty">
-              Chưa có item nào. Vào tab “Của tôi” hoặc “Lịch sử”, bấm nút thư mục trên mỗi sản phẩm
-              để thêm vào dự án.
+              Chưa có item nào. Bấm nút thư mục trên sản phẩm (Lịch sử), đoạn chat (Chat), workflow
+              đã lưu (Thư viện Workflow), hoặc output workflow để thêm vào dự án.
             </p>
           ) : (
             <div className="projects-grid">
-              {items.map((it) => (
+              {items.map((it) => {
+                const link = itemLink(it);
+                if (isAppItem(it) && link) {
+                  const accent = itemAccentColor(it, projects) ?? selectedProject?.color;
+                  return (
+                    <article
+                      key={it.itemId}
+                      className={`project-item project-item--app project-item--${it.type}`}
+                    >
+                      <Link
+                        className="project-item-app-link"
+                        to={link}
+                        style={{
+                          ['--project-accent' as string]:
+                            accent ?? (it.type === 'workflow' ? '#60a5fa' : '#53eb67'),
+                        }}
+                      >
+                        <div className="project-item-app-thumb">
+                          {accent && (
+                            <span className="project-item-app-dot" style={{ background: accent }} />
+                          )}
+                          <span className="project-item-app-badge">
+                            {it.type === 'chat' ? 'Chat' : 'Workflow'}
+                          </span>
+                          <span className="project-item-app-icon-wrap" aria-hidden>
+                            {it.type === 'chat' ? <Sparkles size={20} /> : <Workflow size={20} />}
+                          </span>
+                        </div>
+                        <div className="project-item-app-body">
+                          <p className="project-item-app-title" title={appItemTitle(it)}>
+                            {appItemTitle(it)}
+                          </p>
+                          <p className="project-item-app-meta">{appItemMeta(it)}</p>
+                        </div>
+                      </Link>
+                      <button
+                        type="button"
+                        className="project-item-remove"
+                        aria-label="Bỏ khỏi dự án"
+                        onClick={() => removeItem(it.itemId)}
+                      >
+                        <X size={14} />
+                      </button>
+                    </article>
+                  );
+                }
+                return (
                 <article key={it.itemId} className="project-item">
-                  <a
-                    className="project-item-thumb"
-                    href={it.downloadUrl || it.thumbnailUrl || '#'}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {renderMedia(it)}
-                  </a>
+                  {link ? (
+                    <a
+                      className="project-item-thumb"
+                      href={link}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {renderMedia(it)}
+                    </a>
+                  ) : (
+                    <div className="project-item-thumb">{renderMedia(it)}</div>
+                  )}
                   <button
                     type="button"
                     className="project-item-remove"
@@ -242,7 +323,8 @@ export default function ProjectsPage() {
                     </p>
                   )}
                 </article>
-              ))}
+              );
+              })}
             </div>
           )}
         </section>

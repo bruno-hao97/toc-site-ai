@@ -4,6 +4,7 @@ import BrandLogo from '../BrandLogo';
 import { BRAND_NAME } from '../../lib/brand';
 import { getDisplayUser } from '../../services/authStore';
 import type { ChatSessionSummary } from '../../services/chatSessionsLocal';
+import ProjectPicker from '../ProjectPicker';
 
 interface Props {
   sessions: ChatSessionSummary[];
@@ -133,6 +134,15 @@ export default function ChatSidebar({
                   >
                     <span className="chat-sidebar-row-text">{s.title}</span>
                   </button>
+                  <ProjectPicker
+                    className="chat-sidebar-project-picker"
+                    snapshot={{
+                      itemId: s.sessionId,
+                      type: 'chat',
+                      prompt: s.title,
+                      createdTime: s.updatedAt,
+                    }}
+                  />
                   <button
                     type="button"
                     className="chat-sidebar-row-delete"

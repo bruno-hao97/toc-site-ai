@@ -181,6 +181,14 @@ export default function ChatPage() {
     [clearAttachment, clearReply],
   );
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const sid = params.get('session');
+    if (!sid) return;
+    selectSession(sid);
+    navigate('/chat', { replace: true });
+  }, [location.search, navigate, selectSession]);
+
   const onDeleteSession = useCallback(
     (sid: string) => {
       if (!window.confirm('Xóa đoạn chat này?')) return;

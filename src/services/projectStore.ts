@@ -8,7 +8,7 @@ export interface Project {
   updatedAt: string;
 }
 
-export type ProjectItemType = 'image' | 'video' | 'tts' | 'music' | string;
+export type ProjectItemType = 'image' | 'video' | 'tts' | 'music' | 'chat' | 'workflow' | string;
 
 export interface ProjectItem {
   itemId: string;

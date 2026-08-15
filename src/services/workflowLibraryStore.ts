@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import { authUserKey } from './authStore';
+import { removeItem } from './projectStore';
 
 export interface WorkflowGroup {
   id: string;
@@ -177,6 +178,7 @@ export function renameTemplate(id: string, name: string): void {
 
 export function deleteTemplate(id: string): void {
   saveTemplates(loadTemplates().filter((t) => t.id !== id));
+  removeItem(id);
   dispatch();
 }
 

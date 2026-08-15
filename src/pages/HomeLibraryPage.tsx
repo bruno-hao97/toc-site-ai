@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { useLocale } from '../i18n';
 import HomeFavoritesFeed from '../components/HomeFavoritesFeed';
 import HomeMyContent, { type MineFilter } from '../components/HomeMyContent';
 import type { LibraryTabId } from '../utils/libraryTabForJobType';
-import {
-  librarySearchParams,
-  statusFilterFromSearchParams,
-  type LibraryStatusFilter,
-} from '../utils/feedLibraryStatus';
+import { librarySearchParams } from '../utils/feedLibraryStatus';
+
+const LIBRARY_STATUS_FILTER = 'success' as const;
 
 const LIBRARY_TABS: {
   id: LibraryTabId;
@@ -25,14 +22,6 @@ const LIBRARY_TABS: {
   { id: 'favorite', label: 'Yêu thích', favorites: true },
 ];
 
-const STATUS_FILTERS: LibraryStatusFilter[] = ['all', 'success', 'failed'];
-
-const STATUS_LABEL_KEYS: Record<LibraryStatusFilter, 'library.status.all' | 'library.status.success' | 'library.status.failed'> = {
-  all: 'library.status.all',
-  success: 'library.status.success',
-  failed: 'library.status.failed',
-};
-
 const VALID_TAB_IDS = new Set(LIBRARY_TABS.map((t) => t.id));
 
 function tabFromSearchParams(params: URLSearchParams): LibraryTabId {
@@ -44,45 +33,31 @@ function tabFromSearchParams(params: URLSearchParams): LibraryTabId {
 }
 
 export default function HomeLibraryPage() {
-  const { t } = useLocale();
   const [searchParams, setSearchParams] = useSearchParams();
   const [libraryTab, setLibraryTab] = useState<LibraryTabId>(() =>
     tabFromSearchParams(searchParams),
-  );
-  const [statusFilter, setStatusFilter] = useState<LibraryStatusFilter>(() =>
-    statusFilterFromSearchParams(searchParams),
   );
   const activeLibrary = LIBRARY_TABS.find((t) => t.id === libraryTab) ?? LIBRARY_TABS[0];
 
   useEffect(() => {
     setLibraryTab(tabFromSearchParams(searchParams));
-    setStatusFilter(statusFilterFromSearchParams(searchParams));
   }, [searchParams]);
-
-  function applySearchParams(tabId: LibraryTabId, status: LibraryStatusFilter) {
-    setSearchParams(librarySearchParams(tabId, status), { replace: true });
-  }
 
   function selectTab(tabId: LibraryTabId) {
     setLibraryTab(tabId);
-    applySearchParams(tabId, statusFilter);
-  }
-
-  function selectStatusFilter(status: LibraryStatusFilter) {
-    setStatusFilter(status);
-    applySearchParams(libraryTab, status);
+    setSearchParams(librarySearchParams(tabId), { replace: true });
   }
 
   function renderBody() {
     if (activeLibrary.favorites) {
-      return <HomeFavoritesFeed statusFilter={statusFilter} />;
+      return <HomeFavoritesFeed statusFilter={LIBRARY_STATUS_FILTER} />;
     }
     if (activeLibrary.filter) {
       return (
         <HomeMyContent
           key={activeLibrary.filter}
           filter={activeLibrary.filter}
-          statusFilter={statusFilter}
+          statusFilter={LIBRARY_STATUS_FILTER}
         />
       );
     }
@@ -110,25 +85,6 @@ export default function HomeLibraryPage() {
             onClick={() => selectTab(tab.id)}
           >
             {tab.label}
-          </button>
-        ))}
-      </nav>
-
-      <nav
-        className="home-subtabs home-library-status-tabs"
-        role="tablist"
-        aria-label={t('library.status.filterAria')}
-      >
-        {STATUS_FILTERS.map((status) => (
-          <button
-            key={status}
-            type="button"
-            role="tab"
-            aria-selected={statusFilter === status}
-            className={`home-subtab home-library-status-tab${statusFilter === status ? ' active' : ''}`}
-            onClick={() => selectStatusFilter(status)}
-          >
-            {t(STATUS_LABEL_KEYS[status])}
           </button>
         ))}
       </nav>

@@ -86,6 +86,7 @@ import WorkflowNewModal from '../components/workflow/WorkflowNewModal';
 import WorkflowMediaInputModal from '../components/workflow/WorkflowMediaInputModal';
 import {
   loadTemplates,
+  getTemplate,
   onLibraryUpdated,
   saveTemplate,
   type SavedTemplate,
@@ -116,7 +117,7 @@ import type { FeedItem } from '../services/feedApi';
 import { feedMediaUrl, feedThumb } from '../services/feedApi';
 import { collectWorkflowPreviewItems } from '../services/workflowResultPreview';
 import { downloadMediaUrl } from '../utils/downloadMedia';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   defaultMediaInputDraft,
   draftFromNodeData,
@@ -2049,6 +2050,7 @@ function Flow() {
     kind: 'image' | 'video';
   } | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const togglePortsExpanded = useCallback((nodeId: string) => {
     setPortsExpandedNodeId((prev) => (prev === nodeId ? null : nodeId));
   }, []);
@@ -2438,6 +2440,16 @@ function Flow() {
       [tab.id]: graphFingerprint(patched, t.edges),
     }));
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const templateId = params.get('template');
+    if (!templateId) return;
+    const t = getTemplate(templateId);
+    if (t) openTemplate(t);
+    navigate('/workflow', { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
 
   const handleClear = () => {
     if (!window.confirm('Xóa toàn bộ sơ đồ trong tab này?')) return;

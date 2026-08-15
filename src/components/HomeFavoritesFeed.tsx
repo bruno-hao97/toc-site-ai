@@ -20,7 +20,7 @@ import {
 } from '../utils/feedLibraryStatus';
 
 export default function HomeFavoritesFeed({
-  statusFilter = 'all',
+  statusFilter = 'success',
 }: {
   statusFilter?: LibraryStatusFilter;
 }) {

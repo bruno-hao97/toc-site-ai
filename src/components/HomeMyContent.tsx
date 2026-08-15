@@ -84,7 +84,7 @@ async function fetchSource(source: SourceKey, afterId: string, limit: number): P
 
 export default function HomeMyContent({
   filter,
-  statusFilter = 'all',
+  statusFilter = 'success',
 }: {
   filter: MineFilter;
   statusFilter?: LibraryStatusFilter;
@@ -451,7 +451,7 @@ export default function HomeMyContent({
         <HomeFeedEmpty
           title={emptyTitle}
           description={emptyDescription}
-          showCreate={filter !== 'favorite' && statusFilter === 'all'}
+          showCreate={filter !== 'favorite'}
         />
       )}
 
