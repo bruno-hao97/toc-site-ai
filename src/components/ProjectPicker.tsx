@@ -135,11 +135,7 @@ export default function ProjectPicker({
         onClick={handleToggle}
         title={current ? t('composer.project.inProject', { name: current.name }) : t('composer.project.add')}
       >
-        {current ? (
-          <span className="project-pick-dot" style={{ background: current.color }} />
-        ) : (
-          <FolderPlus size={15} />
-        )}
+        <FolderPlus size={15} />
       </button>
 
       {open &&
@@ -172,7 +168,6 @@ export default function ProjectPicker({
                   className="project-pick-item"
                   onClick={() => pick(p.id)}
                 >
-                  <span className="project-pick-dot" style={{ background: p.color }} />
                   <span className="project-pick-name">{p.name}</span>
                   {currentId === p.id && <Check size={14} className="project-pick-check" />}
                 </button>

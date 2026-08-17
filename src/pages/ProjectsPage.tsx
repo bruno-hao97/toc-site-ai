@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Check, FolderOpen, Pencil, Plus, Sparkles, Trash2, Workflow, X } from 'lucide-react';
+import { FolderOpen, Pencil, Plus, Sparkles, Trash2, Workflow, X } from 'lucide-react';
 import {
   countByProject,
   createProject,
@@ -12,7 +12,6 @@ import {
   onProjectsUpdated,
   removeItem,
   updateProject,
-  PROJECT_COLORS,
   type Project,
   type ProjectItem,
 } from '../services/projectStore';
@@ -40,17 +39,21 @@ function isAppItem(it: ProjectItem): it is ProjectItem & { type: 'chat' | 'workf
   return it.type === 'chat' || it.type === 'workflow';
 }
 
-function itemAccentColor(it: ProjectItem, projects: Project[]): string | undefined {
+function projectNameForItem(it: ProjectItem, projects: Project[]): string | undefined {
   const pid = getItemProjectId(it.itemId);
-  return projects.find((p) => p.id === pid)?.color;
+  return projects.find((p) => p.id === pid)?.name;
 }
 
-function appItemMeta(it: ProjectItem): string {
+function appItemMeta(it: ProjectItem, projectName?: string): string {
+  const parts: string[] = [];
+  if (projectName) parts.push(projectName);
   if (it.type === 'workflow') {
     const t = getTemplate(it.itemId);
-    return t ? `${t.nodeCount} node` : 'Workflow đã lưu';
+    parts.push(t ? `${t.nodeCount} node` : 'Workflow đã lưu');
+  } else {
+    parts.push('Đoạn chat');
   }
-  return 'Đoạn chat';
+  return parts.join(' · ');
 }
 
 function appItemTitle(it: ProjectItem): string {
@@ -161,7 +164,6 @@ export default function ProjectsPage() {
                 role="button"
                 tabIndex={0}
               >
-                <span className="project-pick-dot" style={{ background: p.color }} />
                 {editing === p.id ? (
                   <input
                     className="projects-edit-input"
@@ -190,9 +192,6 @@ export default function ProjectsPage() {
         <section className="projects-main">
           <header className="projects-main-head">
             <div className="projects-main-title">
-              {selectedProject && (
-                <span className="project-pick-dot" style={{ background: selectedProject.color }} />
-              )}
               <h2>{selectedProject ? selectedProject.name : 'Tất cả nội dung'}</h2>
               {selectedProject && editing !== selectedProject.id && (
                 <div className="projects-main-actions">
@@ -210,23 +209,6 @@ export default function ProjectsPage() {
                 </div>
               )}
             </div>
-
-            {selectedProject && (
-              <div className="projects-color-row">
-                {PROJECT_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className={`projects-color${selectedProject.color === c ? ' active' : ''}`}
-                    style={{ background: c }}
-                    onClick={() => updateProject(selectedProject.id, { color: c })}
-                    aria-label="Đổi màu"
-                  >
-                    {selectedProject.color === c && <Check size={12} />}
-                  </button>
-                ))}
-              </div>
-            )}
 
             <div className="projects-cats">
               {CATS.map((c) => (
@@ -252,7 +234,8 @@ export default function ProjectsPage() {
               {items.map((it) => {
                 const link = itemLink(it);
                 if (isAppItem(it) && link) {
-                  const accent = itemAccentColor(it, projects) ?? selectedProject?.color;
+                  const projectName = !selectedProject ? projectNameForItem(it, projects) : undefined;
+                  const accent = it.type === 'workflow' ? '#60a5fa' : '#53eb67';
                   return (
                     <article
                       key={it.itemId}
@@ -261,15 +244,9 @@ export default function ProjectsPage() {
                       <Link
                         className="project-item-app-link"
                         to={link}
-                        style={{
-                          ['--project-accent' as string]:
-                            accent ?? (it.type === 'workflow' ? '#60a5fa' : '#53eb67'),
-                        }}
+                        style={{ ['--project-accent' as string]: accent }}
                       >
                         <div className="project-item-app-thumb">
-                          {accent && (
-                            <span className="project-item-app-dot" style={{ background: accent }} />
-                          )}
                           <span className="project-item-app-badge">
                             {it.type === 'chat' ? 'Chat' : 'Workflow'}
                           </span>
@@ -281,7 +258,7 @@ export default function ProjectsPage() {
                           <p className="project-item-app-title" title={appItemTitle(it)}>
                             {appItemTitle(it)}
                           </p>
-                          <p className="project-item-app-meta">{appItemMeta(it)}</p>
+                          <p className="project-item-app-meta">{appItemMeta(it, projectName)}</p>
                         </div>
                       </Link>
                       <button

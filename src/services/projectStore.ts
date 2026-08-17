@@ -3,7 +3,6 @@ import { authUserKey } from './authStore';
 export interface Project {
   id: string;
   name: string;
-  color: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -23,17 +22,6 @@ export interface ProjectItem {
 
 /** Dữ liệu tối thiểu để gắn một item Gommo vào project. */
 export type ProjectItemSnapshot = Omit<ProjectItem, 'projectId' | 'addedAt'>;
-
-export const PROJECT_COLORS = [
-  '#53eb67',
-  '#3cd74d',
-  '#22c55e',
-  '#f472b6',
-  '#fbbf24',
-  '#34d399',
-  '#f87171',
-  '#16a34a',
-];
 
 const EVENT = 'projects:updated';
 
@@ -86,13 +74,12 @@ function saveProjectItems(list: ProjectItem[]): void {
   localStorage.setItem(itemsKey(), JSON.stringify(list));
 }
 
-export function createProject(name: string, color?: string): Project {
+export function createProject(name: string): Project {
   const list = loadProjects();
   const now = new Date().toISOString();
   const project: Project = {
     id: newId('proj'),
     name: name.trim() || 'Dự án mới',
-    color: color || PROJECT_COLORS[list.length % PROJECT_COLORS.length],
     createdAt: now,
     updatedAt: now,
   };
@@ -101,13 +88,12 @@ export function createProject(name: string, color?: string): Project {
   return project;
 }
 
-export function updateProject(id: string, patch: Partial<Pick<Project, 'name' | 'color'>>): void {
+export function updateProject(id: string, patch: Partial<Pick<Project, 'name'>>): void {
   const list = loadProjects().map((p) =>
     p.id === id
       ? {
           ...p,
           name: patch.name != null ? patch.name.trim() || p.name : p.name,
-          color: patch.color ?? p.color,
           updatedAt: new Date().toISOString(),
         }
       : p,

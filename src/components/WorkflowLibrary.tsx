@@ -203,7 +203,6 @@ export default function WorkflowLibrary({ open, currentGraph, onOpenTemplate, on
               className={`wflib-tab${activeProject === p.id ? ' active' : ''}`}
               onClick={() => setActiveProject(p.id)}
             >
-              <span className="wflib-dot" style={{ background: p.color }} />
               {p.name} <span className="wflib-tab-count">{counts[p.id] ?? 0}</span>
             </button>
           ))}
@@ -256,9 +255,13 @@ function TemplateCard({
 
   return (
     <div className="wflib-card">
-      <div className="wflib-card-thumb" style={project ? { borderColor: project.color } : undefined}>
+      <div className="wflib-card-thumb">
         <FolderOpen size={26} />
-        {project && <span className="wflib-card-tag" style={{ background: project.color }} />}
+        {project && (
+          <span className="wflib-card-tag-text" title={project.name}>
+            {project.name}
+          </span>
+        )}
       </div>
       <div className="wflib-card-body">
         <div className="wflib-card-name" title={template.name}>

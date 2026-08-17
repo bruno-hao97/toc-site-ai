@@ -11475,14 +11475,7 @@ body.qc-sidebar-open .home-quick-create-dock {
 
 .project-pick-btn.assigned {
   border-color: rgba(255, 255, 255, 0.28);
-}
-
-.project-pick-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  display: inline-block;
-  flex-shrink: 0;
+  color: var(--brand, #53eb67);
 }
 
 .project-pick-panel {
@@ -11761,28 +11754,6 @@ body.qc-sidebar-open .home-quick-create-dock {
   border-color: rgba(248, 113, 113, 0.4);
 }
 
-.projects-color-row {
-  display: flex;
-  gap: 0.4rem;
-  margin-bottom: 0.85rem;
-}
-
-.projects-color {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #0b0c0f;
-}
-
-.projects-color.active {
-  border-color: #fff;
-}
-
 .projects-cats {
   display: flex;
   gap: 0.4rem;
@@ -11873,16 +11844,6 @@ body.qc-sidebar-open .home-quick-create-dock {
   height: 88px;
   background: linear-gradient(145deg, #171a22 0%, #0e1014 100%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.project-item-app-dot {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
 }
 
 .project-item-app-badge {
@@ -14970,13 +14931,6 @@ body.qc-sidebar-open .app--shell .app-body {
   color: var(--muted, #8b8f98);
 }
 
-.wflib-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
 .wflib-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -15017,13 +14971,21 @@ body.qc-sidebar-open .app--shell .app-body {
   color: #4a525f;
 }
 
-.wflib-card-tag {
+.wflib-card-tag-text {
   position: absolute;
   top: 8px;
   right: 8px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  max-width: calc(100% - 16px);
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #d4d4d8;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .wflib-card-body {
