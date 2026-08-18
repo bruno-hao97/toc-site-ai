@@ -66,6 +66,8 @@ import {
   notifyCreditsUpdated,
 } from '../services/authStore';
 import { useDisplayCredits } from '../hooks/useDisplayCredits';
+import { useSharedPendingJobs } from '../hooks/useSharedPendingJobs';
+import { bumpSharedPendingProgress } from '../services/pendingJobsStore';
 import { getJobClient } from '../services/platformJobClient';
 
 import {
@@ -772,7 +774,12 @@ export default function StudioPage({
   const [refSelectMode, setRefSelectMode] = useState<'fixed' | 'sequential' | 'random'>('sequential');
   const [concurrencyLimit, setConcurrencyLimit] = useState(2);
   const [multiRefs, setMultiRefs] = useState<string[]>([]);
-  const [pendingJobs, setPendingJobs] = useState<PendingJob[]>([]);
+  const {
+    jobs: pendingJobs,
+    add: addPendingJobs,
+    update: updatePendingJob,
+    remove: removePendingJob,
+  } = useSharedPendingJobs(jobType);
   const [zoom, setZoom] = useState(200);
   const [mainTab, setMainTab] = useState<'current' | 'history' | 'folder'>('current');
   const [libraryCount, setLibraryCount] = useState(0);
@@ -787,6 +794,7 @@ export default function StudioPage({
   const [historyTick, setHistoryTick] = useState(0);
   useHistoryUpdated(() => setHistoryTick((n) => n + 1));
   const abortRef = useRef<AbortController | null>(null);
+  const progressDismissRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const sessionStartRef = useRef(Date.now());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState<number | null>(null);
@@ -802,6 +810,58 @@ export default function StudioPage({
 
   const client = useMemo(() => (loadAuth() ? getJobClient() : null), []);
   const auth = loadAuth();
+
+  const clearProgressDismiss = useCallback(() => {
+    if (progressDismissRef.current != null) {
+      window.clearTimeout(progressDismissRef.current);
+      progressDismissRef.current = null;
+    }
+  }, []);
+
+  const showTransientProgress = useCallback(
+    (message: string, ms = 6000) => {
+      clearProgressDismiss();
+      setProgress(message);
+      progressDismissRef.current = window.setTimeout(() => {
+        setProgress((cur) => (cur === message ? '' : cur));
+        progressDismissRef.current = null;
+      }, ms);
+    },
+    [clearProgressDismiss],
+  );
+
+  useEffect(() => () => clearProgressDismiss(), [clearProgressDismiss]);
+
+  useEffect(() => {
+    if (submitting || pendingJobs.some((p) => p.status === 'processing')) return;
+    clearProgressDismiss();
+    setProgress('');
+  }, [
+    selectedSlug,
+    selectedSlugs,
+    selections.prompt,
+    selections.text,
+    selections.name,
+    selections.style,
+    selections.ratio,
+    selections.mode,
+    selections.resolution,
+    selections.duration,
+    selections.images,
+    selections.subjects,
+    selections.shots,
+    composerMode,
+    videoMode,
+    qty,
+    normalizePrompt,
+    multiShotEnabled,
+    inputMode,
+    motionVideoUrl,
+    editVideoUrl,
+    aiBrief,
+    jobType,
+    clearProgressDismiss,
+  ]);
   // Chỉ /video mới có chế độ Motion; tab chỉ hiện khi list có ít nhất 1 model motion.
   const hasMotionModels = useMemo(
     () => jobType === 'video' && models.some(isMotionModel),
@@ -1234,18 +1294,12 @@ export default function StudioPage({
   }
 
   function bumpPendingProgress(pendingId: string, progress: number) {
-    setPendingJobs((prev) =>
-      prev.map((p) =>
-        p.id === pendingId
-          ? { ...p, progress: Math.min(99, Math.max(p.progress ?? 5, progress)) }
-          : p,
-      ),
-    );
+    bumpSharedPendingProgress(pendingId, progress);
   }
 
   function pushPendingJobs(jobs: PendingJob[]) {
     setMainTab('current');
-    setPendingJobs((prev) => [...jobs, ...prev.filter((p) => p.status === 'processing')]);
+    addPendingJobs(jobs);
   }
 
   function recordSuccess(
@@ -1328,7 +1382,7 @@ export default function StudioPage({
         setResultUrl(finalUrl);
         updateLocalJob(localId, { status: 'success', result_url: finalUrl });
         recordSuccess(finalUrl, slug, prompt, model, coverUrl);
-        setPendingJobs((prev) => prev.filter((p) => p.id !== pendingId));
+        removePendingJob(pendingId);
         loadRecentJobs();
         return true;
       }
@@ -1339,15 +1393,11 @@ export default function StudioPage({
         setError('');
         setProgress(info);
         updateLocalJob(localId, { status: 'processing' });
-        setPendingJobs((prev) =>
-          prev.map((p) =>
-            p.id === pendingId ? { ...p, status: 'processing', progress: 40 } : p,
-          ),
-        );
+        updatePendingJob(pendingId, { status: 'processing', progress: 40 });
         loadRecentJobs();
         // Tránh khóa Submit mãi: sau 45s bỏ card pending (job vẫn chạy trên VMedia).
         window.setTimeout(() => {
-          setPendingJobs((prev) => prev.filter((p) => p.id !== pendingId));
+          removePendingJob(pendingId);
           setProgress((cur) =>
             cur.includes('Đã gửi lên VMedia')
               ? 'Job đang chạy trên VMedia — kiểm tra thư viện trước khi tạo thêm.'
@@ -1360,9 +1410,7 @@ export default function StudioPage({
       const errMsg = 'Job thất bại';
       setError(errMsg);
       updateLocalJob(localId, { status: 'failed', error: errMsg });
-      setPendingJobs((prev) =>
-        prev.map((p) => (p.id === pendingId ? { ...p, status: 'failed' } : p)),
-      );
+      updatePendingJob(pendingId, { status: 'failed' });
       loadRecentJobs();
       return false;
     } catch (err) {
@@ -1371,23 +1419,17 @@ export default function StudioPage({
         setError('');
         setProgress(info);
         updateLocalJob(localId, { status: 'processing' });
-        setPendingJobs((prev) =>
-          prev.map((p) =>
-            p.id === pendingId ? { ...p, status: 'processing', progress: 40 } : p,
-          ),
-        );
+        updatePendingJob(pendingId, { status: 'processing', progress: 40 });
         loadRecentJobs();
         window.setTimeout(() => {
-          setPendingJobs((prev) => prev.filter((p) => p.id !== pendingId));
+          removePendingJob(pendingId);
         }, 45_000);
         return true;
       }
       const msg = err instanceof GommoApiError || err instanceof Error ? err.message : String(err);
       setError(msg);
       updateLocalJob(localId, { status: 'failed', error: msg });
-      setPendingJobs((prev) =>
-        prev.map((p) => (p.id === pendingId ? { ...p, status: 'failed' } : p)),
-      );
+      updatePendingJob(pendingId, { status: 'failed' });
       loadRecentJobs();
       return false;
     }
@@ -1503,7 +1545,7 @@ export default function StudioPage({
           }
         };
         await Promise.all(Array.from({ length: limit }, () => worker()));
-        setProgress(formatPollDoneMessage());
+        showTransientProgress(formatPollDoneMessage());
         await refreshCreditsAfterJob();
       } finally {
         setSubmitting(false);
@@ -1547,7 +1589,7 @@ export default function StudioPage({
             video_url: editVideoUrl,
           },
         });
-        setProgress(formatPollDoneMessage());
+        showTransientProgress(formatPollDoneMessage());
         await refreshCreditsAfterJob();
       } finally {
         setSubmitting(false);
@@ -1690,7 +1732,7 @@ export default function StudioPage({
         }
       };
       await Promise.all(Array.from({ length: limit }, () => worker()));
-      setProgress(formatPollDoneMessage());
+      showTransientProgress(formatPollDoneMessage());
       await refreshCreditsAfterJob();
     } finally {
       setSubmitting(false);
@@ -1773,11 +1815,12 @@ export default function StudioPage({
   const processingJobs = recentJobs.filter((j) => j.type === jobType && j.status === 'processing');
 
   function switchJobType(type: JobType) {
+    clearProgressDismiss();
+    setProgress('');
     setJobType(type);
     setSelectedSlug('');
     setSchema(null);
     setResultUrl(null);
-    setPendingJobs([]);
     setSessionProcessingCount(0);
     setMultiRefs([]);
     setMotionVideoUrl('');
@@ -3480,8 +3523,9 @@ export default function StudioPage({
                     <ComposerPendingMasonry
                       jobs={sessionPendingJobs}
                       thumbSize={zoom}
+                      variant="library"
                       wrapClassName={useClibLayout ? 'clib-group' : 'composer-day-group'}
-                      className={useClibLayout ? 'clib-grid' : 'composer-grid'}
+                      showHeader={false}
                     />
                   )}
                   {groupedResults.map(([day, entries]) => (

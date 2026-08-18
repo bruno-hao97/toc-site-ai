@@ -20,6 +20,7 @@ import type { ComposerPendingJob } from './ComposerHistory';
 import { useLocale } from '../i18n';
 import type { JobType } from '../services/api';
 import { feedItemPrompt, isFeedItemProcessing } from '../utils/feedProcessing';
+import { pruneSharedPendingAgainstFeed } from '../services/pendingJobsStore';
 
 type Kind = 'image' | 'video' | 'unsupported';
 
@@ -121,6 +122,11 @@ export default function ComposerLibrary({
     () => items.some(isFeedItemProcessing),
     [items],
   );
+
+  useEffect(() => {
+    if (!items.length) return;
+    pruneSharedPendingAgainstFeed(items, jobType);
+  }, [items, jobType]);
 
   const load = useCallback(
     async (after: string, reset: boolean) => {
@@ -417,7 +423,7 @@ export default function ComposerLibrary({
         />
       )}
 
-      <ComposerPendingMasonry jobs={pendingJobs} thumbSize={zoom} />
+      <ComposerPendingMasonry jobs={pendingJobs} thumbSize={zoom} variant="library" />
 
       {groups.map(([label, list]) => (
         <section key={label} className="clib-group">

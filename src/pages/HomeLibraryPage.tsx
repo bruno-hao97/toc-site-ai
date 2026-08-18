@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import HomeFavoritesFeed from '../components/HomeFavoritesFeed';
 import HomeMyContent, { type MineFilter } from '../components/HomeMyContent';
 import type { LibraryTabId } from '../utils/libraryTabForJobType';
 import { librarySearchParams } from '../utils/feedLibraryStatus';
+import { readLibraryNavigateState } from '../utils/libraryPendingNavigation';
+import { addSharedPendingJobs } from '../services/pendingJobsStore';
 
 const LIBRARY_STATUS_FILTER = 'success' as const;
 
@@ -33,15 +35,28 @@ function tabFromSearchParams(params: URLSearchParams): LibraryTabId {
 }
 
 export default function HomeLibraryPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [libraryTab, setLibraryTab] = useState<LibraryTabId>(() =>
     tabFromSearchParams(searchParams),
   );
+
   const activeLibrary = LIBRARY_TABS.find((t) => t.id === libraryTab) ?? LIBRARY_TABS[0];
 
   useEffect(() => {
     setLibraryTab(tabFromSearchParams(searchParams));
   }, [searchParams]);
+
+  useEffect(() => {
+    const fromNav = readLibraryNavigateState(location.state);
+    if (!fromNav.pendingJobs?.length || !fromNav.pendingJobType) return;
+    addSharedPendingJobs(fromNav.pendingJobType, fromNav.pendingJobs);
+    navigate(
+      { pathname: location.pathname, search: location.search },
+      { replace: true, state: null },
+    );
+  }, [location.pathname, location.search, location.state, navigate]);
 
   function selectTab(tabId: LibraryTabId) {
     setLibraryTab(tabId);

@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FeedMasonryCard from './FeedMasonryCard';
+import { MasonryPendingMedia } from './FeedItemPendingCard';
 import ComposerLibraryPreviewModal, {
   type ComposerPreviewHandlers,
 } from './ComposerLibraryPreviewModal';
 import HomeAudioLibrary from './HomeAudioLibrary';
 import HomeMusicLibrary from './HomeMusicLibrary';
 import { useCreditsUpdated } from '../hooks/useCreditsUpdated';
+import { useSharedPendingJobs } from '../hooks/useSharedPendingJobs';
 import { isLoggedIn } from '../services/authStore';
 import { studioRouteForType } from '../constants/studioTypes';
 import type { JobType } from '../services/api';
@@ -36,6 +38,13 @@ import { useLocale } from '../i18n';
 import HomeFeedEmpty from './home/HomeFeedEmpty';
 
 export type MineFilter = 'all' | 'video' | 'image' | 'music' | 'tts' | 'favorite';
+
+function pendingScopeForFilter(filter: MineFilter): JobType[] {
+  if (filter === 'image') return ['image'];
+  if (filter === 'video') return ['video'];
+  if (filter === 'all') return ['image', 'video'];
+  return [];
+}
 
 function mineTime(item: FeedItem): number {
   const v = item.created_time;
@@ -91,6 +100,8 @@ export default function HomeMyContent({
 }) {
   const { t } = useLocale();
   const navigate = useNavigate();
+  const pendingScope = pendingScopeForFilter(filter);
+  const { jobs: pendingJobs, activeCount, pruneAgainstFeed } = useSharedPendingJobs(pendingScope);
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -117,6 +128,11 @@ export default function HomeMyContent({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const refreshingRef = useRef(false);
   const [discoveryActive, setDiscoveryActive] = useState(true);
+
+  useEffect(() => {
+    if (!items.length) return;
+    pruneAgainstFeed(items);
+  }, [items, pruneAgainstFeed]);
 
   const refreshRecent = useCallback(async () => {
     if (!isLoggedIn() || refreshingRef.current) return;
@@ -233,12 +249,12 @@ export default function HomeMyContent({
   );
 
   useEffect(() => {
-    if (!hasProcessing && !discoveryActive) return;
+    if (!hasProcessing && !discoveryActive && activeCount === 0) return;
     const id = window.setInterval(() => {
       void refreshRecent();
     }, 4000);
     return () => window.clearInterval(id);
-  }, [hasProcessing, discoveryActive, refreshRecent]);
+  }, [hasProcessing, discoveryActive, activeCount, refreshRecent]);
 
   useCreditsUpdated(() => {
     void refreshRecent();
@@ -403,6 +419,16 @@ export default function HomeMyContent({
       />
     ) : (
       <div className="home-masonry home-masonry--library">
+        {pendingJobs
+          .filter((p) => p.status === 'processing')
+          .map((p) => (
+            <article
+              key={p.id}
+              className={`feed-masonry-card feed-masonry-card--pending ${p.status}`}
+            >
+              <MasonryPendingMedia prompt={p.prompt} status={p.status} progress={p.progress} />
+            </article>
+          ))}
         {displayItems.map((item) => (
           <FeedMasonryCard
             key={item.id_base}
@@ -447,7 +473,7 @@ export default function HomeMyContent({
 
       {error && <p className="error feed-status">{error}</p>}
       {loading && <p className="muted feed-status">Đang tải…</p>}
-      {!loading && !displayItems.length && !error && (
+      {!loading && !displayItems.length && !error && activeCount === 0 && (
         <HomeFeedEmpty
           title={emptyTitle}
           description={emptyDescription}

@@ -3647,8 +3647,9 @@ a.user-pill:hover { color: var(--text); }
 
 .qc-bar--hero .qc-hero-expand.qc-hero-expand--open {
   flex: 0 0 auto;
-  max-height: 3.25rem;
+  max-height: min(480px, 75vh);
   opacity: 1;
+  gap: 0.65rem;
   margin-top: 0.55rem;
   padding-top: 0.55rem;
   border-top: 1px solid var(--leo-border-subtle, rgba(255, 255, 255, 0.08));
@@ -4548,6 +4549,29 @@ a.user-pill:hover { color: var(--text); }
   gap: 1.2rem;
   padding: 0.3rem 0.2rem 0.1rem;
   flex-wrap: wrap;
+}
+
+.qc-storyboard.drag {
+  outline: 1px dashed rgba(83, 235, 103, 0.45);
+  outline-offset: 4px;
+  border-radius: 10px;
+}
+
+.qc-bar--hero .qc-storyboard--hero {
+  padding: 0 0.1rem 0.05rem;
+}
+
+.qc-sb-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.qc-sb-count {
+  font-size: 0.65rem;
+  color: var(--muted, #8b95a8);
+  white-space: nowrap;
 }
 
 .qc-sb-group {

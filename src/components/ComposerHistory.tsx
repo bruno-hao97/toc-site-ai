@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import ComposerSelectCircle from './ComposerSelectCircle';
 import ComposerGalleryEmpty from './composer/ComposerGalleryEmpty';
+import ComposerPendingMasonry, { activePendingJobs } from './composer/ComposerPendingMasonry';
 import { useLocale } from '../i18n';
 import {
   deleteFeedPost,
@@ -26,6 +27,7 @@ import {
 import type { JobType } from '../services/api';
 import { groupRelativeAgeLabel } from '../services/feedLibraryMeta';
 import { isFeedItemProcessing } from '../utils/feedProcessing';
+import { pruneSharedPendingAgainstFeed } from '../services/pendingJobsStore';
 import ProjectPicker from './ProjectPicker';
 import type { ProjectItemType } from '../services/projectStore';
 
@@ -209,9 +211,14 @@ export default function ComposerHistory({
   }, [afterId, hasMore, load]);
 
   const activePending = useMemo(
-    () => pendingJobs.filter((p) => p.status === 'processing'),
+    () => activePendingJobs(pendingJobs),
     [pendingJobs],
   );
+
+  useEffect(() => {
+    if (!items.length) return;
+    pruneSharedPendingAgainstFeed(items, jobType);
+  }, [items, jobType]);
 
   const hasProcessingUpstream = useMemo(
     () => items.some(isFeedItemProcessing),
@@ -437,37 +444,7 @@ export default function ComposerHistory({
       )}
 
       {showLocalPendingSection && (
-        <section className="chist-group">
-          <header className="chist-group-head">
-            <span className="chist-group-label">{t('date.today')}</span>
-            <span className="chist-count">
-              {t('composer.history.processingCount', { count: activePending.length })}
-            </span>
-          </header>
-          <div className="chist-grid">
-            {activePending.map((p) => {
-              const name = (p.prompt || t('composer.noDescription')).trim();
-              return (
-                <div key={p.id} className="chist-block-cell">
-                  <div className="chist-block chist-block-pending">
-                    <div className="chist-block-head">
-                      <span className="chist-name" title={name}>
-                        {name}
-                      </span>
-                      <Loader2 size={16} className="chist-pending-spin" aria-label={t('composer.history.processing')} />
-                    </div>
-                    <div className="chist-pending-bar" role="progressbar" aria-valuenow={p.progress ?? 12}>
-                      <div
-                        className="chist-pending-bar-fill"
-                        style={{ width: `${p.progress ?? 12}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+        <ComposerPendingMasonry jobs={pendingJobs} variant="library" showHeader={false} />
       )}
 
       {groups.map((group) => (

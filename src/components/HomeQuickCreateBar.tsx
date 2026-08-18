@@ -15,18 +15,25 @@ import {
   Mic,
   Monitor,
   Music,
-  Plus,
   Proportions,
   SendHorizontal,
   SlidersHorizontal,
   Sparkles,
+  Video,
   Volume2,
   X,
 } from 'lucide-react';
 import ComposerMediaPickButton from './ComposerMediaPickButton';
 import type { GommoModel, JobType } from '../services/api';
+import { mediaKindFromUrl, validateMediaUrl } from '../services/mediaUrlValidation';
 import type { JobSelections, ModelOption, ModelSchema } from '../services/modelSchema';
 import { mergeSelectionsForSchema, modelSlug, normalizeComponentSelections } from '../services/modelSchema';
+import {
+  getReferenceLimits,
+  getUploadRules,
+  mapUploadTarget,
+  validateMediaFile,
+} from '../services/modelUploadRules';
 import {
   buildQuickSchema,
   canQuickCreate,
@@ -39,6 +46,11 @@ import { notifyCreditsUpdated } from '../services/authStore';
 import { modelPriceRangeLabel, resolveModelPrice } from '../services/modelPricing';
 import { isJobAcceptedPendingError } from '../services/jobInfraErrors';
 import { libraryPathForJobType } from '../utils/libraryTabForJobType';
+import {
+  buildLibraryPendingJobs,
+  libraryNavigateState,
+  stashLibraryPending,
+} from '../utils/libraryPendingNavigation';
 
 type QuickMenuId = 'chat' | 'script' | 'video' | 'image' | 'tts' | 'music' | 'audio' | 'apps';
 
@@ -64,8 +76,6 @@ const QUICK_MENU: QuickMenuItem[] = [
 ];
 
 const JOB_TYPES: JobType[] = ['video', 'image', 'tts', 'music'];
-
-const MAX_MEDIA = 4;
 
 function typeShortLabel(type: JobType): string {
   switch (type) {
@@ -101,7 +111,21 @@ function promptPlaceholder(type: JobType): string {
 }
 
 function urlMediaKind(url: string): 'image' | 'video' {
-  return /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url) ? 'video' : 'image';
+  return mediaKindFromUrl(url) === 'video' ? 'video' : 'image';
+}
+
+function mediaKindFromFile(file: File): 'image' | 'video' {
+  return file.type.startsWith('video/') ? 'video' : 'image';
+}
+
+/** Portal overlays (media menu, album/link modals, model dropdowns) — không thu gọn hero khi click. */
+function isQuickCreateOverlay(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return Boolean(
+    target.closest(
+      '.cms-source-menu, .cms-modal-backdrop, .cms-modal, .qc-dropdown-portal',
+    ),
+  );
 }
 
 interface MiniDropdownProps {
@@ -249,6 +273,7 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
   const [selections, setSelections] = useState<JobSelections>({});
   /** Khóa submit sau khi VMedia đã nhận job (tránh spam tạo lại). */
   const [providerBusy, setProviderBusy] = useState(false);
+  const [refDragOver, setRefDragOver] = useState(false);
 
   const typeRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -275,6 +300,56 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
     );
   }, [currentModel, selections.mode, selections.resolution, selections.duration]);
   const cost = unitCost * qty;
+
+  const refLimits = useMemo(
+    () => getReferenceLimits(currentModel, schema, type),
+    [currentModel, schema, type],
+  );
+  const maxComponents =
+    refLimits.image + refLimits.video ||
+    schema?.limits.maxSubject ||
+    schema?.limits.maxReference ||
+    0;
+  const refImageCount = refs.filter((u) => urlMediaKind(u) !== 'video').length;
+  const refVideoCount = refs.filter((u) => urlMediaKind(u) === 'video').length;
+  const canAddRefImage =
+    refLimits.image > 0
+      ? refImageCount < refLimits.image
+      : refs.length < maxComponents;
+  const canAddRefVideo = refLimits.video > 0 && refVideoCount < refLimits.video;
+  const canAddRefAny = canAddRefImage || canAddRefVideo;
+  const supportsRef =
+    Boolean(schema?.fields.subjects) &&
+    (refLimits.image > 0 || refLimits.video > 0 || maxComponents > 0);
+
+  useEffect(() => {
+    if (!supportsRef && refs.length) setRefs([]);
+  }, [supportsRef, refs.length]);
+
+  useEffect(() => {
+    if (!refs.length) return;
+    setRefs((prev) => {
+      let imgC = 0;
+      let vidC = 0;
+      const next: string[] = [];
+      for (const url of prev) {
+        const kind = urlMediaKind(url);
+        if (kind === 'video') {
+          if (vidC >= refLimits.video) continue;
+          vidC += 1;
+        } else if (refLimits.image > 0) {
+          if (imgC >= refLimits.image) continue;
+          imgC += 1;
+        } else if (next.length >= maxComponents) {
+          continue;
+        } else {
+          imgC += 1;
+        }
+        next.push(url);
+      }
+      return next.length === prev.length ? prev : next;
+    });
+  }, [refLimits.image, refLimits.video, maxComponents]);
 
   useEffect(() => {
     let active = true;
@@ -333,6 +408,7 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
 
     const onDoc = (e: MouseEvent) => {
       if (barRef.current?.contains(e.target as Node)) return;
+      if (isQuickCreateOverlay(e.target)) return;
       if (typeMenuOpen || modelMenuOpen) return;
       if (canCollapse()) setExpanded(false);
     };
@@ -362,24 +438,69 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
   const update = <K extends keyof JobSelections>(key: K, value: JobSelections[K]) =>
     setSelections((s) => ({ ...s, [key]: value }));
 
-  const mediaPickKind = type === 'video' ? 'any' : 'image';
-
-  const ingestMediaUrl = (url: string) => {
-    if (refs.length >= MAX_MEDIA) return;
-    setError('');
-    setRefs((prev) => [...prev, url]);
+  const addRef = (url: string, kind: 'image' | 'video') => {
+    setRefs((prev) => {
+      const imgC = prev.filter((u) => urlMediaKind(u) !== 'video').length;
+      const vidC = prev.filter((u) => urlMediaKind(u) === 'video').length;
+      if (kind === 'video') {
+        if (vidC >= refLimits.video) return prev;
+      } else if (refLimits.image > 0) {
+        if (imgC >= refLimits.image) return prev;
+      } else if (prev.length >= maxComponents) {
+        return prev;
+      }
+      return [...prev, url];
+    });
   };
 
-  const ingestMediaFile = async (file: File) => {
-    if (refs.length >= MAX_MEDIA) return;
+  const ingestMediaUrl = (url: string) => {
+    const expectedKind = type === 'video' ? 'any' : 'image';
+    const validationError = validateMediaUrl(url, expectedKind);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    const kind = mediaKindFromUrl(url) === 'video' ? 'video' : 'image';
+    if (kind === 'video' && !canAddRefVideo) {
+      setError('Đã đạt giới hạn video tham chiếu.');
+      return;
+    }
+    if (kind === 'image' && !canAddRefImage) {
+      setError('Đã đạt giới hạn ảnh tham chiếu.');
+      return;
+    }
+
+    setError('');
+    addRef(url.trim(), kind);
+  };
+
+  const ingestMediaFile = async (file: File, forcedKind?: 'image' | 'video') => {
+    const kind = forcedKind ?? mediaKindFromFile(file);
+    if (kind === 'video' && !canAddRefVideo) {
+      setError('Đã đạt giới hạn video tham chiếu.');
+      return;
+    }
+    if (kind === 'image' && !canAddRefImage) {
+      setError('Đã đạt giới hạn ảnh tham chiếu.');
+      return;
+    }
+
+    const rules = getUploadRules(currentModel, mapUploadTarget('component', kind));
+    const validationError = await validateMediaFile(file, rules, kind);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setError('');
     try {
       const url =
-        type === 'video'
+        kind === 'video'
           ? await uploadQuickMedia(file)
           : await uploadQuickImage(file);
       if (!url) return;
-      setRefs((prev) => [...prev, url]);
+      addRef(url, kind);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -420,12 +541,17 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
     setResult(null);
     setProgress('Đang tạo job…');
 
+    const pendingForNav =
+      type === 'image' || type === 'video' ? buildLibraryPendingJobs(text, qty) : [];
+
     let navigatedAway = false;
     const goToLibrary = () => {
       if (navigatedAway) return;
       navigatedAway = true;
       notifyCreditsUpdated();
-      navigate(libraryPathForJobType(type));
+      const navState = libraryNavigateState(type, pendingForNav);
+      stashLibraryPending(navState);
+      navigate(libraryPathForJobType(type), { state: navState });
       abortRef.current?.abort();
       setSubmitting(false);
     };
@@ -473,7 +599,18 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
     description: modelPriceRangeLabel(m) || undefined,
   }));
 
-  const showStoryboard = expanded && !isHero && (type === 'video' || type === 'image');
+  const showRefs =
+    expanded && supportsRef && (type === 'video' || type === 'image');
+
+  const refCountLabel = () => {
+    if (refLimits.image > 0 || refLimits.video > 0) {
+      const parts: string[] = [];
+      if (refLimits.image > 0) parts.push(`${refImageCount}/${refLimits.image} ảnh`);
+      if (refLimits.video > 0) parts.push(`${refVideoCount}/${refLimits.video} video`);
+      return parts.join(' · ');
+    }
+    return `${refs.length}/${maxComponents}`;
+  };
 
   const menuCount = (item: QuickMenuItem): number | null => {
     if (item.fixedCount != null) return item.fixedCount;
@@ -604,39 +741,67 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
           </div>
         )}
 
-        {showStoryboard && (
-          <div className="qc-storyboard">
+        {showRefs && (
+          <div
+            className={`qc-storyboard${isHero ? ' qc-storyboard--hero' : ''}${refDragOver ? ' drag' : ''}`}
+            onDragOver={(e) => {
+              if (!canAddRefAny) return;
+              e.preventDefault();
+              setRefDragOver(true);
+            }}
+            onDragLeave={() => setRefDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setRefDragOver(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) void ingestMediaFile(file);
+            }}
+          >
             <div className="qc-sb-group">
-              <span className="qc-sb-title">
-                ĐA PHƯƠNG TIỆN ({refs.length}/{MAX_MEDIA})
-              </span>
+              <div className="qc-sb-head">
+                <span className="qc-sb-title">Tham chiếu</span>
+                <span className="qc-sb-count">{refCountLabel()}</span>
+              </div>
               <div className="qc-sb-frames">
                 {refs.map((url, i) => (
-                  <div key={i} className="qc-sb-frame qc-sb-media">
+                  <div key={`${url}-${i}`} className="qc-sb-frame qc-sb-media">
                     {urlMediaKind(url) === 'video' ? (
                       <video src={url} muted loop playsInline />
                     ) : (
-                      <img src={url} alt={`media ${i + 1}`} />
+                      <img src={url} alt={`tham chiếu ${i + 1}`} />
                     )}
                     <button
                       type="button"
                       className="qc-sb-remove"
+                      aria-label="Xóa tham chiếu"
                       onClick={() => setRefs((prev) => prev.filter((_, idx) => idx !== i))}
                     >
                       <X size={11} />
                     </button>
                   </div>
                 ))}
-                {refs.length < MAX_MEDIA && (
+                {canAddRefImage && (
                   <ComposerMediaPickButton
-                    kind={mediaPickKind}
+                    kind="image"
                     className="qc-sb-frame qc-sb-add"
-                    title="Thêm media"
-                    onFile={ingestMediaFile}
+                    title="Thêm ảnh tham chiếu"
+                    onFile={(file) => ingestMediaFile(file, 'image')}
                     onUrl={ingestMediaUrl}
                   >
-                    <Plus size={16} />
-                    <span>ADD</span>
+                    <ImageIcon size={16} />
+                    <span>Ảnh</span>
+                  </ComposerMediaPickButton>
+                )}
+                {canAddRefVideo && (
+                  <ComposerMediaPickButton
+                    kind="video"
+                    className="qc-sb-frame qc-sb-add"
+                    title="Thêm video tham chiếu"
+                    onFile={(file) => ingestMediaFile(file, 'video')}
+                    onUrl={ingestMediaUrl}
+                  >
+                    <Video size={16} />
+                    <span>Video</span>
                   </ComposerMediaPickButton>
                 )}
               </div>
