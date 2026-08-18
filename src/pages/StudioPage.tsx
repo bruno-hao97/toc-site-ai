@@ -794,7 +794,7 @@ export default function StudioPage({
   const [historyTick, setHistoryTick] = useState(0);
   useHistoryUpdated(() => setHistoryTick((n) => n + 1));
   const abortRef = useRef<AbortController | null>(null);
-  const progressDismissRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const progressDismissRef = useRef<number | null>(null);
   const sessionStartRef = useRef(Date.now());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState<number | null>(null);
