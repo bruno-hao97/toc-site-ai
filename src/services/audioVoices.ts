@@ -3,7 +3,7 @@ import { handlePlatformAuthFailure, loadAuth, resolveProjectId } from './authSto
 import { humanizePlatformError } from './platformApiError';
 import { GOMMO_CHAT_CONFIG } from './gommoChatConfig';
 import type { AppLocale } from '../i18n/types';
-import { normalizeElevenLabsCheapModel } from './audioCatalog';
+import { elevenLabsUsesLanguageCode, normalizeElevenLabsCheapModel } from './audioCatalog';
 import { JobAcceptedPendingError } from './jobInfraErrors';
 
 export type VoiceProvider = 'elevenlabs_cheap' | 'minimaxai_cheap' | 'omnivoice_local';
@@ -358,7 +358,11 @@ export async function createAudio(opts: {
 
   const lang = opts.language?.trim();
   if (lang && lang !== 'auto') {
-    body.set('language', lang);
+    if (opts.server === 'elevenlabs_cheap' && elevenLabsUsesLanguageCode(model)) {
+      body.set('language_code', lang);
+    } else {
+      body.set('language', lang);
+    }
   }
 
   const settingKey = isOpenVoiceStyle ? 'voice_setting' : 'voice_settings';

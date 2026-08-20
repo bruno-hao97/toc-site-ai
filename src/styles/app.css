@@ -9727,11 +9727,6 @@ body.qc-sidebar-open .home-quick-create-dock {
   margin-left: 0.25rem;
 }
 
-.composer-zoom input {
-  width: 120px;
-  accent-color: var(--brand);
-}
-
 .composer-toolbar-right {
   display: flex;
   align-items: center;
@@ -21521,10 +21516,6 @@ input.wf-gen-pill--select {
 
 .studio-composer--music .composer-toolbar-tabs button.active {
   box-shadow: inset 0 -2px 0 var(--brand);
-}
-
-.studio-composer--music .composer-zoom {
-  display: none;
 }
 
 .music-track-empty {

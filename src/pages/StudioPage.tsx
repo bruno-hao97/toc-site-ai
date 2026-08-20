@@ -719,6 +719,9 @@ function OptionDropdown({
   );
 }
 
+/** Fixed thumbnail size for history grid / pending cards (no user zoom). */
+const COMPOSER_GRID_THUMB_PX = 200;
+
 export default function StudioPage({
   initialType = 'image',
   lockType = false,
@@ -780,7 +783,6 @@ export default function StudioPage({
     update: updatePendingJob,
     remove: removePendingJob,
   } = useSharedPendingJobs(jobType);
-  const [zoom, setZoom] = useState(200);
   const [mainTab, setMainTab] = useState<'current' | 'history' | 'folder'>('current');
   const [libraryCount, setLibraryCount] = useState(0);
   const [historyCount, setHistoryCount] = useState(0);
@@ -3412,15 +3414,6 @@ export default function StudioPage({
                   </button>
                 </div>
               )}
-              <label className="composer-zoom">
-                <input
-                  type="range"
-                  min={160}
-                  max={320}
-                  value={zoom}
-                  onChange={(e) => setZoom(Number(e.target.value))}
-                />
-              </label>
             </div>
           </div>
 
@@ -3470,7 +3463,7 @@ export default function StudioPage({
           ) : mainTab === 'history' ? (
             <ComposerHistory
               jobType={jobType}
-              zoom={zoom}
+              zoom={COMPOSER_GRID_THUMB_PX}
               pendingJobs={pendingJobs}
               refreshKey={historyTick}
               onItemDeleted={handleFeedItemDeleted}
@@ -3484,7 +3477,7 @@ export default function StudioPage({
           ) : mainTab === 'folder' ? (
             <ComposerLibrary
               jobType={jobType}
-              zoom={zoom}
+              zoom={COMPOSER_GRID_THUMB_PX}
               refreshKey={historyTick}
               pendingJobs={pendingJobs}
               onCountChange={setLibraryCount}
@@ -3522,7 +3515,7 @@ export default function StudioPage({
                   {mainTab === 'current' && (
                     <ComposerPendingMasonry
                       jobs={sessionPendingJobs}
-                      thumbSize={zoom}
+                      thumbSize={COMPOSER_GRID_THUMB_PX}
                       variant="library"
                       wrapClassName={useClibLayout ? 'clib-group' : 'composer-day-group'}
                       showHeader={false}
@@ -3540,7 +3533,11 @@ export default function StudioPage({
                   )}
                   <div
                     className={useClibLayout ? 'home-masonry home-masonry--library' : 'composer-grid'}
-                    style={useClibLayout ? undefined : { ['--thumb' as string]: `${zoom}px` }}
+                    style={
+                      useClibLayout
+                        ? undefined
+                        : { ['--thumb' as string]: `${COMPOSER_GRID_THUMB_PX}px` }
+                    }
                   >
                     {entries.map((entry) => {
                       if (useClibLayout && isClibHistoryEntry(entry, jobType)) {

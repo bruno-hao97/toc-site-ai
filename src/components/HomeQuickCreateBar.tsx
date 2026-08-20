@@ -27,7 +27,7 @@ import ComposerMediaPickButton from './ComposerMediaPickButton';
 import type { GommoModel, JobType } from '../services/api';
 import { mediaKindFromUrl, validateMediaUrl } from '../services/mediaUrlValidation';
 import type { JobSelections, ModelOption, ModelSchema } from '../services/modelSchema';
-import { mergeSelectionsForSchema, modelSlug, normalizeComponentSelections } from '../services/modelSchema';
+import { mergeSelectionsForSchema, modelSlug } from '../services/modelSchema';
 import {
   getReferenceLimits,
   getUploadRules,
@@ -38,6 +38,8 @@ import {
   buildQuickSchema,
   canQuickCreate,
   loadQuickModels,
+  pickQuickCreateModelSlug,
+  prepareQuickCreateSelections,
   quickGenerate,
   uploadQuickImage,
   uploadQuickMedia,
@@ -359,7 +361,7 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
       .then((list) => {
         if (!active) return;
         setModels(list);
-        setModelSlugSel(list[0] ? modelSlug(list[0]) : '');
+        setModelSlugSel((prev) => pickQuickCreateModelSlug(list, prev));
       })
       .catch((err) => active && setError(err instanceof Error ? err.message : String(err)))
       .finally(() => active && setLoadingModels(false));
@@ -522,18 +524,34 @@ export default function HomeQuickCreateBar({ variant = 'dock' }: HomeQuickCreate
       return;
     }
 
+    if (
+      supportsRef &&
+      (type === 'video' || type === 'image') &&
+      refs.length > 0
+    ) {
+      const imgC = refs.filter((u) => urlMediaKind(u) !== 'video').length;
+      const vidC = refs.filter((u) => urlMediaKind(u) === 'video').length;
+      if (imgC > refLimits.image) {
+        setError(`Quá nhiều ảnh tham chiếu (tối đa ${refLimits.image}).`);
+        return;
+      }
+      if (vidC > refLimits.video) {
+        setError(`Quá nhiều video tham chiếu (tối đa ${refLimits.video}).`);
+        return;
+      }
+    }
+
     abortRef.current?.abort();
     abortRef.current = new AbortController();
 
-    const sel = normalizeComponentSelections({
+    const sel = prepareQuickCreateSelections(type, currentModel, {
       ...selections,
       prompt: type === 'tts' ? selections.prompt : type === 'music' ? '' : text,
       text: type === 'tts' ? text : selections.text,
       name: type === 'music' ? text.slice(0, 60) || 'Quick track' : selections.name,
       style: type === 'music' ? text || 'instrumental pop' : selections.style,
       instrumental: type === 'music' ? true : selections.instrumental,
-      ...(refs.length ? { subjects: refs } : {}),
-    });
+    }, refs);
 
     setSubmitting(true);
     setError('');

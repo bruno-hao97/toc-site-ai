@@ -3,6 +3,7 @@ import {
   analyzeModel,
   buildJobPayload,
   modelSlug,
+  normalizeComponentSelections,
   parseModelsList,
   type JobSelections,
   type ModelSchema,
@@ -15,15 +16,63 @@ import {
 } from './pollProgressCopy';
 import type { GommoModel, JobType } from './api';
 import { requireJobResultUrl } from './jobInfraErrors';
+import { isSpecializedStudioVariant, pickNewestModel } from '../utils/featuredModelPick';
+import { mediaKindFromUrl } from './mediaUrlValidation';
 
 /** Có thể tạo job khi đã đăng nhập (platform hoặc Gommo). */
 export function canQuickCreate(): boolean {
   return isLoggedIn();
 }
 
+/** Quick create = tạo mới (giống tab Tạo Video /video) — bỏ Motion, Edit, LipSync… */
+export function filterQuickCreateModels(type: JobType, models: GommoModel[]): GommoModel[] {
+  if (type !== 'video') return models;
+  return models.filter((m) => !isSpecializedStudioVariant(m));
+}
+
 export async function loadQuickModels(type: JobType): Promise<GommoModel[]> {
   if (!loadAuth()) return [];
-  return parseModelsList(await getJobClient().fetchModels(type));
+  const all = parseModelsList(await getJobClient().fetchModels(type));
+  return filterQuickCreateModels(type, all);
+}
+
+export function pickQuickCreateModelSlug(
+  models: GommoModel[],
+  previousSlug?: string,
+): string {
+  if (previousSlug && models.some((m) => modelSlug(m) === previousSlug)) {
+    return previousSlug;
+  }
+  return pickNewestModel(models) ?? (models[0] ? modelSlug(models[0]) : '');
+}
+
+/**
+ * Map refs quick bar → payload giống Studio /video mặc định (Từ ảnh frame):
+ * 1 ảnh → images[] khi model hỗ trợ startFrame; nhiều ảnh / có video → subjects[].
+ */
+export function prepareQuickCreateSelections(
+  type: JobType,
+  model: GommoModel,
+  selections: JobSelections,
+  refs: string[],
+): JobSelections {
+  const base: JobSelections = { ...selections };
+  if (!refs.length) return normalizeComponentSelections(base);
+
+  const schema = analyzeModel(model, type);
+  const imageRefs = refs.filter((u) => mediaKindFromUrl(u) !== 'video');
+  const videoRefs = refs.filter((u) => mediaKindFromUrl(u) === 'video');
+
+  if (
+    (type === 'video' || type === 'image') &&
+    schema.fields.startFrame &&
+    imageRefs.length === 1 &&
+    videoRefs.length === 0
+  ) {
+    return normalizeComponentSelections({ ...base, images: [imageRefs[0]] });
+  }
+
+  return normalizeComponentSelections({ ...base, subjects: refs });
 }
 
 export function buildQuickSchema(model: GommoModel, type: JobType): ModelSchema {

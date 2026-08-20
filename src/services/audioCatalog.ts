@@ -112,6 +112,18 @@ function resolveModelId(entry: TtsModelOption, supported: Set<string>): string {
   return entry.modelId;
 }
 
+/** Eleven V3 family — VMedia/Gommo dùng `language_code`, không phải `language`. */
+const ELEVEN_LANGUAGE_CODE_MODELS = new Set([
+  'eleven_v3',
+  'eleven_turbo_v3',
+  'eleven_multilingual_v3',
+]);
+
+export function elevenLabsUsesLanguageCode(modelId: string): boolean {
+  const model = normalizeElevenLabsCheapModel(modelId);
+  return ELEVEN_LANGUAGE_CODE_MODELS.has(model);
+}
+
 /** GenMax cheap (elevenlabs_cheap) — turbo không được hỗ trợ, dùng flash (khớp vmedia). */
 export function normalizeElevenLabsCheapModel(modelId: string): string {
   const map: Record<string, string> = {
